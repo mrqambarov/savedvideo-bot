@@ -9,6 +9,7 @@ if (!fs.existsSync(dataDir)) {
 const moviesFile = path.join(dataDir, 'movies.json');
 const usersFile = path.join(dataDir, 'users.json');
 const statsFile = path.join(dataDir, 'stats.json');
+const requestsFile = path.join(dataDir, 'requests.json');
 
 // Initialize files if they don't exist
 if (!fs.existsSync(moviesFile)) {
@@ -23,6 +24,9 @@ if (!fs.existsSync(statsFile)) {
     totalSearchQueries: 0,
     dailyUsage: {}
   }, null, 2));
+}
+if (!fs.existsSync(requestsFile)) {
+  fs.writeFileSync(requestsFile, JSON.stringify([], null, 2));
 }
 
 // Movies CRUD
@@ -51,18 +55,23 @@ function addMovie(movie) {
     
     // Check if code already exists
     const index = movies.findIndex(m => String(m.code).trim() === String(movie.code).trim());
+    const existing = index !== -1 ? movies[index] : {};
+    
     const movieData = {
       code: String(movie.code).trim(),
       title: movie.title || 'Noma\'lum film',
       description: movie.description || '',
       fileId: movie.fileId,
-      views: 0,
-      dateAdded: new Date().toISOString()
+      genre: movie.genre || existing.genre || 'Tarjima kino',
+      likes: existing.likes || [],
+      dislikes: existing.dislikes || [],
+      views: existing.views || 0,
+      dateAdded: existing.dateAdded || new Date().toISOString()
     };
 
     if (index !== -1) {
       // Overwrite existing code
-      movies[index] = { ...movies[index], ...movieData };
+      movies[index] = movieData;
     } else {
       movies.push(movieData);
     }
@@ -229,6 +238,118 @@ function trackActiveUser(userId) {
   }
 }
 
+// Requests CRUD
+function getRequests() {
+  try {
+    const raw = fs.readFileSync(requestsFile, 'utf8');
+    return JSON.parse(raw);
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveRequests(requests) {
+  try {
+    fs.writeFileSync(requestsFile, JSON.stringify(requests, null, 2));
+    return true;
+  } catch (e) {
+    console.error('Error saving requests:', e.message);
+    return false;
+  }
+}
+
+function addRequest(userId, username, title) {
+  try {
+    const requests = getRequests();
+    const newRequest = {
+      id: Math.random().toString(36).substring(2, 9),
+      userId,
+      username: username || 'Noma\'lum',
+      title: title.trim(),
+      status: 'pending',
+      dateRequested: new Date().toISOString()
+    };
+    requests.push(newRequest);
+    saveRequests(requests);
+    return newRequest;
+  } catch (e) {
+    console.error('Error adding request:', e.message);
+    return null;
+  }
+}
+
+function completeRequest(id) {
+  try {
+    const requests = getRequests();
+    const idx = requests.findIndex(r => String(r.id) === String(id));
+    if (idx !== -1) {
+      requests[idx].status = 'completed';
+      saveRequests(requests);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.error('Error completing request:', e.message);
+    return false;
+  }
+}
+
+function deleteRequest(id) {
+  try {
+    let requests = getRequests();
+    const initialLength = requests.length;
+    requests = requests.filter(r => String(r.id) !== String(id));
+    if (requests.length < initialLength) {
+      saveRequests(requests);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.error('Error deleting request:', e.message);
+    return false;
+  }
+}
+
+// Like/Dislike ratings
+function toggleLikeDislike(code, userId, voteType) {
+  try {
+    const movies = getMovies();
+    const index = movies.findIndex(m => String(m.code).trim() === String(code).trim());
+    if (index === -1) return null;
+
+    const movie = movies[index];
+    if (!movie.likes) movie.likes = [];
+    if (!movie.dislikes) movie.dislikes = [];
+
+    // Filter out user from both arrays first to reset their vote
+    const alreadyLiked = movie.likes.includes(userId);
+    const alreadyDisliked = movie.dislikes.includes(userId);
+
+    movie.likes = movie.likes.filter(id => id !== userId);
+    movie.dislikes = movie.dislikes.filter(id => id !== userId);
+
+    if (voteType === 'like') {
+      if (!alreadyLiked) {
+        movie.likes.push(userId);
+      }
+    } else if (voteType === 'dislike') {
+      if (!alreadyDisliked) {
+        movie.dislikes.push(userId);
+      }
+    }
+
+    movies[index] = movie;
+    saveMovies(movies);
+    return {
+      likesCount: movie.likes.length,
+      dislikesCount: movie.dislikes.length
+    };
+  } catch (e) {
+    console.error('Error toggling rating:', e.message);
+    return null;
+  }
+}
+
 module.exports = {
   getMovies,
   addMovie,
@@ -240,5 +361,10 @@ module.exports = {
   getStats,
   trackMovieView,
   trackSearch,
-  trackActiveUser
+  trackActiveUser,
+  getRequests,
+  addRequest,
+  completeRequest,
+  deleteRequest,
+  toggleLikeDislike
 };

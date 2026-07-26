@@ -33,6 +33,23 @@ function authMiddleware(req, res, next) {
   res.status(401).json({ error: 'Avtorizatsiyadan o\'tilmagan!' });
 }
 
+// Public API endpoints (accessible without token by public catalog/Mini App)
+router.get('/public-movies', (req, res) => {
+  res.json(db.getMovies());
+});
+
+router.get('/public-genres', (req, res) => {
+  res.json(['Jangari', 'Komediya', 'Melodrama', 'Multfilm', 'Tarixiy', 'Tarjima kino', 'Sarguzasht']);
+});
+
+router.get('/public-config', (req, res) => {
+  res.json({
+    botUsername: bot.getBotUsername() || '',
+    sponsorEnabled: process.env.MOVIE_SPONSOR_CHANNEL_ENABLED === 'true',
+    sponsorLink: process.env.MOVIE_SPONSOR_CHANNEL_LINK || ''
+  });
+});
+
 router.use(authMiddleware);
 
 /**
@@ -99,11 +116,11 @@ router.get('/movies', (req, res) => {
 });
 
 router.post('/movies', (req, res) => {
-  const { code, title, description, fileId } = req.body;
+  const { code, title, description, fileId, genre } = req.body;
   if (!code || !title || !fileId) {
     return res.status(400).json({ error: 'Kod, Nomi va FileID kiritilishi shart.' });
   }
-  const movie = db.addMovie({ code, title, description, fileId });
+  const movie = db.addMovie({ code, title, description, fileId, genre });
   if (movie) {
     res.json({ success: true, movie });
   } else {
@@ -130,7 +147,8 @@ router.get('/config', (req, res) => {
     adminIds: adminIds,
     sponsorEnabled: process.env.MOVIE_SPONSOR_CHANNEL_ENABLED === 'true',
     sponsorUsername: process.env.MOVIE_SPONSOR_CHANNEL_USERNAME || '',
-    sponsorLink: process.env.MOVIE_SPONSOR_CHANNEL_LINK || ''
+    sponsorLink: process.env.MOVIE_SPONSOR_CHANNEL_LINK || '',
+    botUsername: bot.getBotUsername() || ''
   });
 });
 
@@ -268,6 +286,31 @@ router.post('/broadcast', async (req, res) => {
       currentBroadcast.logs.push(`Foydalanuvchi ${user.id}: ${err.message}`);
     }
   }, 40);
+});
+
+// 6. Request Endpoints
+router.get('/requests', (req, res) => {
+  res.json(db.getRequests());
+});
+
+router.post('/requests/:id/complete', (req, res) => {
+  const { id } = req.params;
+  const completed = db.completeRequest(id);
+  if (completed) {
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'Buyurtma topilmadi.' });
+  }
+});
+
+router.delete('/requests/:id', (req, res) => {
+  const { id } = req.params;
+  const deleted = db.deleteRequest(id);
+  if (deleted) {
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'Buyurtma topilmadi.' });
+  }
 });
 
 module.exports = router;
