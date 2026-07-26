@@ -3,7 +3,9 @@ const path = require('path');
 const https = require('https');
 
 const binDir = path.join(__dirname, 'bin');
-const ytDlpPath = path.join(binDir, 'yt-dlp.exe');
+const isWindows = process.platform === 'win32';
+const ytDlpName = isWindows ? 'yt-dlp.exe' : 'yt-dlp';
+const ytDlpPath = path.join(binDir, ytDlpName);
 
 function downloadFile(url, dest) {
   return new Promise((resolve, reject) => {
@@ -35,19 +37,27 @@ function downloadFile(url, dest) {
   });
 }
 
-async function main() {
+async function ensureBinaries() {
   try {
     if (!fs.existsSync(binDir)) {
       fs.mkdirSync(binDir, { recursive: true });
     }
 
     if (!fs.existsSync(ytDlpPath)) {
-      console.log('Downloading yt-dlp.exe (this may take a few seconds)...');
-      const url = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe';
+      console.log(`Downloading ${ytDlpName} (this may take a few seconds)...`);
+      const url = `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytDlpName}`;
       await downloadFile(url, ytDlpPath);
-      console.log('yt-dlp.exe downloaded successfully to:', ytDlpPath);
+      if (!isWindows) {
+        fs.chmodSync(ytDlpPath, 0o755);
+      }
+      console.log(`${ytDlpName} downloaded successfully to:`, ytDlpPath);
     } else {
-      console.log('yt-dlp.exe already exists.');
+      console.log(`${ytDlpName} already exists.`);
+      if (!isWindows) {
+        try {
+          fs.chmodSync(ytDlpPath, 0o755);
+        } catch (e) {}
+      }
     }
 
     // Copy ffmpeg and ffprobe from npm packages to bin/ for auto-discovery
@@ -56,14 +66,40 @@ async function main() {
       const ffmpegSource = require('@ffmpeg-installer/ffmpeg').path;
       const ffprobeSource = require('@ffprobe-installer/ffprobe').path;
 
-      fs.copyFileSync(ffmpegSource, path.join(binDir, 'ffmpeg.exe'));
-      fs.copyFileSync(ffprobeSource, path.join(binDir, 'ffprobe.exe'));
-      console.log('FFmpeg and FFprobe copied successfully to bin/!');
+      const ffmpegDestName = isWindows ? 'ffmpeg.exe' : 'ffmpeg';
+      const ffprobeDestName = isWindows ? 'ffprobe.exe' : 'ffprobe';
+
+      const ffmpegDestPath = path.join(binDir, ffmpegDestName);
+      const ffprobeDestPath = path.join(binDir, ffprobeDestName);
+
+      if (!fs.existsSync(ffmpegDestPath)) {
+        fs.copyFileSync(ffmpegSource, ffmpegDestPath);
+        if (!isWindows) {
+          fs.chmodSync(ffmpegDestPath, 0o755);
+        }
+        console.log(`FFmpeg copied successfully to ${ffmpegDestName}`);
+      }
+
+      if (!fs.existsSync(ffprobeDestPath)) {
+        fs.copyFileSync(ffprobeSource, ffprobeDestPath);
+        if (!isWindows) {
+          fs.chmodSync(ffprobeDestPath, 0o755);
+        }
+        console.log(`FFprobe copied successfully to ${ffprobeDestName}`);
+      }
     } catch (copyErr) {
       console.warn('Could not copy FFmpeg/FFprobe binaries from node_modules:', copyErr.message);
     }
   } catch (err) {
     console.error('Setup error:', err.message);
+    throw err;
+  }
+}
+
+async function main() {
+  try {
+    await ensureBinaries();
+  } catch (err) {
     process.exit(1);
   }
 }
@@ -72,4 +108,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { ytDlpPath };
+module.exports = { ytDlpPath, ensureBinaries };

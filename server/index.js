@@ -6,6 +6,7 @@ require('dotenv').config();
 
 const apiRouter = require('./api');
 const bot = require('./bot');
+const { ensureBinaries } = require('./setup');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -31,8 +32,17 @@ if (fs.existsSync(clientDist)) {
 }
 
 // Start Server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Express API Server running on port ${PORT}`);
+
+  // Ensure yt-dlp, ffmpeg, ffprobe binaries are correctly downloaded and copied
+  try {
+    console.log('Verifying server binaries...');
+    await ensureBinaries();
+    console.log('Server binaries verification complete.');
+  } catch (err) {
+    console.error('CRITICAL: Server binaries setup failed:', err.message);
+  }
 
   // Automatically start Telegram Bot on boot if token is present
   const botToken = process.env.TELEGRAM_BOT_TOKEN;

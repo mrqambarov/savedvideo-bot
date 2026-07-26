@@ -3,10 +3,15 @@ const path = require('path');
 const fs = require('fs');
 
 const isWindows = process.platform === 'win32';
-const ytDlpPath = isWindows 
-  ? path.join(__dirname, 'bin', 'yt-dlp.exe') 
-  : 'yt-dlp';
+const binDir = path.join(__dirname, 'bin');
+const localYtDlp = path.join(binDir, isWindows ? 'yt-dlp.exe' : 'yt-dlp');
+const ytDlpPath = fs.existsSync(localYtDlp) ? localYtDlp : 'yt-dlp';
 const tempDir = path.join(__dirname, 'temp');
+
+// Build environment variables with the local bin folder in PATH for ffmpeg/ffprobe discovery
+const env = { ...process.env };
+const pathKey = isWindows ? 'Path' : 'PATH';
+env[pathKey] = `${binDir}${path.delimiter}${env[pathKey] || ''}`;
 
 if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
@@ -39,7 +44,7 @@ function getInfo(url) {
     }
     args.push(url);
 
-    execFile(ytDlpPath, args, { maxBuffer: 20 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile(ytDlpPath, args, { maxBuffer: 20 * 1024 * 1024, env }, (err, stdout, stderr) => {
       if (err) {
         return reject(new Error(stderr || err.message));
       }
@@ -87,7 +92,7 @@ function downloadVideo(url, outputName) {
     }
     args.push(url);
 
-    execFile(ytDlpPath, args, (err, stdout, stderr) => {
+    execFile(ytDlpPath, args, { env }, (err, stdout, stderr) => {
       if (err) {
         return reject(new Error(stderr || err.message));
       }
@@ -136,7 +141,7 @@ function downloadAudio(url, outputName) {
     }
     args.push(url);
 
-    execFile(ytDlpPath, args, (err, stdout, stderr) => {
+    execFile(ytDlpPath, args, { env }, (err, stdout, stderr) => {
       if (err) {
         return reject(new Error(stderr || err.message));
       }
@@ -174,7 +179,7 @@ function searchMusic(query, limit = 10) {
     }
     args.push(searchTarget);
 
-    execFile(ytDlpPath, args, { maxBuffer: 15 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile(ytDlpPath, args, { maxBuffer: 15 * 1024 * 1024, env }, (err, stdout, stderr) => {
       if (err && !stdout) {
         return reject(new Error(stderr || err.message));
       }

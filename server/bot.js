@@ -1051,10 +1051,17 @@ function formatDownloadError(err) {
         }
       });
 
-      // Start bot polling
-      botInstance.start();
+      // Start bot polling safely with error catching
+      botInstance.start({
+        onStart: (botInfo) => {
+          console.log(`Telegram Bot @${botInfo.username} started successfully.`);
+        }
+      }).catch((err) => {
+        console.error('Telegram Bot polling encountered an error:', err.message);
+        isBotRunning = false;
+      });
+
       isBotRunning = true;
-      console.log('Telegram Bot running successfully.');
       resolve(true);
     } catch (err) {
       isBotRunning = false;
