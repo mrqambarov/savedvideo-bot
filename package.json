@@ -7,9 +7,14 @@
     "server": "node server/index.js",
     "client": "npm --prefix client run dev",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "install:all": "npm install && npm install --prefix server && npm install --prefix client",
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client && npm install --prefix movie-server && npm install --prefix movie-client",
     "build": "npm install --prefix server && npm install --prefix client && npm run build --prefix client",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "movie:server": "node movie-server/index.js",
+    "movie:client": "npm --prefix movie-client run dev",
+    "movie:dev": "concurrently \"npm run movie:server\" \"npm run movie:client\"",
+    "movie:build": "npm install --prefix movie-server && npm install --prefix movie-client && npm run build --prefix movie-client",
+    "movie:start": "node movie-server/index.js"
   },
   "dependencies": {
     "concurrently": "^8.2.2"
