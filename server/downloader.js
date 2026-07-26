@@ -1,0 +1,207 @@
+const { execFile } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+
+const isWindows = process.platform === 'win32';
+const ytDlpPath = isWindows 
+  ? path.join(__dirname, 'bin', 'yt-dlp.exe') 
+  : 'yt-dlp';
+const tempDir = path.join(__dirname, 'temp');
+
+if (!fs.existsSync(tempDir)) {
+  fs.mkdirSync(tempDir, { recursive: true });
+}
+
+// Simulated real Chrome browser User-Agent to bypass bot filters
+const browserHeaders = [
+  '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+];
+
+/**
+ * Get video metadata from a URL
+ * @param {string} url 
+ * @returns {Promise<object>}
+ */
+function getInfo(url) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      '--dump-json', 
+      '--no-playlist', 
+      '--no-warnings', 
+      '--retries', '0',
+      '--socket-timeout', '5',
+      '--extractor-args', 'youtube:player-client=android,mweb',
+      ...browserHeaders
+    ];
+    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+    if (fs.existsSync(cookiesPath)) {
+      args.push('--cookies', cookiesPath);
+    }
+    args.push(url);
+
+    execFile(ytDlpPath, args, { maxBuffer: 20 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) {
+        return reject(new Error(stderr || err.message));
+      }
+      try {
+        const metadata = JSON.parse(stdout);
+        resolve({
+          title: metadata.title,
+          duration: metadata.duration,
+          thumbnail: metadata.thumbnail || (metadata.thumbnails && metadata.thumbnails.length > 0 ? metadata.thumbnails[metadata.thumbnails.length - 1].url : null),
+          artist: metadata.artist || null,
+          track: metadata.track || null,
+          url: url,
+          extractor: metadata.extractor_key || metadata.extractor
+        });
+      } catch (parseErr) {
+        reject(new Error('Failed to parse video metadata: ' + parseErr.message));
+      }
+    });
+  });
+}
+
+/**
+ * Download a video as MP4
+ * @param {string} url 
+ * @param {string} outputName 
+ * @returns {Promise<string>} Path to the downloaded video file
+ */
+function downloadVideo(url, outputName) {
+  return new Promise((resolve, reject) => {
+    const templatePath = path.join(tempDir, `${outputName}.%(ext)s`);
+    const args = [
+      '-f', 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[ext=mp4]/best',
+      '--merge-output-format', 'mp4',
+      '--no-playlist',
+      '--geo-bypass',
+      '--retries', '0',
+      '--socket-timeout', '5',
+      '--extractor-args', 'youtube:player-client=android,mweb',
+      '-o', templatePath,
+      ...browserHeaders
+    ];
+    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+    if (fs.existsSync(cookiesPath)) {
+      args.push('--cookies', cookiesPath);
+    }
+    args.push(url);
+
+    execFile(ytDlpPath, args, (err, stdout, stderr) => {
+      if (err) {
+        return reject(new Error(stderr || err.message));
+      }
+      
+      // Find the file dynamically because extension is variable
+      try {
+        const files = fs.readdirSync(tempDir);
+        const matched = files.find(f => f.startsWith(outputName));
+        if (matched) {
+          resolve(path.join(tempDir, matched));
+        } else {
+          reject(new Error('Downloaded media file not found.'));
+        }
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
+}
+
+/**
+ * Download a video/audio and extract to MP3
+ * @param {string} url 
+ * @param {string} outputName 
+ * @returns {Promise<string>} Path to the downloaded MP3 file
+ */
+function downloadAudio(url, outputName) {
+  return new Promise((resolve, reject) => {
+    const outputPath = path.join(tempDir, `${outputName}.mp3`);
+    const args = [
+      '-f', 'ba/best', 
+      '-x',
+      '--audio-format', 'mp3',
+      '--audio-quality', '5',
+      '--no-playlist',
+      '--geo-bypass',
+      '--retries', '0',
+      '--socket-timeout', '5',
+      '--extractor-args', 'youtube:player-client=android,mweb',
+      '-o', path.join(tempDir, `${outputName}.%(ext)s`),
+      ...browserHeaders
+    ];
+    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+    if (fs.existsSync(cookiesPath)) {
+      args.push('--cookies', cookiesPath);
+    }
+    args.push(url);
+
+    execFile(ytDlpPath, args, (err, stdout, stderr) => {
+      if (err) {
+        return reject(new Error(stderr || err.message));
+      }
+      if (fs.existsSync(outputPath)) {
+        resolve(outputPath);
+      } else {
+        reject(new Error('Downloaded audio file not found at ' + outputPath));
+      }
+    });
+  });
+}
+
+/**
+ * Searches YouTube for a query and returns top results metadata (flat playlist)
+ * @param {string} query 
+ * @param {number} limit 
+ * @returns {Promise<Array<object>>}
+ */
+function searchMusic(query, limit = 10) {
+  return new Promise((resolve, reject) => {
+    const searchTarget = `ytsearch${limit}:${query}`;
+    const args = [
+      '--flat-playlist',
+      '--dump-json',
+      '--no-playlist',
+      '--geo-bypass',
+      '--retries', '0',
+      '--socket-timeout', '5',
+      '--extractor-args', 'youtube:player-client=android,mweb',
+      ...browserHeaders
+    ];
+    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+    if (fs.existsSync(cookiesPath)) {
+      args.push('--cookies', cookiesPath);
+    }
+    args.push(searchTarget);
+
+    execFile(ytDlpPath, args, { maxBuffer: 15 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err && !stdout) {
+        return reject(new Error(stderr || err.message));
+      }
+
+      const results = [];
+      const lines = stdout.trim().split('\n');
+      for (const line of lines) {
+        if (!line) continue;
+        try {
+          const item = JSON.parse(line);
+          results.push({
+            title: item.title,
+            id: item.id,
+            duration: item.duration || 0,
+            url: `https://www.youtube.com/watch?v=${item.id}`
+          });
+        } catch (e) {}
+      }
+      resolve(results);
+    });
+  });
+}
+
+module.exports = {
+  getInfo,
+  downloadVideo,
+  downloadAudio,
+  searchMusic,
+  tempDir
+};
