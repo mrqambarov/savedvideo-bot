@@ -169,6 +169,26 @@ export default function App() {
     }
   };
 
+  const handleUploadCookies = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setLoading(true);
+    const formData = new FormData();
+    formData.append('cookies', file);
+    try {
+      await axios.post(`${API_BASE}/upload-cookies`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      alert('cookies.txt muvaffaqiyatli saqlandi! Endi bot orqali qoshiq yuklab olishni boshqatdan urunib ko\'ring.');
+    } catch (err) {
+      alert('Cookies yuklashda xatolik: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Downloader Handler
   const handleFetchInfo = async () => {
     if (!linkUrl) return;
@@ -696,6 +716,34 @@ export default function App() {
                     </span>
                   )}
                 </form>
+              </div>
+
+              {/* YouTube cookies.txt Upload Panel */}
+              <div className="glass-card">
+                <h3 style={{ marginBottom: '20px', fontFamily: 'var(--font-title)' }}>YouTube cookies.txt Yuklash</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '15px' }}>
+                  Agar botda YouTube yuklashlari <b>"Sign in to confirm you're not a bot"</b> xatosi bilan ishlamay qolsa, bu yerga brauzeringizdan eksport qilingan <code>cookies.txt</code> faylini yuklang.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  <input 
+                    type="file" 
+                    id="cookiesFileSelect" 
+                    accept=".txt"
+                    onChange={handleUploadCookies}
+                    style={{ display: 'none' }}
+                  />
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={() => document.getElementById('cookiesFileSelect').click()}
+                    disabled={loading}
+                  >
+                    📂 Cookies.txt Tanlash
+                  </button>
+                  <small style={{ color: 'var(--text-muted)', display: 'block' }}>
+                    Tavsiya etiladigan kengaytma: <b>Get cookies.txt LOCALLY</b> (Chrome/Firefox).
+                  </small>
+                </div>
               </div>
 
               {/* Bot Control Panel */}

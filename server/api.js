@@ -347,6 +347,24 @@ router.post('/config', async (req, res) => {
   }
 });
 
+// 7b. Upload cookies.txt
+router.post('/upload-cookies', upload.single('cookies'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Fayl tanlanmagan.' });
+  }
+
+  const tempPath = req.file.path;
+  const targetPath = path.join(__dirname, '..', 'cookies.txt');
+
+  try {
+    fs.copyFileSync(tempPath, targetPath);
+    fs.unlinkSync(tempPath);
+    res.json({ success: true, message: 'cookies.txt muvaffaqiyatli saqlandi!' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 8. Get Users and usage stats
 router.get('/stats', (req, res) => {
   try {
