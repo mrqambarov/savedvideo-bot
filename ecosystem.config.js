@@ -3,6 +3,7 @@ module.exports = {
     {
       name: 'vibeconvert-bot',
       script: './server/index.js',
+      cwd: __dirname,
       exec_mode: 'fork',
       instances: 1,
       env: {
@@ -16,6 +17,7 @@ module.exports = {
     {
       name: 'movie-bot',
       script: './movie-server/index.js',
+      cwd: __dirname,
       exec_mode: 'fork',
       instances: 1,
       env: {
