@@ -33,6 +33,33 @@ const upload = multer({
 
 const envPath = path.join(__dirname, '..', '.env');
 
+// Auth Token and Route
+const ADMIN_TOKEN = 'vibeconvert-secure-token-2026';
+
+router.post('/login', (req, res) => {
+  const { password } = req.body;
+  if (!password) {
+    return res.status(400).json({ error: 'Parol kiritilmadi.' });
+  }
+  const adminPassword = process.env.ADMIN_PASSWORD || 'Anvar2006';
+  if (password === adminPassword) {
+    res.json({ success: true, token: ADMIN_TOKEN });
+  } else {
+    res.status(401).json({ error: 'Parol noto\'g\'ri!' });
+  }
+});
+
+// Middleware to protect routes
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader === `Bearer ${ADMIN_TOKEN}`) {
+    return next();
+  }
+  res.status(401).json({ error: 'Avtorizatsiyadan o\'tilmagan!' });
+}
+
+router.use(authMiddleware);
+
 /**
  * Utility to write variables back to .env
  */

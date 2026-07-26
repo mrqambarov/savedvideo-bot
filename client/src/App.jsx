@@ -5,7 +5,22 @@ const API_BASE = window.location.origin.includes('localhost') || window.location
   ? 'http://localhost:5000/api' 
   : '/api';
 
+// Axios Authorization Header Interceptor
+axios.interceptors.request.use((config) => {
+  const token = localStorage.getItem('adminToken');
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('adminToken'));
+  const [passwordInput, setPasswordInput] = useState('');
+  const [loginError, setLoginError] = useState('');
+
   const [activeTab, setActiveTab] = useState('downloader');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -54,11 +69,13 @@ export default function App() {
 
   // Fetch initial data
   useEffect(() => {
-    fetchBotStatus();
-    fetchConfig();
-    fetchStats();
-    fetchBroadcastStatus();
-  }, []);
+    if (isAuthenticated) {
+      fetchBotStatus();
+      fetchConfig();
+      fetchStats();
+      fetchBroadcastStatus();
+    }
+  }, [isAuthenticated]);
 
   // Poll broadcast status when active
   useEffect(() => {
@@ -169,6 +186,26 @@ export default function App() {
     }
   };
 
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setLoginError('');
+    try {
+      const res = await axios.post(`${API_BASE}/login`, { password: passwordInput });
+      localStorage.setItem('adminToken', res.data.token);
+      setIsAuthenticated(true);
+    } catch (err) {
+      setLoginError(err.response?.data?.error || 'Parol noto\'g\'ri!');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('adminToken');
+    setIsAuthenticated(false);
+  };
+
   const handleUploadCookies = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -268,6 +305,40 @@ export default function App() {
     if (url) setProcessedAudioUrl(url);
   };
 
+  if (!isAuthenticated) {
+    return (
+      <div className="login-container">
+        <div className="login-card">
+          <div className="login-logo">V</div>
+          <h1 className="login-title">VibeConvert</h1>
+          <p className="login-subtitle">Admin paneli tizimiga kirish</p>
+          
+          <form onSubmit={handleLogin} className="login-form">
+            <div>
+              <input 
+                type="password" 
+                className="text-input" 
+                style={{ width: '100%', textAlign: 'center' }} 
+                placeholder="Parolni kiriting"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                required
+              />
+            </div>
+            
+            {loginError && (
+              <div className="login-error-msg">⚠️ {loginError}</div>
+            )}
+            
+            <button type="submit" className="btn" style={{ width: '100%', marginTop: '10px' }} disabled={loading}>
+              {loading ? <span className="spinner"></span> : 'Kirish'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-container">
       {/* Sidebar navigation */}
@@ -311,6 +382,13 @@ export default function App() {
             <span>Sponsor Channel</span>
           </li>
         </ul>
+
+        <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
+          <button className="btn btn-secondary btn-danger" onClick={handleLogout} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <span>🚪</span>
+            <span>Chiqish</span>
+          </button>
+        </div>
       </aside>
 
       {/* Main dashboard content */}
