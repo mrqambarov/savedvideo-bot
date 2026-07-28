@@ -171,6 +171,32 @@ async function queryShazamAPI(rawPcmPath, apiKey) {
     throw new Error('Shazam recognition failed: ' + (error.response?.data?.message || error.message));
   }
 }
+// Referral / contest info — shared by the /referal command and the keyboard button.
+async function sendReferralInfo(ctx) {
+  const uname = ctx.me.username;
+  const link = `https://t.me/${uname}?start=ref_${ctx.from.id}`;
+  const info = db.getReferralInfo(ctx.from.id);
+  const board = db.getReferralLeaderboard(5);
+  let top = '';
+  board.forEach((u, i) => {
+    const medal = ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
+    const name = u.username ? '@' + u.username : (u.first_name || 'Foydalanuvchi');
+    top += `${medal} ${name} — ${u.refCount} ta\n`;
+  });
+  const rankLine = info.rank > 0 ? `🏆 Sizning o'rningiz: **${info.rank}**` : `🏆 Hali reytingga kirmadingiz`;
+  const msg =
+    `🎁 **Do'stlarni taklif qiling va sovg'alar yutib oling!**\n\n` +
+    `Havolangizni do'stlaringizga ulashing. Har bir do'st bot orqali biror narsa yuklab olsa, sizga hisoblanadi.\n\n` +
+    `🔗 Sizning havolangiz:\n\`${link}\`\n\n` +
+    `✅ Muvaffaqiyatli takliflar: **${info.refCount}**\n` +
+    `⏳ Kutilmoqda (hali yuklamagan): **${info.refPending}**\n` +
+    `${rankLine}\n\n` +
+    (top ? `🏅 **Eng faol taklif qiluvchilar:**\n${top}` : '');
+  const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent('Video va musiqa yuklovchi zo\'r bot! 🚀')}`;
+  const kb = new InlineKeyboard().url('📤 Do\'stlarga ulashish', shareUrl);
+  await ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: kb });
+}
+
 // getChatMember fails on every message when the bot is not an admin of the
 // sponsor channel ("member list is inaccessible"). Throttle that log to once
 // per 5 minutes and spell out the fix, instead of flooding the error log.
@@ -321,7 +347,7 @@ function startBot(token) {
         if (ctx.callbackQuery && ctx.callbackQuery.data === 'chk_sub') {
           return await next();
         }
-        if (ctx.message && ctx.message.text && (ctx.message.text.startsWith('/start') || ctx.message.text.startsWith('/help') || ctx.message.text === '❓ Yordam' || ctx.message.text === '📢 Botni Ulashish')) {
+        if (ctx.message && ctx.message.text && (ctx.message.text.startsWith('/start') || ctx.message.text.startsWith('/help') || ctx.message.text === '❓ Yordam' || ctx.message.text === '📢 Botni Ulashish' || ctx.message.text === '🎁 Do\'stlarni taklif qilish' || ctx.message.text.startsWith('/referal'))) {
           return await next();
         }
 
@@ -359,6 +385,8 @@ function startBot(token) {
       });
 
       const mainKeyboard = new Keyboard()
+        .text('🎁 Do\'stlarni taklif qilish')
+        .row()
         .text('❓ Yordam')
         .resized();
 
@@ -380,28 +408,7 @@ function startBot(token) {
 
       // Referral / contest command
       botInstance.command('referal', async (ctx) => {
-        const uname = ctx.me.username;
-        const link = `https://t.me/${uname}?start=ref_${ctx.from.id}`;
-        const info = db.getReferralInfo(ctx.from.id);
-        const board = db.getReferralLeaderboard(5);
-        let top = '';
-        board.forEach((u, i) => {
-          const medal = ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
-          const name = u.username ? '@' + u.username : (u.first_name || 'Foydalanuvchi');
-          top += `${medal} ${name} — ${u.refCount} ta\n`;
-        });
-        const rankLine = info.rank > 0 ? `🏆 Sizning o'rningiz: **${info.rank}**` : `🏆 Hali reytingga kirmadingiz`;
-        const msg =
-          `🎁 **Do'stlarni taklif qiling va sovg'alar yutib oling!**\n\n` +
-          `Havolangizni do'stlaringizga ulashing. Har bir do'st bot orqali biror narsa yuklab olsa, sizga hisoblanadi.\n\n` +
-          `🔗 Sizning havolangiz:\n\`${link}\`\n\n` +
-          `✅ Muvaffaqiyatli takliflar: **${info.refCount}**\n` +
-          `⏳ Kutilmoqda (hali yuklamagan): **${info.refPending}**\n` +
-          `${rankLine}\n\n` +
-          (top ? `🏅 **Eng faol taklif qiluvchilar:**\n${top}` : '');
-        const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent('Video va musiqa yuklovchi zo\'r bot! 🚀')}`;
-        const kb = new InlineKeyboard().url('📤 Do\'stlarga ulashish', shareUrl);
-        await ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: kb });
+        await sendReferralInfo(ctx);
       });
 
       // Help Command
@@ -478,6 +485,10 @@ function formatDownloadError(err) {
       // Listen for text (links and search queries)
       botInstance.on('message:text', async (ctx) => {
         const text = ctx.message.text.trim();
+
+        if (text === '🎁 Do\'stlarni taklif qilish') {
+          return await sendReferralInfo(ctx);
+        }
 
         if (text === '📜 Yuklashlar Tarixi') {
           return await showHistory(ctx);

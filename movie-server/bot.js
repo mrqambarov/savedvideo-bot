@@ -123,7 +123,7 @@ function startBot(token) {
         if (ctx.callbackQuery && ctx.callbackQuery.data === 'chk_sub') {
           return await next();
         }
-        if (ctx.message && ctx.message.text && (ctx.message.text.startsWith('/start') || ctx.message.text.startsWith('/help') || isAdmin(ctx.from.id))) {
+        if (ctx.message && ctx.message.text && (ctx.message.text.startsWith('/start') || ctx.message.text.startsWith('/help') || ctx.message.text === '🎁 Do\'stlarni taklif qilish' || isAdmin(ctx.from.id))) {
           return await next();
         }
 
