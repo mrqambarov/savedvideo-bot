@@ -10,6 +10,10 @@ const moviesFile = path.join(dataDir, 'movies.json');
 const usersFile = path.join(dataDir, 'users.json');
 const statsFile = path.join(dataDir, 'stats.json');
 const requestsFile = path.join(dataDir, 'requests.json');
+const genresFile = path.join(dataDir, 'genres.json');
+const searchesFile = path.join(dataDir, 'searches.json');
+
+const DEFAULT_GENRES = ['Jangari', 'Komediya', 'Melodrama', 'Multfilm', 'Tarixiy', 'Tarjima kino', 'Sarguzasht'];
 
 // Initialize files if they don't exist
 if (!fs.existsSync(moviesFile)) {
@@ -27,6 +31,12 @@ if (!fs.existsSync(statsFile)) {
 }
 if (!fs.existsSync(requestsFile)) {
   fs.writeFileSync(requestsFile, JSON.stringify([], null, 2));
+}
+if (!fs.existsSync(genresFile)) {
+  fs.writeFileSync(genresFile, JSON.stringify(DEFAULT_GENRES, null, 2));
+}
+if (!fs.existsSync(searchesFile)) {
+  fs.writeFileSync(searchesFile, JSON.stringify({}, null, 2));
 }
 
 // Movies CRUD
@@ -63,6 +73,7 @@ function addMovie(movie) {
       description: movie.description || '',
       fileId: movie.fileId,
       genre: movie.genre || existing.genre || 'Tarjima kino',
+      poster: movie.poster !== undefined ? String(movie.poster || '').trim() : (existing.poster || ''),
       likes: existing.likes || [],
       dislikes: existing.dislikes || [],
       views: existing.views || 0,
@@ -216,6 +227,61 @@ function trackSearch() {
     saveStats(stats);
   } catch (e) {
     console.error('Error tracking search:', e.message);
+  }
+}
+
+// Genres (editable list, seeded from DEFAULT_GENRES)
+function getGenres() {
+  try {
+    const raw = fs.readFileSync(genresFile, 'utf8');
+    const list = JSON.parse(raw);
+    return Array.isArray(list) && list.length ? list : [...DEFAULT_GENRES];
+  } catch (e) {
+    return [...DEFAULT_GENRES];
+  }
+}
+
+function saveGenres(list) {
+  try {
+    const clean = [...new Set((list || []).map(g => String(g).trim()).filter(Boolean))];
+    fs.writeFileSync(genresFile, JSON.stringify(clean, null, 2));
+    return clean;
+  } catch (e) {
+    console.error('Error saving genres:', e.message);
+    return null;
+  }
+}
+
+// Search analytics: record each query term with a hit counter and last result count.
+function trackSearchQuery(query, resultCount) {
+  try {
+    const q = String(query || '').toLowerCase().trim();
+    if (!q || q.length > 100) return;
+    let data = {};
+    try { data = JSON.parse(fs.readFileSync(searchesFile, 'utf8')) || {}; } catch (e) { data = {}; }
+    const entry = data[q] || { query: q, count: 0, lastResults: 0, lastAt: null };
+    entry.count += 1;
+    entry.lastResults = Number(resultCount) || 0;
+    entry.lastAt = new Date().toISOString();
+    data[q] = entry;
+    fs.writeFileSync(searchesFile, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.error('Error tracking search query:', e.message);
+  }
+}
+
+function getSearchAnalytics() {
+  try {
+    const data = JSON.parse(fs.readFileSync(searchesFile, 'utf8')) || {};
+    const all = Object.values(data);
+    const byCount = (a, b) => b.count - a.count;
+    return {
+      totalUnique: all.length,
+      top: [...all].sort(byCount).slice(0, 50),
+      noResults: all.filter(e => e.lastResults === 0).sort(byCount).slice(0, 50),
+    };
+  } catch (e) {
+    return { totalUnique: 0, top: [], noResults: [] };
   }
 }
 
@@ -451,6 +517,10 @@ module.exports = {
   deleteMovie,
   getMovieByCode,
   searchMovies,
+  getGenres,
+  saveGenres,
+  trackSearchQuery,
+  getSearchAnalytics,
   getUsers,
   addUser,
   getStats,

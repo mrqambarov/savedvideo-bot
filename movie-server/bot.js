@@ -6,7 +6,6 @@ const path = require('path');
 let botInstance = null;
 let isBotRunning = false;
 let botUsername = '';
-const genres = ['Jangari', 'Komediya', 'Melodrama', 'Multfilm', 'Tarixiy', 'Tarjima kino', 'Sarguzasht'];
 const userSession = new Map(); // userId -> state
 const userPendingActions = new Map(); // userId -> pending message context
 
@@ -222,7 +221,7 @@ function startBot(token) {
 
         if (text === '🗂 Janrlar') {
           const keyboard = new InlineKeyboard();
-          genres.forEach((genre, idx) => {
+          db.getGenres().forEach((genre, idx) => {
             keyboard.text(genre, `genre:${genre}`);
             if (idx % 2 === 1) keyboard.row();
           });
@@ -305,6 +304,7 @@ function startBot(token) {
         // Default: Search movie by name
         db.trackSearch();
         const results = db.searchMovies(text);
+        db.trackSearchQuery(text, results ? results.length : 0);
         if (results && results.length > 0) {
           let replyText = `🔍 **"${text}" bo'yicha topilgan kinolar:**\n\n`;
           const keyboard = new InlineKeyboard();

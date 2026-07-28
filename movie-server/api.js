@@ -39,7 +39,7 @@ router.get('/public-movies', (req, res) => {
 });
 
 router.get('/public-genres', (req, res) => {
-  res.json(['Jangari', 'Komediya', 'Melodrama', 'Multfilm', 'Tarixiy', 'Tarjima kino', 'Sarguzasht']);
+  res.json(db.getGenres());
 });
 
 router.get('/public-config', (req, res) => {
@@ -116,16 +116,39 @@ router.get('/movies', (req, res) => {
 });
 
 router.post('/movies', (req, res) => {
-  const { code, title, description, fileId, genre } = req.body;
+  const { code, title, description, fileId, genre, poster } = req.body;
   if (!code || !title || !fileId) {
     return res.status(400).json({ error: 'Kod, Nomi va FileID kiritilishi shart.' });
   }
-  const movie = db.addMovie({ code, title, description, fileId, genre });
+  const movie = db.addMovie({ code, title, description, fileId, genre, poster });
   if (movie) {
     res.json({ success: true, movie });
   } else {
     res.status(500).json({ error: 'Bazaga saqlashda xatolik yuz berdi.' });
   }
+});
+
+// 1b. Genres management
+router.get('/genres', (req, res) => {
+  res.json(db.getGenres());
+});
+
+router.post('/genres', (req, res) => {
+  const { genres } = req.body;
+  if (!Array.isArray(genres)) {
+    return res.status(400).json({ error: 'genres massivi yuborilishi kerak.' });
+  }
+  const saved = db.saveGenres(genres);
+  if (saved) {
+    res.json({ success: true, genres: saved });
+  } else {
+    res.status(500).json({ error: 'Janrlarni saqlashda xatolik.' });
+  }
+});
+
+// 1c. Search analytics (top queries + zero-result queries)
+router.get('/search-analytics', (req, res) => {
+  res.json(db.getSearchAnalytics());
 });
 
 router.delete('/movies/:code', (req, res) => {

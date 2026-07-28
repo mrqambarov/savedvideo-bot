@@ -1,13 +1,33 @@
 import { useState, useMemo } from 'react';
-import { Users, UserPlus, Activity, Video, Music, Search } from 'lucide-react';
-import { useStats } from '../lib/useData.js';
-import { StatCard, Loader, Segmented } from '../components/ui.jsx';
+import { Users, UserPlus, Activity, Video, Search, TrendingUp, SearchX } from 'lucide-react';
+import { useStats, useResource } from '../lib/useData.js';
+import { movieApi } from '../lib/api.js';
+import { StatCard, Loader, Segmented, Empty } from '../components/ui.jsx';
 import { TrendArea, BarsChart } from '../components/charts.jsx';
 import DataTable from '../components/DataTable.jsx';
 import { nf, fmtDate, avatarColor, initials } from '../lib/format.js';
 
+function SearchList({ items, icon: Icon, accent, emptyText }) {
+  const max = Math.max(1, ...items.map((i) => i.count));
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {items.length === 0 && <Empty icon={Icon} title={emptyText} />}
+      {items.map((it) => (
+        <div key={it.query} style={{ position: 'relative', padding: '9px 12px', borderRadius: 9, background: 'var(--surface-2)', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, width: `${(it.count / max) * 100}%`, background: accent, opacity: 0.12 }} />
+          <div className="between" style={{ position: 'relative' }}>
+            <span style={{ fontWeight: 500 }}>{it.query}</span>
+            <span className="badge badge-muted">{nf(it.count)}×</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Analytics() {
   const { dl, movie, loading } = useStats();
+  const search = useResource(() => movieApi.get('/search-analytics'), 30000);
   const [period, setPeriod] = useState('week');
   const [bot, setBot] = useState('dl');
 
@@ -92,6 +112,27 @@ export default function Analytics() {
           </div>
         </div>
       )}
+
+      <div className="grid grid-2 mt">
+        <div className="card">
+          <div className="card-head">
+            <h3><Search size={15} style={{ verticalAlign: -2, marginRight: 6 }} />Eng ko'p qidirilganlar</h3>
+            <span className="sub">kino bot</span>
+          </div>
+          <div className="card-pad">
+            <SearchList items={(search.data?.top || []).slice(0, 12)} icon={Search} accent="#6366f1" emptyText="Hali qidiruv yo'q" />
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-head">
+            <h3><SearchX size={15} style={{ verticalAlign: -2, marginRight: 6 }} />Natijasiz qidiruvlar</h3>
+            <span className="sub">qo'shish kerak bo'lgan kinolar</span>
+          </div>
+          <div className="card-pad">
+            <SearchList items={(search.data?.noResults || []).slice(0, 12)} icon={SearchX} accent="#f59e0b" emptyText="Natijasiz qidiruv yo'q" />
+          </div>
+        </div>
+      </div>
 
       <div className="card mt">
         <div className="card-head">
