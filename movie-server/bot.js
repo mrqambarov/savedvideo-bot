@@ -106,7 +106,16 @@ function startBot(token) {
       // User Tracking and Sponsor Verification Middleware
       botInstance.use(async (ctx, next) => {
         if (ctx.from && !ctx.from.is_bot) {
-          db.addUser(ctx.from);
+          let referredBy = null;
+          const txt = ctx.message && ctx.message.text;
+          if (txt && txt.startsWith('/start ')) {
+            const payload = txt.split(' ')[1];
+            if (payload && payload.startsWith('ref_')) {
+              const rid = parseInt(payload.slice(4), 10);
+              if (rid && rid !== ctx.from.id) referredBy = rid;
+            }
+          }
+          db.addUser(ctx.from, referredBy);
           db.trackActiveUser(ctx.from.id);
         }
 
@@ -150,6 +159,8 @@ function startBot(token) {
       // Keyboard
       const mainKeyboard = new Keyboard()
         .text('🔍 Kino Qidirish').text('🗂 Janrlar')
+        .row()
+        .text('🎁 Do\'stlarni taklif qilish')
         .row()
         .text('🙋‍♂️ Buyurtma berish').text('ℹ️ Yordam')
         .resized();
@@ -229,6 +240,31 @@ function startBot(token) {
             parse_mode: 'Markdown',
             reply_markup: keyboard
           });
+        }
+
+        if (text === '🎁 Do\'stlarni taklif qilish') {
+          const uname = ctx.me.username;
+          const link = `https://t.me/${uname}?start=ref_${ctx.from.id}`;
+          const info = db.getReferralInfo(ctx.from.id);
+          const board = db.getReferralLeaderboard(5);
+          let top = '';
+          board.forEach((u, i) => {
+            const medal = ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
+            const name = u.username ? '@' + u.username : (u.first_name || 'Foydalanuvchi');
+            top += `${medal} ${name} — ${u.refCount} ta\n`;
+          });
+          const rankLine = info.rank > 0 ? `🏆 Sizning o'rningiz: **${info.rank}**` : `🏆 Hali reytingga kirmadingiz`;
+          const msg =
+            `🎁 **Do'stlarni taklif qiling va sovg'alar yutib oling!**\n\n` +
+            `Havolangizni do'stlaringizga ulashing. Har bir do'st bot orqali kino ko'rsa, sizga hisoblanadi.\n\n` +
+            `🔗 Sizning havolangiz:\n\`${link}\`\n\n` +
+            `✅ Muvaffaqiyatli takliflar: **${info.refCount}**\n` +
+            `⏳ Kutilmoqda (hali kino ko'rmagan): **${info.refPending}**\n` +
+            `${rankLine}\n\n` +
+            (top ? `🏅 **Eng faol taklif qiluvchilar:**\n${top}` : '');
+          const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent('Bepul kinolar shu botda! 🍿')}`;
+          const kb = new InlineKeyboard().url('📤 Do\'stlarga ulashish', shareUrl);
+          return await ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: kb });
         }
 
         if (text === '🙋‍♂️ Buyurtma berish') {
@@ -495,6 +531,8 @@ function startBot(token) {
 }
 
 async function sendMovie(ctx, movie) {
+  // Watching a movie is the qualifying action for the inviter's referral.
+  if (ctx.from) db.qualifyReferral(ctx.from.id);
   const likesCount = movie.likes ? movie.likes.length : 0;
   const dislikesCount = movie.dislikes ? movie.dislikes.length : 0;
   const downloaderBotUsername = process.env.DOWNLOADER_BOT_USERNAME || 'savemedia_music_bot';

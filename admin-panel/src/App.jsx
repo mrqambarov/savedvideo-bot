@@ -9,6 +9,7 @@ import Movies from './pages/Movies.jsx';
 import Requests from './pages/Requests.jsx';
 import Broadcast from './pages/Broadcast.jsx';
 import Channels from './pages/Channels.jsx';
+import Referrals from './pages/Referrals.jsx';
 import Downloader from './pages/Downloader.jsx';
 import MovieBot from './pages/MovieBot.jsx';
 import SettingsPage from './pages/Settings.jsx';
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/requests" element={<Requests />} />
           <Route path="/broadcast" element={<Broadcast />} />
           <Route path="/channels" element={<Channels />} />
+          <Route path="/referrals" element={<Referrals />} />
           <Route path="/downloader" element={<Downloader />} />
           <Route path="/movie-bot" element={<MovieBot />} />
           <Route path="/settings" element={<SettingsPage />} />

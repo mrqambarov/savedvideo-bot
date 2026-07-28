@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, BarChart3, Film, Inbox, Megaphone, Radio,
-  Download, Bot, Settings, Menu, Moon, Sun, LogOut, Sparkles,
+  Download, Bot, Settings, Menu, Moon, Sun, LogOut, Sparkles, Gift,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
 import { movieApi, safe } from '../lib/api.js';
@@ -16,6 +16,7 @@ const NAV = [
   { to: '/requests', label: "So'rovlar", icon: Inbox, badge: 'requests' },
   { section: 'Boshqaruv' },
   { to: '/broadcast', label: 'Broadcast', icon: Megaphone },
+  { to: '/referrals', label: 'Konkurs / Referal', icon: Gift },
   { to: '/channels', label: 'Homiy kanallar', icon: Radio },
   { section: 'Botlar' },
   { to: '/downloader', label: 'Downloader Bot', icon: Download },
@@ -29,6 +30,7 @@ const TITLES = {
   '/movies': ['Kinolar', 'Kino katalogini boshqarish'],
   '/requests': ["So'rovlar", "Foydalanuvchi kino so'rovlari"],
   '/broadcast': ['Broadcast', 'Ommaviy xabar yuborish'],
+  '/referrals': ['Konkurs / Referal', "Do'st taklif qilish reytingi va g'olib tanlash"],
   '/channels': ['Homiy kanallar', 'Majburiy obuna kanallari'],
   '/downloader': ['Downloader Bot', 'Video yuklovchi bot sozlamalari'],
   '/movie-bot': ['Kino Bot', 'Kino bot sozlamalari'],

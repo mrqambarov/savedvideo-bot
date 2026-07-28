@@ -40,20 +40,93 @@ function saveUsers(users) {
   }
 }
 
-function addUser(user) {
+// Adds a user if new. Optionally attributes them to a referrer (their invite
+// is counted as "pending" until the new user performs a real action — see
+// qualifyReferral). Returns true if the user was newly created.
+function addUser(user, referredBy = null) {
   try {
     const users = getUsers();
-    if (!users.some(u => Number(u.id) === Number(user.id))) {
-      users.push({
-        id: user.id,
-        username: user.username || '',
-        first_name: user.first_name || '',
-        dateJoined: new Date().toISOString()
-      });
-      saveUsers(users);
+    if (users.some(u => Number(u.id) === Number(user.id))) {
+      return false;
     }
+    const newUser = {
+      id: user.id,
+      username: user.username || '',
+      first_name: user.first_name || '',
+      dateJoined: new Date().toISOString(),
+      referredBy: null,
+      refCount: 0,
+      refPending: 0,
+      refQualified: false
+    };
+    if (referredBy && Number(referredBy) !== Number(user.id)) {
+      const referrer = users.find(u => Number(u.id) === Number(referredBy));
+      if (referrer) {
+        newUser.referredBy = Number(referredBy);
+        referrer.refPending = (referrer.refPending || 0) + 1;
+      }
+    }
+    users.push(newUser);
+    saveUsers(users);
+    return true;
   } catch (e) {
     console.error('Error adding user:', e.message);
+    return false;
+  }
+}
+
+// Anti-cheat: a referral only counts once the invited user does something real
+// (a download), not merely opening the bot. Idempotent per user.
+function qualifyReferral(userId) {
+  try {
+    const users = getUsers();
+    const user = users.find(u => Number(u.id) === Number(userId));
+    if (!user || !user.referredBy || user.refQualified) return;
+    user.refQualified = true;
+    const referrer = users.find(u => Number(u.id) === Number(user.referredBy));
+    if (referrer) {
+      referrer.refPending = Math.max(0, (referrer.refPending || 0) - 1);
+      referrer.refCount = (referrer.refCount || 0) + 1;
+    }
+    saveUsers(users);
+  } catch (e) {
+    console.error('Error qualifying referral:', e.message);
+  }
+}
+
+function getReferralInfo(userId) {
+  try {
+    const users = getUsers();
+    const ranked = [...users].sort((a, b) => (b.refCount || 0) - (a.refCount || 0));
+    const idx = ranked.findIndex(u => Number(u.id) === Number(userId));
+    const user = idx !== -1 ? ranked[idx] : null;
+    return {
+      refCount: user ? (user.refCount || 0) : 0,
+      refPending: user ? (user.refPending || 0) : 0,
+      rank: user && (user.refCount || 0) > 0 ? idx + 1 : 0,
+      totalUsers: users.length
+    };
+  } catch (e) {
+    return { refCount: 0, refPending: 0, rank: 0, totalUsers: 0 };
+  }
+}
+
+function getReferralLeaderboard(limit = 200) {
+  try {
+    const users = getUsers();
+    return users
+      .filter(u => (u.refCount || 0) > 0 || (u.refPending || 0) > 0)
+      .sort((a, b) => (b.refCount || 0) - (a.refCount || 0) || (b.refPending || 0) - (a.refPending || 0))
+      .slice(0, limit)
+      .map(u => ({
+        id: u.id,
+        username: u.username || '',
+        first_name: u.first_name || '',
+        refCount: u.refCount || 0,
+        refPending: u.refPending || 0
+      }));
+  } catch (e) {
+    return [];
   }
 }
 
@@ -140,6 +213,8 @@ function trackActiveUser(userId) {
 
 function trackUserDownload(userId, title, type, url) {
   try {
+    // A completed download is the qualifying action for the inviter's referral.
+    qualifyReferral(userId);
     const users = getUsers();
     const userIndex = users.findIndex(u => Number(u.id) === Number(userId));
     if (userIndex !== -1) {
@@ -279,6 +354,9 @@ function getAdvancedStats() {
 module.exports = {
   getUsers,
   addUser,
+  qualifyReferral,
+  getReferralInfo,
+  getReferralLeaderboard,
   getStats,
   trackDownload,
   trackSearch,

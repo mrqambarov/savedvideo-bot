@@ -151,6 +151,11 @@ router.get('/search-analytics', (req, res) => {
   res.json(db.getSearchAnalytics());
 });
 
+// 1d. Referral leaderboard (contest)
+router.get('/referrals', (req, res) => {
+  res.json(db.getReferralLeaderboard(200));
+});
+
 router.delete('/movies/:code', (req, res) => {
   const { code } = req.params;
   const deleted = db.deleteMovie(code);

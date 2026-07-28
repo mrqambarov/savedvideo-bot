@@ -401,6 +401,15 @@ router.get('/stats', (req, res) => {
   }
 });
 
+// 8a. Referral leaderboard (contest)
+router.get('/referrals', (req, res) => {
+  try {
+    res.json(db.getReferralLeaderboard(200));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // 8b. Channels Management (shared channels.json for sponsor rotation)
 const channelsPath = path.join(__dirname, '..', 'channels.json');
 

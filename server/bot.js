@@ -304,7 +304,16 @@ function startBot(token) {
       // User Tracking and Sponsor Verification Middleware
       botInstance.use(async (ctx, next) => {
         if (ctx.from && !ctx.from.is_bot) {
-          db.addUser(ctx.from);
+          let referredBy = null;
+          const txt = ctx.message && ctx.message.text;
+          if (txt && txt.startsWith('/start ')) {
+            const payload = txt.split(' ')[1];
+            if (payload && payload.startsWith('ref_')) {
+              const rid = parseInt(payload.slice(4), 10);
+              if (rid && rid !== ctx.from.id) referredBy = rid;
+            }
+          }
+          db.addUser(ctx.from, referredBy);
           db.trackActiveUser(ctx.from.id);
         }
 
@@ -363,9 +372,36 @@ function startBot(token) {
           `2️⃣ **Dumaloq Video (Teleskop):** Menga kvadrat yoki ixtiyoriy video yuboring - men uni Telegram dumaloq videosiga (Video Note) aylantiraman.\n` +
           `3️⃣ **Ovozni ajratish:** Videodan MP3 musiqasini ajratib beraman.\n` +
           `4️⃣ **Musiqa effektlari:** Ovoz fayllarini Concert, Bass Boost, Nightcore, Slowed & Reverb, 8D, Karaoke va Auto-Pan formatlariga o'tkazib beraman.\n` +
-          `5️⃣ **Musiqani aniqlash:** Noma'lum musiqani yuboring, men uni kim aytganini topib beraman!`,
+          `5️⃣ **Musiqani aniqlash:** Noma'lum musiqani yuboring, men uni kim aytganini topib beraman!\n\n` +
+          `🎁 **Do'stlaringizni taklif qiling va sovg'alar yuting!** Havolangizni olish uchun /referal buyrug'ini yuboring.`,
           { parse_mode: 'Markdown', reply_markup: mainKeyboard }
         );
+      });
+
+      // Referral / contest command
+      botInstance.command('referal', async (ctx) => {
+        const uname = ctx.me.username;
+        const link = `https://t.me/${uname}?start=ref_${ctx.from.id}`;
+        const info = db.getReferralInfo(ctx.from.id);
+        const board = db.getReferralLeaderboard(5);
+        let top = '';
+        board.forEach((u, i) => {
+          const medal = ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
+          const name = u.username ? '@' + u.username : (u.first_name || 'Foydalanuvchi');
+          top += `${medal} ${name} — ${u.refCount} ta\n`;
+        });
+        const rankLine = info.rank > 0 ? `🏆 Sizning o'rningiz: **${info.rank}**` : `🏆 Hali reytingga kirmadingiz`;
+        const msg =
+          `🎁 **Do'stlarni taklif qiling va sovg'alar yutib oling!**\n\n` +
+          `Havolangizni do'stlaringizga ulashing. Har bir do'st bot orqali biror narsa yuklab olsa, sizga hisoblanadi.\n\n` +
+          `🔗 Sizning havolangiz:\n\`${link}\`\n\n` +
+          `✅ Muvaffaqiyatli takliflar: **${info.refCount}**\n` +
+          `⏳ Kutilmoqda (hali yuklamagan): **${info.refPending}**\n` +
+          `${rankLine}\n\n` +
+          (top ? `🏅 **Eng faol taklif qiluvchilar:**\n${top}` : '');
+        const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent('Video va musiqa yuklovchi zo\'r bot! 🚀')}`;
+        const kb = new InlineKeyboard().url('📤 Do\'stlarga ulashish', shareUrl);
+        await ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: kb });
       });
 
       // Help Command
