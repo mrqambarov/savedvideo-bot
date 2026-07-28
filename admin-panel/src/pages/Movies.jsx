@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Eye, ThumbsUp, ThumbsDown, Film, Tag, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, ThumbsUp, ThumbsDown, Film, Tag, X, Upload, Download, Bell } from 'lucide-react';
 import { movieApi, safe } from '../lib/api.js';
 import { useResource } from '../lib/useData.js';
 import { useApp } from '../context/AppContext.jsx';
 import { Loader, Modal } from '../components/ui.jsx';
 import DataTable from '../components/DataTable.jsx';
 import { nf, fmtDate } from '../lib/format.js';
+import { toCSV, downloadCSV, parseCSV } from '../lib/csv.js';
 
-const EMPTY = { code: '', title: '', description: '', genre: '', fileId: '', poster: '' };
+const EMPTY = { code: '', title: '', description: '', genre: '', fileId: '', poster: '', notify: false };
 
 function Poster({ src, size = 40 }) {
   const [err, setErr] = useState(false);
@@ -30,6 +31,7 @@ export default function Movies() {
   const [del, setDel] = useState(null);
   const [busy, setBusy] = useState(false);
   const [genreModal, setGenreModal] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const movies = Array.isArray(data) ? data : [];
   const genres = Array.isArray(genresRes.data) ? genresRes.data : [];
@@ -104,6 +106,13 @@ export default function Movies() {
           <span className="sub">{nf(movies.length)} ta film</span>
           <div className="spacer" />
           <button className="btn btn-ghost btn-sm" onClick={() => setGenreModal(true)}><Tag size={16} /> Janrlar</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => downloadCSV('kinolar.csv', toCSV(movies, [
+            { key: 'code', label: 'Kod' }, { key: 'title', label: 'Nomi' }, { key: 'genre', label: 'Janr' },
+            { key: 'views', label: 'Korishlar' }, { key: 'fileId', label: 'FileID' },
+            { key: 'likes', label: 'Layklar', value: (m) => m.likes?.length || 0 },
+            { key: 'dateAdded', label: 'Qoshilgan' },
+          ]))} style={{ marginLeft: 10 }}><Download size={16} /> Eksport</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => setBulkOpen(true)} style={{ marginLeft: 10 }}><Upload size={16} /> Import</button>
           <button className="btn btn-primary btn-sm" onClick={openAdd} style={{ marginLeft: 10 }}><Plus size={16} /> Kino qo'shish</button>
         </div>
         <DataTable
@@ -159,15 +168,32 @@ export default function Movies() {
               <label>Tavsif</label>
               <textarea className="textarea" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Qisqa tavsif..." />
             </div>
-            <div className="field" style={{ marginBottom: 0 }}>
+            <div className="field" style={{ marginBottom: editing ? 0 : 16 }}>
               <label>Telegram File ID *</label>
               <input className="input mono" value={form.fileId} onChange={(e) => setForm({ ...form, fileId: e.target.value })} placeholder="BAACAg... " />
             </div>
+            {!editing && (
+              <div className="between" style={{ padding: '12px 14px', background: 'var(--surface-2)', borderRadius: 10 }}>
+                <div className="flex gap" style={{ alignItems: 'center' }}>
+                  <Bell size={16} className="muted" />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>Foydalanuvchilarga xabar berish</div>
+                    <div className="cell-sub">Barcha foydalanuvchilarga yangi kino haqida bildirishnoma yuboriladi</div>
+                  </div>
+                </div>
+                <label className="switch">
+                  <input type="checkbox" checked={!!form.notify} onChange={(e) => setForm({ ...form, notify: e.target.checked })} />
+                  <span className="slider" />
+                </label>
+              </div>
+            )}
           </>
         )}
       </Modal>
 
       <GenreModal open={genreModal} onClose={() => setGenreModal(false)} genres={genres} onSaved={() => { genresRes.reload(); }} />
+
+      <BulkImport open={bulkOpen} onClose={() => setBulkOpen(false)} onDone={reload} />
 
       <Modal
         open={!!del}
@@ -183,6 +209,86 @@ export default function Movies() {
         <p><strong>{del?.title}</strong> (kod: {del?.code}) o'chirilsinmi? Bu amalni qaytarib bo'lmaydi.</p>
       </Modal>
     </div>
+  );
+}
+
+function BulkImport({ open, onClose, onDone }) {
+  const { toast } = useApp();
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const parse = () => {
+    const rows = parseCSV(text.trim());
+    if (!rows.length) return [];
+    // Skip a header row if the first cell isn't purely a code-like value.
+    let start = 0;
+    const first = (rows[0][0] || '').toLowerCase();
+    if (first === 'code' || first === 'kod') start = 1;
+    return rows.slice(start).map((r) => ({
+      code: (r[0] || '').trim(),
+      title: (r[1] || '').trim(),
+      genre: (r[2] || '').trim(),
+      fileId: (r[3] || '').trim(),
+      description: (r[4] || '').trim(),
+    })).filter((m) => m.code || m.title || m.fileId);
+  };
+
+  const preview = open ? parse() : [];
+
+  const submit = async () => {
+    const movies = parse();
+    if (!movies.length) { toast('Import uchun maʼlumot yoʻq', 'error'); return; }
+    setBusy(true);
+    const { data, error } = await safe(movieApi.post('/movies/bulk', { movies }));
+    setBusy(false);
+    if (error) { toast(error, 'error'); return; }
+    setResult(data);
+    toast(`${data.added} ta kino qoʻshildi`);
+    onDone?.();
+  };
+
+  const close = () => { setText(''); setResult(null); onClose(); };
+
+  return (
+    <Modal
+      open={open}
+      title="Ommaviy import (CSV)"
+      onClose={close}
+      width={620}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={close}>Yopish</button>
+          <button className="btn btn-primary" onClick={submit} disabled={busy || preview.length === 0}>
+            {busy ? <span className="spinner" /> : `${preview.length} ta kinoni import qilish`}
+          </button>
+        </>
+      }
+    >
+      <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
+        Har bir qatorda vergul bilan ajratilgan: <span className="mono">kod,nomi,janr,fileId,tavsif</span>. Birinchi qator sarlavha boʻlsa avtomatik oʻtkazib yuboriladi.
+      </p>
+      <textarea
+        className="textarea mono"
+        style={{ minHeight: 160, fontSize: 12.5 }}
+        value={text}
+        onChange={(e) => { setText(e.target.value); setResult(null); }}
+        placeholder={'101,Titanik,Melodrama,BAACAgI...,Klassik film\n102,Avatar,Fantastika,BAACAgI...,'}
+      />
+      {preview.length > 0 && (
+        <div className="muted" style={{ marginTop: 10, fontSize: 12.5 }}>👀 {preview.length} ta qator aniqlandi</div>
+      )}
+      {result && (
+        <div style={{ marginTop: 12, padding: 12, background: 'var(--success-soft)', borderRadius: 10 }}>
+          <strong style={{ color: 'var(--success)' }}>✅ {result.added} / {result.total} ta qoʻshildi</strong>
+          {result.errors?.length > 0 && (
+            <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
+              {result.errors.slice(0, 5).map((e, i) => <div key={i}>⚠️ {e}</div>)}
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
   );
 }
 

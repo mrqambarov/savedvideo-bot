@@ -116,16 +116,40 @@ router.get('/movies', (req, res) => {
 });
 
 router.post('/movies', (req, res) => {
-  const { code, title, description, fileId, genre, poster } = req.body;
+  const { code, title, description, fileId, genre, poster, notify } = req.body;
   if (!code || !title || !fileId) {
     return res.status(400).json({ error: 'Kod, Nomi va FileID kiritilishi shart.' });
   }
   const movie = db.addMovie({ code, title, description, fileId, genre, poster });
   if (movie) {
-    res.json({ success: true, movie });
+    if (notify) {
+      // Fire-and-forget broadcast to all users about the new movie.
+      bot.notifyNewMovie(movie).catch(e => console.error('notifyNewMovie error:', e.message));
+    }
+    res.json({ success: true, movie, notified: !!notify });
   } else {
     res.status(500).json({ error: 'Bazaga saqlashda xatolik yuz berdi.' });
   }
+});
+
+// Bulk import movies (array of { code, title, description, genre, fileId, poster })
+router.post('/movies/bulk', (req, res) => {
+  const { movies } = req.body;
+  if (!Array.isArray(movies)) {
+    return res.status(400).json({ error: 'movies massivi yuborilishi kerak.' });
+  }
+  let added = 0;
+  const errors = [];
+  movies.forEach((m, i) => {
+    if (!m.code || !m.title || !m.fileId) {
+      errors.push(`Qator ${i + 1}: kod, nomi yoki fileId yo'q`);
+      return;
+    }
+    const saved = db.addMovie(m);
+    if (saved) added++;
+    else errors.push(`Qator ${i + 1}: saqlashda xatolik`);
+  });
+  res.json({ success: true, added, total: movies.length, errors });
 });
 
 // 1b. Genres management

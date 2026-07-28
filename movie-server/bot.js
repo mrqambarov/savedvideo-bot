@@ -160,7 +160,9 @@ function startBot(token) {
       const mainKeyboard = new Keyboard()
         .text('🔍 Kino Qidirish').text('🗂 Janrlar')
         .row()
-        .text('🎁 Do\'stlarni taklif qilish')
+        .text('🔥 TOP kinolar').text('🎲 Tasodifiy')
+        .row()
+        .text('⭐ Sevimlilarim').text('🎁 Do\'stlarni taklif qilish')
         .row()
         .text('🙋‍♂️ Buyurtma berish').text('ℹ️ Yordam')
         .resized();
@@ -264,6 +266,40 @@ function startBot(token) {
             (top ? `🏅 **Eng faol taklif qiluvchilar:**\n${top}` : '');
           const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent('Bepul kinolar shu botda! 🍿')}`;
           const kb = new InlineKeyboard().url('📤 Do\'stlarga ulashish', shareUrl);
+          return await ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: kb });
+        }
+
+        if (text === '🔥 TOP kinolar') {
+          const top = db.getTopMovies('views', 10);
+          if (!top.length) return await ctx.reply('Hozircha kinolar yo\'q.');
+          let msg = '🔥 **Eng ko\'p ko\'rilgan kinolar:**\n\n';
+          const kb = new InlineKeyboard();
+          top.forEach((m, i) => {
+            const medal = ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
+            msg += `${medal} *${m.title}* — 👁 ${m.views || 0} | Kod: \`${m.code}\`\n`;
+            kb.text(`${i + 1}`, `mv:${m.code}`);
+            if (i % 5 === 4) kb.row();
+          });
+          return await ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: kb });
+        }
+
+        if (text === '🎲 Tasodifiy') {
+          const movie = db.getRandomMovie();
+          if (!movie) return await ctx.reply('Hozircha kinolar yo\'q.');
+          db.trackMovieView(movie.code);
+          return await sendMovie(ctx, movie);
+        }
+
+        if (text === '⭐ Sevimlilarim') {
+          const favs = db.getFavorites(ctx.from.id);
+          if (!favs.length) return await ctx.reply('⭐ Sevimlilaringiz hali bo\'sh.\n\nKino ostidagi "☆ Sevimlilarga" tugmasi orqali qo\'shing.');
+          let msg = '⭐ **Sevimli kinolaringiz:**\n\n';
+          const kb = new InlineKeyboard();
+          favs.forEach((m, i) => {
+            msg += `${i + 1}. *${m.title}* — Kod: \`${m.code}\`\n`;
+            kb.text(`${i + 1} 🎬`, `mv:${m.code}`);
+            if (i % 4 === 3) kb.row();
+          });
           return await ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: kb });
         }
 
@@ -450,6 +486,23 @@ function startBot(token) {
           return;
         }
 
+        // Favorite toggle Callback
+        if (data.startsWith('fav:')) {
+          const code = data.split(':')[1];
+          const { favorited } = db.toggleFavorite(ctx.from.id, code);
+          const movie = db.getMovieByCode(code);
+          const likesCount = movie && movie.likes ? movie.likes.length : 0;
+          const dislikesCount = movie && movie.dislikes ? movie.dislikes.length : 0;
+          const keyboard = new InlineKeyboard()
+            .text(`👍 ${likesCount}`, `like:${code}`)
+            .text(`👎 ${dislikesCount}`, `dislike:${code}`)
+            .row()
+            .text(favorited ? '⭐ Sevimlilarda' : '☆ Sevimlilarga', `fav:${code}`);
+          try { await ctx.editMessageReplyMarkup({ reply_markup: keyboard }); } catch (e) {}
+          await ctx.answerCallbackQuery({ text: favorited ? "⭐ Sevimlilarga qo'shildi" : "Sevimlilardan olindi" }).catch(() => {});
+          return;
+        }
+
         // Genre Click Callback
         if (data.startsWith('genre:')) {
           const selectedGenre = data.split(':')[1];
@@ -542,9 +595,12 @@ async function sendMovie(ctx, movie) {
     `📝 _${movie.description || 'Tavsif berilmagan'}_\n\n` +
     `📹 YouTube, Instagram, TikTokdan yuklab olish: @${downloaderBotUsername}`;
 
+  const fav = ctx.from ? db.isFavorite(ctx.from.id, movie.code) : false;
   const keyboard = new InlineKeyboard()
     .text(`👍 ${likesCount}`, `like:${movie.code}`)
-    .text(`👎 ${dislikesCount}`, `dislike:${movie.code}`);
+    .text(`👎 ${dislikesCount}`, `dislike:${movie.code}`)
+    .row()
+    .text(fav ? '⭐ Sevimlilarda' : '☆ Sevimlilarga', `fav:${movie.code}`);
 
   try {
     return await ctx.replyWithVideo(movie.fileId, {
@@ -597,10 +653,39 @@ function getBotUsername() {
   return botUsername;
 }
 
+// Announce a newly added movie to every user (fire-and-forget; throttled).
+async function notifyNewMovie(movie) {
+  if (!isBotRunning || !botInstance) return { sent: 0, failed: 0 };
+  const users = db.getUsers();
+  const caption =
+    `🆕 **Yangi kino qo'shildi!**\n\n` +
+    `🎬 *${movie.title}*\n` +
+    `🗂 ${movie.genre || 'Tarjima kino'}\n` +
+    `🔑 Kod: \`${movie.code}\`\n\n` +
+    `Ko'rish uchun shu kodni yuboring: \`${movie.code}\``;
+  let sent = 0, failed = 0;
+  for (const u of users) {
+    try {
+      if (movie.poster) {
+        await botInstance.api.sendPhoto(u.id, movie.poster, { caption, parse_mode: 'Markdown' });
+      } else {
+        await botInstance.api.sendMessage(u.id, caption, { parse_mode: 'Markdown' });
+      }
+      sent++;
+    } catch (e) {
+      failed++;
+    }
+    await new Promise(r => setTimeout(r, 40));
+  }
+  console.log(`New movie notification for ${movie.code}: sent ${sent}, failed ${failed}`);
+  return { sent, failed };
+}
+
 module.exports = {
   startBot,
   stopBot,
   getBotStatus,
   getBotInstance,
-  getBotUsername
+  getBotUsername,
+  notifyNewMovie
 };

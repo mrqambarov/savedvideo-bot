@@ -125,10 +125,80 @@ function searchMovies(query) {
     const movies = getMovies();
     const cleanQuery = query.toLowerCase().trim();
     if (!cleanQuery) return [];
-    return movies.filter(m => 
-      m.title.toLowerCase().includes(cleanQuery) || 
+    return movies.filter(m =>
+      m.title.toLowerCase().includes(cleanQuery) ||
       m.description.toLowerCase().includes(cleanQuery)
     );
+  } catch (e) {
+    return [];
+  }
+}
+
+// Top movies by views or rating (likes - dislikes)
+function getTopMovies(by = 'views', limit = 10) {
+  try {
+    const movies = [...getMovies()];
+    if (by === 'rating') {
+      movies.sort((a, b) =>
+        ((b.likes?.length || 0) - (b.dislikes?.length || 0)) -
+        ((a.likes?.length || 0) - (a.dislikes?.length || 0)));
+    } else {
+      movies.sort((a, b) => (b.views || 0) - (a.views || 0));
+    }
+    return movies.slice(0, limit);
+  } catch (e) {
+    return [];
+  }
+}
+
+function getRandomMovie() {
+  try {
+    const movies = getMovies();
+    if (!movies.length) return null;
+    return movies[Math.floor(Math.random() * movies.length)];
+  } catch (e) {
+    return null;
+  }
+}
+
+// Favorites (stored as movie codes on the user record)
+function toggleFavorite(userId, code) {
+  try {
+    const users = getUsers();
+    const user = users.find(u => Number(u.id) === Number(userId));
+    if (!user) return { favorited: false };
+    if (!Array.isArray(user.favorites)) user.favorites = [];
+    const c = String(code).trim();
+    const idx = user.favorites.indexOf(c);
+    let favorited;
+    if (idx === -1) { user.favorites.push(c); favorited = true; }
+    else { user.favorites.splice(idx, 1); favorited = false; }
+    saveUsers(users);
+    return { favorited };
+  } catch (e) {
+    return { favorited: false };
+  }
+}
+
+function isFavorite(userId, code) {
+  try {
+    const users = getUsers();
+    const user = users.find(u => Number(u.id) === Number(userId));
+    return !!(user && Array.isArray(user.favorites) && user.favorites.includes(String(code).trim()));
+  } catch (e) {
+    return false;
+  }
+}
+
+function getFavorites(userId) {
+  try {
+    const users = getUsers();
+    const user = users.find(u => Number(u.id) === Number(userId));
+    const codes = (user && Array.isArray(user.favorites)) ? user.favorites : [];
+    const movies = getMovies();
+    return codes
+      .map(c => movies.find(m => String(m.code).trim() === String(c).trim()))
+      .filter(Boolean);
   } catch (e) {
     return [];
   }
@@ -590,6 +660,11 @@ module.exports = {
   deleteMovie,
   getMovieByCode,
   searchMovies,
+  getTopMovies,
+  getRandomMovie,
+  toggleFavorite,
+  isFavorite,
+  getFavorites,
   getGenres,
   saveGenres,
   trackSearchQuery,
