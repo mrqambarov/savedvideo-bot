@@ -12,6 +12,7 @@ const statsFile = path.join(dataDir, 'stats.json');
 const requestsFile = path.join(dataDir, 'requests.json');
 const genresFile = path.join(dataDir, 'genres.json');
 const searchesFile = path.join(dataDir, 'searches.json');
+const tiersFile = path.join(dataDir, 'reward_tiers.json');
 
 const DEFAULT_GENRES = ['Jangari', 'Komediya', 'Melodrama', 'Multfilm', 'Tarixiy', 'Tarjima kino', 'Sarguzasht'];
 
@@ -37,6 +38,9 @@ if (!fs.existsSync(genresFile)) {
 }
 if (!fs.existsSync(searchesFile)) {
   fs.writeFileSync(searchesFile, JSON.stringify({}, null, 2));
+}
+if (!fs.existsSync(tiersFile)) {
+  fs.writeFileSync(tiersFile, JSON.stringify([], null, 2));
 }
 
 // Movies CRUD
@@ -286,16 +290,86 @@ function qualifyReferral(userId) {
   try {
     const users = getUsers();
     const user = users.find(u => Number(u.id) === Number(userId));
-    if (!user || !user.referredBy || user.refQualified) return;
+    if (!user || !user.referredBy || user.refQualified) return { qualified: false };
     user.refQualified = true;
     const referrer = users.find(u => Number(u.id) === Number(user.referredBy));
+    let referrerId = null, refCount = 0;
     if (referrer) {
       referrer.refPending = Math.max(0, (referrer.refPending || 0) - 1);
       referrer.refCount = (referrer.refCount || 0) + 1;
+      referrerId = referrer.id;
+      refCount = referrer.refCount;
     }
     saveUsers(users);
+    return { qualified: true, referrerId, refCount };
   } catch (e) {
     console.error('Error qualifying referral:', e.message);
+    return { qualified: false };
+  }
+}
+
+// Reward tiers: [{ count, reward }] configured by admin.
+function getRewardTiers() {
+  try {
+    const list = JSON.parse(fs.readFileSync(tiersFile, 'utf8'));
+    return Array.isArray(list) ? list.sort((a, b) => a.count - b.count) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveRewardTiers(tiers) {
+  try {
+    const clean = (tiers || [])
+      .map(t => ({ count: parseInt(t.count, 10), reward: String(t.reward || '').trim() }))
+      .filter(t => t.count > 0 && t.reward)
+      .sort((a, b) => a.count - b.count);
+    fs.writeFileSync(tiersFile, JSON.stringify(clean, null, 2));
+    return clean;
+  } catch (e) {
+    return null;
+  }
+}
+
+// After a referrer's count changes, return the highest newly-reached unclaimed
+// tier (and mark it claimed), or null.
+function claimTierFor(userId, refCount) {
+  try {
+    const tiers = getRewardTiers();
+    if (!tiers.length) return null;
+    const users = getUsers();
+    const user = users.find(u => Number(u.id) === Number(userId));
+    if (!user) return null;
+    if (!Array.isArray(user.claimedTiers)) user.claimedTiers = [];
+    const eligible = tiers.filter(t => t.count <= refCount && !user.claimedTiers.includes(t.count));
+    if (!eligible.length) return null;
+    const tier = eligible[eligible.length - 1]; // highest reached (tiers sorted asc)
+    user.claimedTiers.push(tier.count);
+    saveUsers(users);
+    return tier;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Daily check-in streak.
+function checkIn(userId) {
+  try {
+    const users = getUsers();
+    const user = users.find(u => Number(u.id) === Number(userId));
+    if (!user) return { streak: 0, alreadyToday: false };
+    const today = new Date().toISOString().split('T')[0];
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    const yesterday = y.toISOString().split('T')[0];
+    if (user.lastCheckIn === today) {
+      return { streak: user.streak || 0, alreadyToday: true };
+    }
+    user.streak = user.lastCheckIn === yesterday ? (user.streak || 0) + 1 : 1;
+    user.lastCheckIn = today;
+    saveUsers(users);
+    return { streak: user.streak, alreadyToday: false };
+  } catch (e) {
+    return { streak: 0, alreadyToday: false };
   }
 }
 
@@ -699,6 +773,10 @@ module.exports = {
   qualifyReferral,
   getReferralInfo,
   getReferralLeaderboard,
+  getRewardTiers,
+  saveRewardTiers,
+  claimTierFor,
+  checkIn,
   getStats,
   trackMovieView,
   trackSearch,

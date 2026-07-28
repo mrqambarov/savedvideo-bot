@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Gift, Users, CheckCircle2, Clock, Trophy, Dices, Crown, Sparkles } from 'lucide-react';
-import { dlApi, movieApi } from '../lib/api.js';
+import { Gift, Users, CheckCircle2, Clock, Trophy, Dices, Crown, Sparkles, Award, Plus, Trash2 } from 'lucide-react';
+import { dlApi, movieApi, safe } from '../lib/api.js';
 import { useResource } from '../lib/useData.js';
+import { useApp } from '../context/AppContext.jsx';
 import { StatCard, Loader, Segmented, Modal } from '../components/ui.jsx';
 import DataTable from '../components/DataTable.jsx';
 import { nf, avatarColor, initials } from '../lib/format.js';
@@ -12,6 +13,7 @@ export default function Referrals() {
   const { data, loading } = useResource(() => api.get('/referrals'), 30000, [bot]);
   const [winner, setWinner] = useState(null);
   const [rolling, setRolling] = useState(false);
+  const [tiersOpen, setTiersOpen] = useState(false);
 
   const rows = useMemo(() => {
     const list = Array.isArray(data) ? data : [];
@@ -81,9 +83,14 @@ export default function Referrals() {
     <div>
       <div className="between wrap gap" style={{ marginBottom: 18 }}>
         <Segmented options={[{ value: 'movie', label: 'Kino bot' }, { value: 'dl', label: 'Downloader' }]} value={bot} onChange={setBot} />
-        <button className="btn btn-primary" onClick={pickWinner} disabled={totals.qualified === 0}>
-          <Dices size={16} /> Tasodifiy g'olibni tanlash
-        </button>
+        <div className="flex gap wrap">
+          {bot === 'movie' && (
+            <button className="btn btn-ghost" onClick={() => setTiersOpen(true)}><Award size={16} /> Mukofot bosqichlari</button>
+          )}
+          <button className="btn btn-primary" onClick={pickWinner} disabled={totals.qualified === 0}>
+            <Dices size={16} /> Tasodifiy g'olibni tanlash
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-stats">
@@ -135,6 +142,66 @@ export default function Referrals() {
           </div>
         )}
       </Modal>
+
+      <TiersModal open={tiersOpen} onClose={() => setTiersOpen(false)} />
     </div>
+  );
+}
+
+function TiersModal({ open, onClose }) {
+  const { toast } = useApp();
+  const [tiers, setTiers] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [wasOpen, setWasOpen] = useState(false);
+
+  if (open && !wasOpen) {
+    setWasOpen(true);
+    safe(movieApi.get('/reward-tiers')).then(({ data }) => setTiers(Array.isArray(data) ? data : []));
+  }
+  if (!open && wasOpen) setWasOpen(false);
+
+  const add = () => setTiers([...tiers, { count: '', reward: '' }]);
+  const update = (i, field, val) => setTiers(tiers.map((t, idx) => (idx === i ? { ...t, [field]: val } : t)));
+  const remove = (i) => setTiers(tiers.filter((_, idx) => idx !== i));
+
+  const save = async () => {
+    setBusy(true);
+    const { data, error } = await safe(movieApi.post('/reward-tiers', { tiers }));
+    setBusy(false);
+    if (error) return toast(error, 'error');
+    setTiers(data.tiers || []);
+    toast('Mukofot bosqichlari saqlandi');
+    onClose();
+  };
+
+  return (
+    <Modal
+      open={open}
+      title="Bosqichli mukofotlar"
+      onClose={onClose}
+      width={560}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose}>Bekor</button>
+          <button className="btn btn-primary" onClick={save} disabled={busy}>{busy ? <span className="spinner" /> : 'Saqlash'}</button>
+        </>
+      }
+    >
+      <p className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
+        Foydalanuvchi belgilangan sonda do'st taklif qilganda, bot avtomatik ravishda mukofot matnini yuboradi.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {tiers.map((t, i) => (
+          <div key={i} className="flex gap" style={{ alignItems: 'center' }}>
+            <input className="input" style={{ width: 90 }} type="number" min="1" placeholder="soni" value={t.count} onChange={(e) => update(i, 'count', e.target.value)} />
+            <span className="muted">taklif →</span>
+            <input className="input" style={{ flex: 1 }} placeholder="Mukofot (masalan: 10 000 so'm balans)" value={t.reward} onChange={(e) => update(i, 'reward', e.target.value)} />
+            <button className="icon-btn" style={{ width: 34, height: 34 }} onClick={() => remove(i)}><Trash2 size={15} /></button>
+          </div>
+        ))}
+        {tiers.length === 0 && <div className="muted" style={{ padding: '8px 0' }}>Hali bosqich yo'q</div>}
+      </div>
+      <button className="btn btn-ghost" style={{ marginTop: 14 }} onClick={add}><Plus size={16} /> Bosqich qo'shish</button>
+    </Modal>
   );
 }

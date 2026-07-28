@@ -163,7 +163,9 @@ function startBot(token) {
         .row()
         .text('🔥 TOP kinolar').text('🎲 Tasodifiy')
         .row()
-        .text('⭐ Sevimlilarim').text('🎁 Do\'stlarni taklif qilish')
+        .text('⭐ Sevimlilarim').text('📅 Kunlik bonus')
+        .row()
+        .text('🎁 Do\'stlarni taklif qilish')
         .row()
         .text('🙋‍♂️ Buyurtma berish').text('ℹ️ Yordam')
         .resized();
@@ -302,6 +304,16 @@ function startBot(token) {
             if (i % 4 === 3) kb.row();
           });
           return await ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: kb });
+        }
+
+        if (text === '📅 Kunlik bonus') {
+          const { streak, alreadyToday } = db.checkIn(ctx.from.id);
+          if (alreadyToday) {
+            return await ctx.reply(`✅ Bugungi bonusni allaqachon oldingiz!\n\n🔥 Joriy streak: **${streak} kun**\nErtaga yana keling — streakni uzmang!`, { parse_mode: 'Markdown' });
+          }
+          const milestones = { 3: '🎬 3 kunlik streak!', 7: '🏆 7 kun ketma-ket, zo\'r!', 14: '💎 14 kun!', 30: '👑 30 kun — afsona!' };
+          const bonus = milestones[streak] ? `\n\n${milestones[streak]}` : '';
+          return await ctx.reply(`🎁 **Kunlik bonus olindi!**\n\n🔥 Streak: **${streak} kun** ketma-ket\n\nHar kuni kelib streakni oshiring!${bonus}`, { parse_mode: 'Markdown' });
         }
 
         if (text === '🙋‍♂️ Buyurtma berish') {
@@ -586,7 +598,19 @@ function startBot(token) {
 
 async function sendMovie(ctx, movie) {
   // Watching a movie is the qualifying action for the inviter's referral.
-  if (ctx.from) db.qualifyReferral(ctx.from.id);
+  if (ctx.from) {
+    const q = db.qualifyReferral(ctx.from.id);
+    if (q && q.qualified && q.referrerId) {
+      const tier = db.claimTierFor(q.referrerId, q.refCount);
+      if (tier) {
+        try {
+          await ctx.api.sendMessage(q.referrerId,
+            `🎉 **Tabriklaymiz!** Siz **${tier.count} ta** do'st taklif qildingiz va mukofotga ega bo'ldingiz:\n\n🎁 ${tier.reward}`,
+            { parse_mode: 'Markdown' });
+        } catch (e) {}
+      }
+    }
+  }
   const likesCount = movie.likes ? movie.likes.length : 0;
   const dislikesCount = movie.dislikes ? movie.dislikes.length : 0;
   const downloaderBotUsername = process.env.DOWNLOADER_BOT_USERNAME || 'savemedia_music_bot';

@@ -180,6 +180,19 @@ router.get('/referrals', (req, res) => {
   res.json(db.getReferralLeaderboard(200));
 });
 
+// 1d2. Referral reward tiers
+router.get('/reward-tiers', (req, res) => {
+  res.json(db.getRewardTiers());
+});
+
+router.post('/reward-tiers', (req, res) => {
+  const { tiers } = req.body;
+  if (!Array.isArray(tiers)) return res.status(400).json({ error: 'tiers massivi kerak.' });
+  const saved = db.saveRewardTiers(tiers);
+  if (saved) res.json({ success: true, tiers: saved });
+  else res.status(500).json({ error: 'Saqlashda xatolik.' });
+});
+
 // 1e. User management
 router.get('/users', (req, res) => {
   res.json(db.getUsers());
