@@ -178,6 +178,104 @@ function getUserDownloads(userId) {
   }
 }
 
+/**
+ * Computes advanced analytics: growth (daily/weekly/monthly new users),
+ * active users, usage stats, and 14-day trend data for the dashboard.
+ */
+function getAdvancedStats() {
+  const users = getUsers();
+  const stats = getStats();
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+
+  // Helper: date string N days ago
+  function daysAgo(n) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - n);
+    return d.toISOString().split('T')[0];
+  }
+
+  const weekAgoStr = daysAgo(7);
+  const monthAgoStr = daysAgo(30);
+
+  // Count new users by period
+  let newUsersToday = 0, newUsersWeek = 0, newUsersMonth = 0;
+  users.forEach(u => {
+    if (!u.dateJoined) return;
+    const joinDate = u.dateJoined.split('T')[0];
+    if (joinDate === todayStr) newUsersToday++;
+    if (joinDate >= weekAgoStr) newUsersWeek++;
+    if (joinDate >= monthAgoStr) newUsersMonth++;
+  });
+
+  // Calculate active users and usage by period
+  const dailyUsage = stats.dailyUsage || {};
+  let activeToday = 0, activeWeek = 0, activeMonth = 0;
+  let usageToday = { downloadsVideo: 0, downloadsAudio: 0, searches: 0 };
+  let usageWeek = { downloadsVideo: 0, downloadsAudio: 0, searches: 0 };
+  let usageMonth = { downloadsVideo: 0, downloadsAudio: 0, searches: 0 };
+
+  // Collect unique active user sets for week and month
+  const activeWeekSet = new Set();
+  const activeMonthSet = new Set();
+
+  Object.keys(dailyUsage).forEach(dateStr => {
+    const day = dailyUsage[dateStr];
+    const activeUsers = day.activeUsers || [];
+
+    if (dateStr === todayStr) {
+      activeToday = activeUsers.length;
+      usageToday.downloadsVideo = day.videoDownloads || 0;
+      usageToday.downloadsAudio = day.audioDownloads || 0;
+      usageToday.searches = day.searchQueries || 0;
+    }
+
+    if (dateStr >= weekAgoStr) {
+      activeUsers.forEach(id => activeWeekSet.add(id));
+      usageWeek.downloadsVideo += day.videoDownloads || 0;
+      usageWeek.downloadsAudio += day.audioDownloads || 0;
+      usageWeek.searches += day.searchQueries || 0;
+    }
+
+    if (dateStr >= monthAgoStr) {
+      activeUsers.forEach(id => activeMonthSet.add(id));
+      usageMonth.downloadsVideo += day.videoDownloads || 0;
+      usageMonth.downloadsAudio += day.audioDownloads || 0;
+      usageMonth.searches += day.searchQueries || 0;
+    }
+  });
+
+  activeWeek = activeWeekSet.size;
+  activeMonth = activeMonthSet.size;
+
+  // Build 14-day trend data
+  const trend = [];
+  for (let i = 13; i >= 0; i--) {
+    const dateStr = daysAgo(i);
+    const day = dailyUsage[dateStr] || {};
+    const newUsersOnDay = users.filter(u => u.dateJoined && u.dateJoined.split('T')[0] === dateStr).length;
+
+    trend.push({
+      date: dateStr,
+      newUsers: newUsersOnDay,
+      activeUsers: (day.activeUsers || []).length,
+      downloadsVideo: day.videoDownloads || 0,
+      downloadsAudio: day.audioDownloads || 0,
+      searches: day.searchQueries || 0
+    });
+  }
+
+  return {
+    totalUsers: users.length,
+    growth: { newUsersToday, newUsersWeek, newUsersMonth },
+    active: { today: activeToday, week: activeWeek, month: activeMonth },
+    usage: { today: usageToday, week: usageWeek, month: usageMonth },
+    trend,
+    usersList: users,
+    stats
+  };
+}
+
 module.exports = {
   getUsers,
   addUser,
@@ -186,5 +284,6 @@ module.exports = {
   trackSearch,
   trackActiveUser,
   trackUserDownload,
-  getUserDownloads
+  getUserDownloads,
+  getAdvancedStats
 };

@@ -16,7 +16,7 @@ router.post('/login', (req, res) => {
   if (!password) {
     return res.status(400).json({ error: 'Parol kiritilmadi.' });
   }
-  const adminPassword = process.env.ADMIN_PASSWORD || 'Anvar2006';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'Anvar06';
   if (password === adminPassword) {
     res.json({ success: true, token: MOVIE_ADMIN_TOKEN });
   } else {
@@ -197,18 +197,44 @@ router.post('/bot-status', async (req, res) => {
   }
 });
 
-// 4. Stats
+// 4. Stats (Advanced Analytics)
 router.get('/stats', (req, res) => {
   try {
-    const users = db.getUsers();
-    const stats = db.getStats();
-    const movies = db.getMovies();
-    res.json({
-      totalUsers: users.length,
-      usersList: users,
-      moviesList: movies,
-      stats
-    });
+    res.json(db.getAdvancedStats());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 4b. Channels Management (shared channels.json for sponsor rotation)
+const channelsPath = path.join(__dirname, '..', 'channels.json');
+
+router.get('/channels', (req, res) => {
+  try {
+    if (fs.existsSync(channelsPath)) {
+      const channels = JSON.parse(fs.readFileSync(channelsPath, 'utf8'));
+      res.json(channels);
+    } else {
+      res.json([]);
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/channels', (req, res) => {
+  try {
+    const { channels } = req.body;
+    if (!Array.isArray(channels)) {
+      return res.status(400).json({ error: 'channels massivi yuborilishi kerak.' });
+    }
+    const limited = channels.slice(0, 5).map(c => ({
+      username: String(c.username || '').trim(),
+      link: String(c.link || '').trim()
+    })).filter(c => c.username && c.link);
+
+    fs.writeFileSync(channelsPath, JSON.stringify(limited, null, 2));
+    res.json({ success: true, channels: limited });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -291,6 +317,16 @@ router.post('/broadcast', async (req, res) => {
 // 6. Request Endpoints
 router.get('/requests', (req, res) => {
   res.json(db.getRequests());
+});
+
+router.post('/requests/:id/complete', (req, res) => {
+  const { id } = req.params;
+  const completed = db.completeRequest(id);
+  if (completed) {
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'Buyurtma topilmadi.' });
+  }
 });
 
 router.post('/requests/:id/complete', (req, res) => {

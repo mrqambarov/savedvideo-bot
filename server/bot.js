@@ -15,6 +15,7 @@ const urlCache = new Map();
 const localVideoCache = new Map();
 const searchCache = new Map();
 const fileCache = new Map();
+const userPendingActions = new Map();
 
 /**
  * Formats duration in seconds to MM:SS format
@@ -171,10 +172,41 @@ async function queryShazamAPI(rawPcmPath, apiKey) {
   }
 }
 /**
- * Helper to get cleaned and validated sponsor channel username.
- * Automatically tries to fall back to the channel link username if the username input is invalid or contains spaces.
+ * Helper to get the currently active sponsor channel based on 2-day rotation logic.
+ * Reads channels list from shared channels.json file.
  */
-function getCleanSponsorChannel() {
+function getActiveSponsorChannel() {
+  try {
+    const channelsPath = path.join(__dirname, '..', 'channels.json');
+    if (fs.existsSync(channelsPath)) {
+      const channels = JSON.parse(fs.readFileSync(channelsPath, 'utf8'));
+      if (channels && channels.length > 0) {
+        const epochDays = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+        const activeIndex = Math.floor(epochDays / 2) % channels.length;
+        const channel = channels[activeIndex];
+
+        let cleanUsername = channel.username.trim().replace(/\s+/g, '');
+        if (cleanUsername.includes('t.me/')) {
+          const parts = cleanUsername.split('t.me/');
+          cleanUsername = '@' + parts[parts.length - 1].split('/')[0];
+        } else if (!cleanUsername.startsWith('@')) {
+          cleanUsername = '@' + cleanUsername;
+        }
+
+        const isValidUsername = cleanUsername && /^@[a-zA-Z0-9_]+$/.test(cleanUsername);
+        if (isValidUsername) {
+          return {
+            username: cleanUsername,
+            link: channel.link || `https://t.me/${cleanUsername.replace('@', '')}`
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error reading active sponsor channel:', e.message);
+  }
+
+  // Fallback to .env values if channels.json is missing or empty
   const sponsorEnabled = process.env.SPONSOR_CHANNEL_ENABLED === 'true';
   if (!sponsorEnabled) return null;
 
@@ -191,7 +223,6 @@ function getCleanSponsorChannel() {
     }
   }
 
-  // Validate username regex pattern
   const isValidUsername = cleanUsername && /^@[a-zA-Z0-9_]+$/.test(cleanUsername);
   if (!isValidUsername && process.env.SPONSOR_CHANNEL_LINK) {
     const link = process.env.SPONSOR_CHANNEL_LINK.trim();
@@ -202,7 +233,10 @@ function getCleanSponsorChannel() {
   }
 
   if (cleanUsername && /^@[a-zA-Z0-9_]+$/.test(cleanUsername)) {
-    return cleanUsername;
+    return {
+      username: cleanUsername,
+      link: process.env.SPONSOR_CHANNEL_LINK || `https://t.me/${cleanUsername.replace('@', '')}`
+    };
   }
 
   return null;
@@ -271,26 +305,33 @@ function startBot(token) {
           return await next();
         }
 
-        const cleanUsername = getCleanSponsorChannel();
+        const activeChannel = getActiveSponsorChannel();
 
-        if (cleanUsername) {
+        if (activeChannel) {
           try {
-            const chatMember = await ctx.api.getChatMember(cleanUsername, ctx.from.id);
+            const chatMember = await ctx.api.getChatMember(activeChannel.username, ctx.from.id);
             const isMember = ['creator', 'administrator', 'member', 'restricted'].includes(chatMember.status);
             if (!isMember) {
-              const channelLink = process.env.SPONSOR_CHANNEL_LINK || `https://t.me/${cleanUsername.replace('@', '')}`;
+              // Save the pending action so we can process it after verification
+              if (ctx.message) {
+                userPendingActions.set(ctx.from.id, {
+                  type: ctx.message.text ? 'text' : (ctx.message.video ? 'video' : (ctx.message.audio ? 'audio' : (ctx.message.voice ? 'voice' : (ctx.message.document ? 'document' : 'text')))),
+                  message: ctx.message
+                });
+              }
+
               const keyboard = new InlineKeyboard()
-                .url('📢 Kanalga A\'zo Bo\'lish', channelLink)
+                .url(`📢 ${activeChannel.username} kanaliga a'zo bo'lish`, activeChannel.link)
                 .row()
                 .text('🔄 A\'zolikni Tekshirish', 'chk_sub');
 
               return await ctx.reply(
-                `⚠️ **Botdan foydalanish uchun rasmiy kanalimizga a'zo bo'ling!**\n\nKanalga a'zo bo'lgach, botdan to'liq foydalanishingiz mumkin.`,
+                `⚠️ **Botdan foydalanish uchun kanalimizga a'zo bo'ling!**\n\n📢 ${activeChannel.username}\n\nA'zo bo'lgach, "A'zolikni Tekshirish" tugmasini bosing — bot so'rovingizni darhol bajaradi.`,
                 { parse_mode: 'Markdown', reply_markup: keyboard }
               );
             }
           } catch (err) {
-            console.error('Sponsor channel check error for', cleanUsername, ':', err.message);
+            console.error('Sponsor channel check error for', activeChannel.username, ':', err.message);
           }
         }
 
@@ -433,7 +474,8 @@ function formatDownloadError(err) {
             const mediaPath = await downloader.downloadVideo(url, `dl_inst_${shortId}`);
 
             const botUsername = ctx.me.username;
-            const captionText = `❤️ @${botUsername} orqali yuklab olindi 🚀`;
+            const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
+            const captionText = `❤️ @${botUsername} orqali yuklab olindi 🚀\n\n🍿 Yangi kinolar bepul: @${movieBotUsername}`;
             
             const shareText = encodeURIComponent(`Eng tezkor video va musiqa yuklovchi bot! 🚀`);
             const shareUrl = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${shareText}`;
@@ -623,23 +665,33 @@ function formatDownloadError(err) {
 
         // Sponsor Check
         if (action === 'chk_sub') {
-          const cleanUsername = getCleanSponsorChannel();
-          if (!cleanUsername) {
-            await ctx.reply('✅ Rahmat! A\'zolik tekshirish muvaffaqiyatli o\'tdi. Botdan foydalanishingiz mumkin.');
-            try {
-              await ctx.deleteMessage();
-            } catch (e) {}
+          const activeChannel = getActiveSponsorChannel();
+          if (!activeChannel) {
+            // No sponsor channel configured, allow access
+            try { await ctx.deleteMessage(); } catch (e) {}
+            const pending = userPendingActions.get(ctx.from.id);
+            if (pending) {
+              userPendingActions.delete(ctx.from.id);
+              ctx.message = pending.message;
+              return await next();
+            }
             return;
           }
 
           try {
-            const chatMember = await ctx.api.getChatMember(cleanUsername, ctx.from.id);
+            const chatMember = await ctx.api.getChatMember(activeChannel.username, ctx.from.id);
             const isMember = ['creator', 'administrator', 'member', 'restricted'].includes(chatMember.status);
             if (isMember) {
-              await ctx.reply('✅ Rahmat! A\'zoligingiz tasdiqlandi. Endi botdan to\'liq foydalanishingiz mumkin. Boshlash uchun havolani qayta yuboring yoki /start bosing.');
-              try {
-                await ctx.deleteMessage();
-              } catch (e) {}
+              try { await ctx.deleteMessage(); } catch (e) {}
+              const pending = userPendingActions.get(ctx.from.id);
+              if (pending) {
+                userPendingActions.delete(ctx.from.id);
+                // Re-inject the pending message into context and call next
+                ctx.message = pending.message;
+                return await next();
+              } else {
+                await ctx.reply('✅ A\'zoligingiz tasdiqlandi! Endi havolani, video yoki audio faylni yuboring.');
+              }
             } else {
               await ctx.answerCallbackQuery({
                 text: '❌ Siz hali kanalga a\'zo bo\'lmadingiz. Iltimos a\'zo bo\'ling.',
@@ -647,11 +699,14 @@ function formatDownloadError(err) {
               });
             }
           } catch (err) {
-            console.error('Sponsor check callback error for', cleanUsername, ':', err.message);
-            await ctx.reply('✅ Rahmat! A\'zolik tekshirish muvaffaqiyatli o\'tdi. Botdan foydalanishingiz mumkin.');
-            try {
-              await ctx.deleteMessage();
-            } catch (e) {}
+            console.error('Sponsor check callback error:', err.message);
+            try { await ctx.deleteMessage(); } catch (e) {}
+            const pending = userPendingActions.get(ctx.from.id);
+            if (pending) {
+              userPendingActions.delete(ctx.from.id);
+              ctx.message = pending.message;
+              return await next();
+            }
           }
           return;
         }
@@ -825,13 +880,14 @@ function formatDownloadError(err) {
             await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '📤 Telegramga yuklanmoqda...');
             
             const botUsername = ctx.me.username;
+            const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
             const shareText = encodeURIComponent(`Eng tezkor video va musiqa yuklovchi bot! 🚀`);
             const shareUrl = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${shareText}`;
 
             await ctx.replyWithAudio(new InputFile(audioPath), {
               title: song.title,
               performer: `VibeConvert (@${botUsername})`,
-              caption: `❤️ @${botUsername} orqali yuklab olindi 🚀`,
+              caption: `❤️ @${botUsername} orqali yuklab olindi 🚀\n\n🍿 Yangi kinolar bepul: @${movieBotUsername}`,
               reply_markup: new InlineKeyboard()
                 .url('↪️ Do\'stlarga ulashish', shareUrl)
                 .row()

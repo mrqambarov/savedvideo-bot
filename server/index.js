@@ -7,6 +7,7 @@ require('dotenv').config();
 const apiRouter = require('./api');
 const bot = require('./bot');
 const { ensureBinaries } = require('./setup');
+const { cleanTempDirectory } = require('./processor');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,6 +36,12 @@ if (fs.existsSync(clientDist)) {
 app.listen(PORT, async () => {
   console.log(`Express API Server running on port ${PORT}`);
 
+  // Initial temp cleanup and set periodic interval (every 30 minutes)
+  cleanTempDirectory();
+  setInterval(() => {
+    cleanTempDirectory();
+  }, 30 * 60 * 1000);
+
   // Ensure yt-dlp, ffmpeg, ffprobe binaries are correctly downloaded and copied
   try {
     console.log('Verifying server binaries...');
@@ -55,3 +62,4 @@ app.listen(PORT, async () => {
     console.log('No TELEGRAM_BOT_TOKEN configured. Bot is inactive. Set the token in .env or the web UI to start it.');
   }
 });
+

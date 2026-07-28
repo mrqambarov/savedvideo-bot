@@ -41,7 +41,7 @@ router.post('/login', (req, res) => {
   if (!password) {
     return res.status(400).json({ error: 'Parol kiritilmadi.' });
   }
-  const adminPassword = process.env.ADMIN_PASSWORD || 'Anvar2006';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'Anvar06';
   if (password === adminPassword) {
     res.json({ success: true, token: ADMIN_TOKEN });
   } else {
@@ -392,16 +392,45 @@ router.post('/upload-cookies', upload.single('cookies'), (req, res) => {
   }
 });
 
-// 8. Get Users and usage stats
+// 8. Get Users and usage stats (Advanced Analytics)
 router.get('/stats', (req, res) => {
   try {
-    const users = db.getUsers();
-    const stats = db.getStats();
-    res.json({
-      totalUsers: users.length,
-      usersList: users,
-      stats
-    });
+    res.json(db.getAdvancedStats());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 8b. Channels Management (shared channels.json for sponsor rotation)
+const channelsPath = path.join(__dirname, '..', 'channels.json');
+
+router.get('/channels', (req, res) => {
+  try {
+    if (fs.existsSync(channelsPath)) {
+      const channels = JSON.parse(fs.readFileSync(channelsPath, 'utf8'));
+      res.json(channels);
+    } else {
+      res.json([]);
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/channels', (req, res) => {
+  try {
+    const { channels } = req.body;
+    if (!Array.isArray(channels)) {
+      return res.status(400).json({ error: 'channels massivi yuborilishi kerak.' });
+    }
+    // Max 5 channels
+    const limited = channels.slice(0, 5).map(c => ({
+      username: String(c.username || '').trim(),
+      link: String(c.link || '').trim()
+    })).filter(c => c.username && c.link);
+
+    fs.writeFileSync(channelsPath, JSON.stringify(limited, null, 2));
+    res.json({ success: true, channels: limited });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

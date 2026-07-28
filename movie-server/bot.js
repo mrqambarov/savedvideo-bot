@@ -1,19 +1,51 @@
 const { Bot, InlineKeyboard, Keyboard } = require('grammy');
 const db = require('./db');
+const fs = require('fs');
+const path = require('path');
 
 let botInstance = null;
 let isBotRunning = false;
 let botUsername = '';
 const genres = ['Jangari', 'Komediya', 'Melodrama', 'Multfilm', 'Tarixiy', 'Tarjima kino', 'Sarguzasht'];
 const userSession = new Map(); // userId -> state
+const userPendingActions = new Map(); // userId -> pending message context
 
-function getCleanSponsorChannel() {
+function getActiveSponsorChannel() {
+  try {
+    const channelsPath = path.join(__dirname, '..', 'channels.json');
+    if (fs.existsSync(channelsPath)) {
+      const channels = JSON.parse(fs.readFileSync(channelsPath, 'utf8'));
+      if (channels && channels.length > 0) {
+        const epochDays = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+        const activeIndex = Math.floor(epochDays / 2) % channels.length;
+        const channel = channels[activeIndex];
+
+        let cleanUsername = channel.username.trim().replace(/\s+/g, '');
+        if (cleanUsername.includes('t.me/')) {
+          const parts = cleanUsername.split('t.me/');
+          cleanUsername = '@' + parts[parts.length - 1].split('/')[0];
+        } else if (!cleanUsername.startsWith('@')) {
+          cleanUsername = '@' + cleanUsername;
+        }
+
+        if (/^@[a-zA-Z0-9_]+$/.test(cleanUsername)) {
+          return {
+            username: cleanUsername,
+            link: channel.link || `https://t.me/${cleanUsername.replace('@', '')}`
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Movie bot: error reading active sponsor channel:', e.message);
+  }
+
+  // Fallback to .env
   const sponsorEnabled = process.env.MOVIE_SPONSOR_CHANNEL_ENABLED === 'true';
   if (!sponsorEnabled) return null;
 
   let channelUsername = process.env.MOVIE_SPONSOR_CHANNEL_USERNAME;
   let cleanUsername = null;
-
   if (channelUsername) {
     cleanUsername = channelUsername.trim().replace(/\s+/g, '');
     if (cleanUsername.includes('t.me/')) {
@@ -24,7 +56,6 @@ function getCleanSponsorChannel() {
     }
   }
 
-  // Validate username regex pattern
   const isValidUsername = cleanUsername && /^@[a-zA-Z0-9_]+$/.test(cleanUsername);
   if (!isValidUsername && process.env.MOVIE_SPONSOR_CHANNEL_LINK) {
     const link = process.env.MOVIE_SPONSOR_CHANNEL_LINK.trim();
@@ -35,9 +66,11 @@ function getCleanSponsorChannel() {
   }
 
   if (cleanUsername && /^@[a-zA-Z0-9_]+$/.test(cleanUsername)) {
-    return cleanUsername;
+    return {
+      username: cleanUsername,
+      link: process.env.MOVIE_SPONSOR_CHANNEL_LINK || `https://t.me/${cleanUsername.replace('@', '')}`
+    };
   }
-
   return null;
 }
 
@@ -75,20 +108,24 @@ function startBot(token) {
           return await next();
         }
 
-        const cleanUsername = getCleanSponsorChannel();
-        if (cleanUsername) {
+        const activeChannel = getActiveSponsorChannel();
+        if (activeChannel) {
           try {
-            const chatMember = await ctx.api.getChatMember(cleanUsername, ctx.from.id);
+            const chatMember = await ctx.api.getChatMember(activeChannel.username, ctx.from.id);
             const isMember = ['creator', 'administrator', 'member', 'restricted'].includes(chatMember.status);
             if (!isMember) {
-              const channelLink = process.env.MOVIE_SPONSOR_CHANNEL_LINK || `https://t.me/${cleanUsername.replace('@', '')}`;
+              // Save pending message so we can process after verification
+              if (ctx.message) {
+                userPendingActions.set(ctx.from.id, { message: ctx.message });
+              }
+
               const keyboard = new InlineKeyboard()
-                .url('📢 Kanalga A\'zo Bo\'lish', channelLink)
+                .url(`📢 ${activeChannel.username} kanaliga a'zo bo'lish`, activeChannel.link)
                 .row()
                 .text('🔄 A\'zolikni Tekshirish', 'chk_sub');
 
               return await ctx.reply(
-                `⚠️ **Botdan foydalanish uchun rasmiy kanalimizga a'zo bo'ling!**\n\nKanalga a'zo bo'lgach, botdan to'liq foydalanishingiz mumkin.`,
+                `⚠️ **Botdan foydalanish uchun kanalimizga a'zo bo'ling!**\n\n📢 ${activeChannel.username}\n\nA'zo bo'lgach, "A'zolikni Tekshirish" tugmasini bosing — bot so'rovingizni darhol bajaradi.`,
                 { parse_mode: 'Markdown', reply_markup: keyboard }
               );
             }
@@ -303,19 +340,31 @@ function startBot(token) {
         // Sponsor Check
         if (data === 'chk_sub') {
           await ctx.answerCallbackQuery().catch(() => {});
-          const cleanUsername = getCleanSponsorChannel();
-          if (!cleanUsername) {
-            await ctx.reply('✅ Rahmat! A\'zolik muvaffaqiyatli tekshirildi. Boshlash uchun kino kodini kiriting.');
+          const activeChannel = getActiveSponsorChannel();
+          if (!activeChannel) {
             try { await ctx.deleteMessage(); } catch (e) {}
+            const pending = userPendingActions.get(ctx.from.id);
+            if (pending) {
+              userPendingActions.delete(ctx.from.id);
+              ctx.message = pending.message;
+              return await next();
+            }
             return;
           }
 
           try {
-            const chatMember = await ctx.api.getChatMember(cleanUsername, ctx.from.id);
+            const chatMember = await ctx.api.getChatMember(activeChannel.username, ctx.from.id);
             const isMember = ['creator', 'administrator', 'member', 'restricted'].includes(chatMember.status);
             if (isMember) {
-              await ctx.reply('✅ Rahmat! A\'zoligingiz tasdiqlandi. Kino kodini yuboring.');
               try { await ctx.deleteMessage(); } catch (e) {}
+              const pending = userPendingActions.get(ctx.from.id);
+              if (pending) {
+                userPendingActions.delete(ctx.from.id);
+                ctx.message = pending.message;
+                return await next();
+              } else {
+                await ctx.reply('✅ A\'zoligingiz tasdiqlandi! Kino kodi yoki nomini yuboring.');
+              }
             } else {
               await ctx.answerCallbackQuery({
                 text: '❌ Siz hali kanalga a\'zo bo\'lmadingiz.',
@@ -324,8 +373,13 @@ function startBot(token) {
             }
           } catch (err) {
             console.error('Sponsor check callback error:', err.message);
-            await ctx.reply('✅ A\'zolik muvaffaqiyatli tekshirildi. Kino kodini yuboring.');
             try { await ctx.deleteMessage(); } catch (e) {}
+            const pending = userPendingActions.get(ctx.from.id);
+            if (pending) {
+              userPendingActions.delete(ctx.from.id);
+              ctx.message = pending.message;
+              return await next();
+            }
           }
           return;
         }
@@ -432,10 +486,12 @@ function startBot(token) {
 async function sendMovie(ctx, movie) {
   const likesCount = movie.likes ? movie.likes.length : 0;
   const dislikesCount = movie.dislikes ? movie.dislikes.length : 0;
+  const downloaderBotUsername = process.env.DOWNLOADER_BOT_USERNAME || 'savemedia_music_bot';
   const captionText = `🎬 **${movie.title}**\n\n` +
     `🗂 Janr: #${movie.genre ? movie.genre.replace(/\s+/g, '_') : 'Tarjima_kino'}\n` +
     `🔑 Kod: \`${movie.code}\`\n\n` +
-    `📝 _${movie.description || 'Tavsif berilmagan'}_`;
+    `📝 _${movie.description || 'Tavsif berilmagan'}_\n\n` +
+    `📹 YouTube, Instagram, TikTokdan yuklab olish: @${downloaderBotUsername}`;
 
   const keyboard = new InlineKeyboard()
     .text(`👍 ${likesCount}`, `like:${movie.code}`)

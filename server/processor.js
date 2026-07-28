@@ -182,11 +182,38 @@ function generateRawPcmForShazam(inputPath, outputName) {
     });
 }
 
+/**
+ * Scans temp directory and removes files older than maxAgeMs (default: 1 hour)
+ * @param {number} maxAgeMs
+ */
+function cleanTempDirectory(maxAgeMs = 3600000) {
+  try {
+    if (!fs.existsSync(tempDir)) return;
+    const now = Date.now();
+    const files = fs.readdirSync(tempDir);
+    for (const file of files) {
+      const filePath = path.join(tempDir, file);
+      try {
+        const stats = fs.statSync(filePath);
+        if (stats.isFile() && (now - stats.mtimeMs) > maxAgeMs) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (err) {
+        // Ignore single file unlink error
+      }
+    }
+  } catch (err) {
+    console.error('Error cleaning temp directory:', err.message);
+  }
+}
+
 module.exports = {
   extractAudio,
   convertToRoundVideo,
   applyAudioEffect,
   generateRawPcmForShazam,
+  cleanTempDirectory,
   ffmpegPath,
   ffprobePath
 };
+

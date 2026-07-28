@@ -54,6 +54,12 @@ export default function App() {
   // Analytics states
   const [statsData, setStatsData] = useState(null);
 
+  // Channels (Multi-Sponsor) States
+  const [channelsList, setChannelsList] = useState([]);
+  const [newChannelUsername, setNewChannelUsername] = useState('');
+  const [newChannelLink, setNewChannelLink] = useState('');
+  const [channelsSaved, setChannelsSaved] = useState(false);
+
   // Broadcast states
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [broadcastButtonText, setBroadcastButtonText] = useState('');
@@ -75,6 +81,7 @@ export default function App() {
       fetchStats();
       fetchBroadcastStatus();
       fetchRequests();
+      fetchChannels();
     } else {
       fetchPublicConfig();
       fetchPublicMovies();
@@ -182,6 +189,42 @@ export default function App() {
     } catch (err) {
       console.error('Failed to fetch broadcast status:', err);
     }
+  };
+
+  const fetchChannels = async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/channels`);
+      setChannelsList(res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch channels:', err);
+    }
+  };
+
+  const saveChannels = async (updatedChannels) => {
+    try {
+      const res = await axios.post(`${API_BASE}/channels`, { channels: updatedChannels });
+      setChannelsList(res.data.channels || []);
+      setChannelsSaved(true);
+      setTimeout(() => setChannelsSaved(false), 3000);
+    } catch (err) {
+      alert('Kanallarni saqlashda xatolik: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const addChannel = () => {
+    if (!newChannelUsername || !newChannelLink) return;
+    if (channelsList.length >= 5) {
+      return alert('Maksimal 5 ta kanal qo\'shish mumkin.');
+    }
+    const updated = [...channelsList, { username: newChannelUsername, link: newChannelLink }];
+    saveChannels(updated);
+    setNewChannelUsername('');
+    setNewChannelLink('');
+  };
+
+  const removeChannel = (index) => {
+    const updated = channelsList.filter((_, i) => i !== index);
+    saveChannels(updated);
   };
 
   const fetchConfig = async () => {
@@ -316,8 +359,8 @@ export default function App() {
     }
   };
 
-  const filteredMovies = moviesList.filter(m => 
-    m.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredMovies = moviesList.filter(m =>
+    m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     String(m.code).includes(searchQuery) ||
     (m.genre && m.genre.toLowerCase().includes(searchQuery.toLowerCase()))
   );
@@ -325,13 +368,13 @@ export default function App() {
   // If public view (not logged in) - Render stunning catalog
   if (!isAuthenticated) {
     const filteredPublicMovies = publicMoviesList.filter(m => {
-      const matchesSearch = m.title.toLowerCase().includes(publicSearchQuery.toLowerCase()) || 
+      const matchesSearch = m.title.toLowerCase().includes(publicSearchQuery.toLowerCase()) ||
                             String(m.code).includes(publicSearchQuery);
       const matchesGenre = selectedPublicGenre === 'Barchasi' || m.genre === selectedPublicGenre;
       return matchesSearch && matchesGenre;
     });
 
-    const heroMovie = publicMoviesList.length > 0 
+    const heroMovie = publicMoviesList.length > 0
       ? [...publicMoviesList].sort((a, b) => (b.views || 0) - (a.views || 0))[0]
       : null;
 
@@ -356,9 +399,9 @@ export default function App() {
             <p className="catalog-hero-desc">
               {heroMovie.description || 'Ushbu kino hozirda eng ko\'p ko\'rilayotgan kinolar ro\'yxatida birinchi o\'rinda turibdi. Telegram botimiz orqali hoziroq tomosha qiling.'}
             </p>
-            <a 
+            <a
               href={`https://t.me/${publicConfig.botUsername || 'xitfilm_bot'}?start=${heroMovie.code}`}
-              target="_blank" 
+              target="_blank"
               rel="noopener noreferrer"
               className="btn"
               style={{ width: 'fit-content', marginTop: '10px' }}
@@ -374,18 +417,18 @@ export default function App() {
 
         {/* Search & Genres */}
         <div className="catalog-search-row">
-          <input 
-            type="text" 
-            className="text-input" 
-            placeholder="Kino kodi yoki nomini kiriting..." 
+          <input
+            type="text"
+            className="text-input"
+            placeholder="Kino kodi yoki nomini kiriting..."
             style={{ flex: 1, minWidth: '250px' }}
             value={publicSearchQuery}
             onChange={(e) => setPublicSearchQuery(e.target.value)}
           />
           <div className="catalog-filters">
             {['Barchasi', ...genresList].map((genre, idx) => (
-              <button 
-                key={idx} 
+              <button
+                key={idx}
                 className={`catalog-filter-btn ${selectedPublicGenre === genre ? 'active' : ''}`}
                 onClick={() => setSelectedPublicGenre(genre)}
               >
@@ -417,9 +460,9 @@ export default function App() {
                         <span>👁️ {m.views || 0} ta</span>
                         <span className="movie-card-likes">👍 {m.likes?.length || 0}</span>
                       </div>
-                      <a 
+                      <a
                         href={`https://t.me/${publicConfig.botUsername || 'xitfilm_bot'}?start=${m.code}`}
-                        target="_blank" 
+                        target="_blank"
                         rel="noopener noreferrer"
                         className="btn"
                         style={{ padding: '8px 16px', fontSize: '0.85rem' }}
@@ -446,24 +489,24 @@ export default function App() {
               <div className="login-logo">⚙️</div>
               <h1 className="login-title">FilmZone Boshqaruv</h1>
               <p className="login-subtitle">Admin yoki operator paroli</p>
-              
+
               <form onSubmit={handleLogin} className="login-form">
                 <div>
-                  <input 
-                    type="password" 
-                    className="text-input" 
-                    style={{ width: '100%', textAlign: 'center' }} 
+                  <input
+                    type="password"
+                    className="text-input"
+                    style={{ width: '100%', textAlign: 'center' }}
                     placeholder="Parolni kiriting"
                     value={passwordInput}
                     onChange={(e) => setPasswordInput(e.target.value)}
                     required
                   />
                 </div>
-                
+
                 {loginError && (
                   <div className="login-error-msg">⚠️ {loginError}</div>
                 )}
-                
+
                 <button type="submit" className="btn" style={{ width: '100%', marginTop: '10px' }} disabled={loading}>
                   {loading ? <span className="spinner"></span> : 'Kirish'}
                 </button>
@@ -484,7 +527,7 @@ export default function App() {
           <div className="brand-logo">🎬</div>
           <span className="brand-name">FilmZone</span>
         </div>
-        
+
         <ul className="menu-list">
           <li className={`menu-item ${activeTab === 'movies' ? 'active' : ''}`} onClick={() => setActiveTab('movies')}>
             <span className="menu-icon">🍿</span>
@@ -506,9 +549,9 @@ export default function App() {
             <span className="menu-icon">📢</span>
             <span>Broadcaster</span>
           </li>
-          <li className={`menu-item ${activeTab === 'sponsor' ? 'active' : ''}`} onClick={() => setActiveTab('sponsor')}>
+          <li className={`menu-item ${activeTab === 'sponsor' ? 'active' : ''}`} onClick={() => { setActiveTab('sponsor'); fetchChannels(); }}>
             <span className="menu-icon">🔒</span>
-            <span>Sponsor Channel</span>
+            <span>Sponsor Kanallar</span>
           </li>
         </ul>
 
@@ -522,7 +565,7 @@ export default function App() {
 
       {/* Main content area */}
       <main className="main-content">
-        
+
         {/* Tab 1: Movies list */}
         {activeTab === 'movies' && (
           <div>
@@ -539,10 +582,10 @@ export default function App() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '15px' }}>
                     <div>
                       <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px' }}>Kino kodi</label>
-                      <input 
-                        type="text" 
-                        className="text-input" 
-                        placeholder="101" 
+                      <input
+                        type="text"
+                        className="text-input"
+                        placeholder="101"
                         style={{ width: '100%' }}
                         value={movieCode}
                         onChange={(e) => setMovieCode(e.target.value)}
@@ -551,10 +594,10 @@ export default function App() {
                     </div>
                     <div>
                       <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px' }}>Kino nomi</label>
-                      <input 
-                        type="text" 
-                        className="text-input" 
-                        placeholder="Masalan: Forsaj 10 (Uzbekcha)" 
+                      <input
+                        type="text"
+                        className="text-input"
+                        placeholder="Masalan: Forsaj 10 (Uzbekcha)"
                         style={{ width: '100%' }}
                         value={movieTitle}
                         onChange={(e) => setMovieTitle(e.target.value)}
@@ -566,10 +609,10 @@ export default function App() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                     <div>
                       <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px' }}>Telegram File ID</label>
-                      <input 
-                        type="text" 
-                        className="text-input" 
-                        placeholder="BAACAgIAAxkBAAMVY..." 
+                      <input
+                        type="text"
+                        className="text-input"
+                        placeholder="BAACAgIAAxkBAAMVY..."
                         style={{ width: '100%' }}
                         value={movieFileId}
                         onChange={(e) => setMovieFileId(e.target.value)}
@@ -578,7 +621,7 @@ export default function App() {
                     </div>
                     <div>
                       <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px' }}>Janr / Kategoriya</label>
-                      <select 
+                      <select
                         className="genre-select"
                         value={movieGenre}
                         onChange={(e) => setMovieGenre(e.target.value)}
@@ -592,8 +635,8 @@ export default function App() {
 
                   <div>
                     <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '8px' }}>Kino haqida qisqacha ma'lumot (Tavsif)</label>
-                    <textarea 
-                      className="text-input" 
+                    <textarea
+                      className="text-input"
                       style={{ width: '100%', minHeight: '80px', resize: 'vertical' }}
                       placeholder="Ushbu kino haqida batafsil..."
                       value={movieDesc}
@@ -610,10 +653,10 @@ export default function App() {
               {/* Movies list section */}
               <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <h3 style={{ fontFamily: 'var(--font-title)' }}>Filmlar bazasi</h3>
-                <input 
-                  type="text" 
-                  className="text-input" 
-                  placeholder="Kodi yoki nomi bo'yicha qidirish..." 
+                <input
+                  type="text"
+                  className="text-input"
+                  placeholder="Kodi yoki nomi bo'yicha qidirish..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -679,9 +722,9 @@ export default function App() {
                     <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>
                       Movie Bot Token
                     </label>
-                    <input 
-                      type="text" 
-                      className="text-input" 
+                    <input
+                      type="text"
+                      className="text-input"
                       style={{ width: '100%' }}
                       placeholder="Masalan: 987654321:XYZabc..."
                       value={botTokenInput}
@@ -693,9 +736,9 @@ export default function App() {
                     <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>
                       Admin Telegram ID raqamlari (Vergul bilan ajrating)
                     </label>
-                    <input 
-                      type="text" 
-                      className="text-input" 
+                    <input
+                      type="text"
+                      className="text-input"
                       style={{ width: '100%' }}
                       placeholder="Masalan: 123456789, 987654321"
                       value={adminIdsInput}
@@ -720,7 +763,7 @@ export default function App() {
 
               <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <h3 style={{ fontFamily: 'var(--font-title)' }}>Bot Statusi</h3>
-                
+
                 <div>
                   {botStatus.running ? (
                     <span className="status-badge active">● Bot Ishlamoqda</span>
@@ -730,16 +773,16 @@ export default function App() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '15px' }}>
-                  <button 
-                    className="btn" 
-                    onClick={() => toggleBot('start')} 
+                  <button
+                    className="btn"
+                    onClick={() => toggleBot('start')}
                     disabled={loading || botStatus.running || !botStatus.hasToken && !botTokenInput}
                   >
                     ▶ Yoqish
                   </button>
-                  <button 
-                    className="btn btn-secondary btn-danger" 
-                    onClick={() => toggleBot('stop')} 
+                  <button
+                    className="btn btn-secondary btn-danger"
+                    onClick={() => toggleBot('stop')}
                     disabled={loading || !botStatus.running}
                   >
                     ■ To'xtatish
@@ -750,16 +793,17 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 3: Analytics */}
+        {/* Tab 3: Advanced Analytics */}
         {activeTab === 'analytics' && (
           <div>
             <div className="page-header">
               <h1 className="page-title">Bot Analitikasi</h1>
-              <p className="page-subtitle">A'zolar soni va ko'rishlar statistikasi.</p>
+              <p className="page-subtitle">A'zolar o'sishi, faollik va kino ko'rish statistikasi.</p>
             </div>
 
             {statsData ? (
               <div>
+                {/* Summary Cards */}
                 <div className="analytics-grid">
                   <div className="glass-card stat-card">
                     <span style={{ fontSize: '2rem' }}>👥</span>
@@ -768,23 +812,106 @@ export default function App() {
                   </div>
                   <div className="glass-card stat-card">
                     <span style={{ fontSize: '2rem' }}>🎬</span>
-                    <div className="stat-value">{statsData.moviesList?.length || 0}</div>
+                    <div className="stat-value">{statsData.totalMovies || statsData.moviesList?.length || 0}</div>
                     <div className="stat-label">Bazadagi Kinolar</div>
                   </div>
                   <div className="glass-card stat-card">
                     <span style={{ fontSize: '2rem' }}>👁</span>
                     <div className="stat-value">{statsData.stats?.totalViews || 0}</div>
-                    <div className="stat-label">Kinolar ko'rilishi</div>
+                    <div className="stat-label">Jami Ko'rishlar</div>
                   </div>
                   <div className="glass-card stat-card">
                     <span style={{ fontSize: '2rem' }}>🔍</span>
                     <div className="stat-value">{statsData.stats?.totalSearchQueries || 0}</div>
-                    <div className="stat-label">Qidiruvlar</div>
+                    <div className="stat-label">Jami Qidiruvlar</div>
                   </div>
                 </div>
 
-                <div className="glass-card" style={{ marginTop: '30px' }}>
-                  <h3 style={{ marginBottom: '20px', fontFamily: 'var(--font-title)' }}>Bot A'zolari Ro'yxati</h3>
+                {/* Growth & Active Users Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginTop: '25px' }}>
+                  <div className="glass-card">
+                    <h3 style={{ marginBottom: '15px', fontFamily: 'var(--font-title)', fontSize: '1rem' }}>📈 Yangi A'zolar (O'sish)</h3>
+                    <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, textAlign: 'center', padding: '12px', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '12px' }}>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-primary)' }}>{statsData.growth?.newUsersToday || 0}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Bugun</div>
+                      </div>
+                      <div style={{ flex: 1, textAlign: 'center', padding: '12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px' }}>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#3b82f6' }}>{statsData.growth?.newUsersWeek || 0}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Haftalik</div>
+                      </div>
+                      <div style={{ flex: 1, textAlign: 'center', padding: '12px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '12px' }}>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981' }}>{statsData.growth?.newUsersMonth || 0}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Oylik</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="glass-card">
+                    <h3 style={{ marginBottom: '15px', fontFamily: 'var(--font-title)', fontSize: '1rem' }}>🟢 Faol Foydalanuvchilar</h3>
+                    <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, textAlign: 'center', padding: '12px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '12px' }}>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f59e0b' }}>{statsData.active?.today || 0}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Bugun</div>
+                      </div>
+                      <div style={{ flex: 1, textAlign: 'center', padding: '12px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '12px' }}>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ef4444' }}>{statsData.active?.week || 0}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Haftalik</div>
+                      </div>
+                      <div style={{ flex: 1, textAlign: 'center', padding: '12px', background: 'rgba(168, 85, 247, 0.1)', borderRadius: '12px' }}>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#a855f7' }}>{statsData.active?.month || 0}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Oylik</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="glass-card">
+                    <h3 style={{ marginBottom: '15px', fontFamily: 'var(--font-title)', fontSize: '1rem' }}>📊 Foydalanish (Bugun / Hafta / Oy)</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(99, 102, 241, 0.06)', borderRadius: '8px' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>🎬 Kino Ko'rish</span>
+                        <span style={{ fontWeight: 600 }}>{statsData.usage?.today?.movieViews || 0} / {statsData.usage?.week?.movieViews || 0} / {statsData.usage?.month?.movieViews || 0}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(99, 102, 241, 0.06)', borderRadius: '8px' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>🔍 Qidiruvlar</span>
+                        <span style={{ fontWeight: 600 }}>{statsData.usage?.today?.searches || 0} / {statsData.usage?.week?.searches || 0} / {statsData.usage?.month?.searches || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 14-Day Trend Table */}
+                <div className="glass-card" style={{ marginTop: '25px' }}>
+                  <h3 style={{ marginBottom: '20px', fontFamily: 'var(--font-title)' }}>📅 Oxirgi 14 kunlik dinamika</h3>
+                  <div className="table-responsive">
+                    <table className="user-table">
+                      <thead>
+                        <tr>
+                          <th>Sana</th>
+                          <th>Yangi A'zolar</th>
+                          <th>Faol</th>
+                          <th>🎬 Ko'rishlar</th>
+                          <th>🔍 Qidiruv</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {statsData.trend && statsData.trend.map((t, i) => (
+                          <tr key={i}>
+                            <td style={{ fontWeight: t.date === new Date().toISOString().split('T')[0] ? 700 : 400 }}>{t.date}</td>
+                            <td style={{ color: t.newUsers > 0 ? '#10b981' : 'inherit', fontWeight: t.newUsers > 0 ? 600 : 400 }}>+{t.newUsers}</td>
+                            <td>{t.activeUsers}</td>
+                            <td>{t.movieViews}</td>
+                            <td>{t.searches}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Users List */}
+                <div className="glass-card" style={{ marginTop: '25px' }}>
+                  <h3 style={{ marginBottom: '20px', fontFamily: 'var(--font-title)' }}>Bot A'zolari Ro'yxati ({statsData.totalUsers})</h3>
                   <div className="table-responsive">
                     <table className="user-table">
                       <thead>
@@ -865,25 +992,25 @@ export default function App() {
                             <div style={{ display: 'flex', gap: '8px' }}>
                               {req.status !== 'completed' && (
                                 <>
-                                  <button 
-                                    className="btn btn-secondary" 
-                                    style={{ padding: '6px 12px', fontSize: '0.8rem', borderColor: 'var(--color-success)', color: 'var(--color-success)' }} 
+                                  <button
+                                    className="btn btn-secondary"
+                                    style={{ padding: '6px 12px', fontSize: '0.8rem', borderColor: 'var(--color-success)', color: 'var(--color-success)' }}
                                     onClick={() => handleAddMovieFromRequest(req)}
                                   >
                                     ➕ Qo'shish
                                   </button>
-                                  <button 
-                                    className="btn btn-secondary" 
-                                    style={{ padding: '6px 12px', fontSize: '0.8rem' }} 
+                                  <button
+                                    className="btn btn-secondary"
+                                    style={{ padding: '6px 12px', fontSize: '0.8rem' }}
                                     onClick={() => handleCompleteRequest(req.id)}
                                   >
                                     ✓ Bajarildi
                                   </button>
                                 </>
                               )}
-                              <button 
-                                className="btn btn-secondary btn-danger" 
-                                style={{ padding: '6px 12px', fontSize: '0.8rem' }} 
+                              <button
+                                className="btn btn-secondary btn-danger"
+                                style={{ padding: '6px 12px', fontSize: '0.8rem' }}
                                 onClick={() => handleDeleteRequest(req.id)}
                               >
                                 O'chirish
@@ -922,8 +1049,8 @@ export default function App() {
                     <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>
                       Xabar Matni (HTML formatida)
                     </label>
-                    <textarea 
-                      className="text-input" 
+                    <textarea
+                      className="text-input"
                       style={{ width: '100%', minHeight: '150px', resize: 'vertical' }}
                       placeholder="Salom, botimizda yangi kinolar qo'shildi! 🎬"
                       value={broadcastMessage}
@@ -936,9 +1063,9 @@ export default function App() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                     <div>
                       <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>Tugma Matni</label>
-                      <input 
-                        type="text" 
-                        className="text-input" 
+                      <input
+                        type="text"
+                        className="text-input"
                         placeholder="Masalan: Ko'rish"
                         value={broadcastButtonText}
                         onChange={(e) => setBroadcastButtonText(e.target.value)}
@@ -947,9 +1074,9 @@ export default function App() {
                     </div>
                     <div>
                       <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>Tugma URL</label>
-                      <input 
-                        type="url" 
-                        className="text-input" 
+                      <input
+                        type="url"
+                        className="text-input"
                         placeholder="https://t.me/yourchannel"
                         value={broadcastButtonUrl}
                         onChange={(e) => setBroadcastButtonUrl(e.target.value)}
@@ -958,9 +1085,9 @@ export default function App() {
                     </div>
                   </div>
 
-                  <button 
-                    type="submit" 
-                    className="btn" 
+                  <button
+                    type="submit"
+                    className="btn"
                     disabled={loading || !broadcastMessage || broadcastStatus.status === 'running' || !botStatus.running}
                   >
                     🚀 Yuborishni boshlash
@@ -970,7 +1097,7 @@ export default function App() {
 
               <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <h3 style={{ fontFamily: 'var(--font-title)' }}>Yuborish Holati</h3>
-                
+
                 <div>
                   {broadcastStatus.status === 'running' && <span className="status-badge active" style={{ backgroundColor: 'var(--color-primary)', color: '#000' }}>⚡️ Yuborilmoqda</span>}
                   {broadcastStatus.status === 'completed' && <span className="status-badge active">✓ Yakunlandi</span>}
@@ -985,9 +1112,9 @@ export default function App() {
                       <span>{Math.round((broadcastStatus.sent + broadcastStatus.failed) / broadcastStatus.total * 100) || 0}%</span>
                     </div>
                     <div className="progress-bar-bg" style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div 
-                        className="progress-bar-fill" 
-                        style={{ 
+                      <div
+                        className="progress-bar-fill"
+                        style={{
                           height: '100%',
                           width: `${Math.round((broadcastStatus.sent + broadcastStatus.failed) / broadcastStatus.total * 100) || 0}%`,
                           background: 'var(--grad-primary)'
@@ -1014,76 +1141,107 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 5: Sponsor Channel */}
+        {/* Tab 5: Sponsor Channels (Multi-Channel Rotation) */}
         {activeTab === 'sponsor' && (
           <div>
             <div className="page-header">
-              <h1 className="page-title">Sponsorlik Kanali (Majburiy a'zolik)</h1>
-              <p className="page-subtitle">Kino yuklab olishdan oldin majburiy a'zolikni sozlang.</p>
+              <h1 className="page-title">Sponsor Kanallar (Rotatsiya)</h1>
+              <p className="page-subtitle">Kanallar har 2 kunda avtomatik almashadi. Maksimal 5 ta kanal qo'shish mumkin.</p>
             </div>
 
             <div className="glass-card">
-              <h3 style={{ marginBottom: '20px', fontFamily: 'var(--font-title)' }}>Homiy kanal sozlamalari</h3>
+              <h3 style={{ marginBottom: '15px', fontFamily: 'var(--font-title)' }}>📢 Hozirgi Kanallar</h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
+                Bot kanallarni har 2 kunda navbatma-navbat almashtiradi.
+              </p>
+
+              {channelsList.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '25px' }}>
+                  {channelsList.map((ch, idx) => {
+                    const epochDays = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+                    const activeIdx = Math.floor(epochDays / 2) % channelsList.length;
+                    const isActive = idx === activeIdx;
+                    return (
+                      <div key={idx} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '12px 16px', borderRadius: '12px',
+                        border: isActive ? '2px solid var(--color-primary)' : '1px solid var(--border-glass)',
+                        background: isActive ? 'rgba(99, 102, 241, 0.08)' : 'transparent'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          {isActive && <span style={{ fontSize: '0.7rem', background: 'var(--color-primary)', color: '#fff', padding: '2px 8px', borderRadius: '6px', fontWeight: 600 }}>FAOL</span>}
+                          <div>
+                            <div style={{ fontWeight: 600 }}>{ch.username}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{ch.link}</div>
+                          </div>
+                        </div>
+                        <button className="btn btn-secondary btn-danger" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => removeChannel(idx)}>
+                          🗑 O'chirish
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)', border: '1px dashed var(--border-glass)', borderRadius: '12px', marginBottom: '25px' }}>
+                  Hozircha hech qanday sponsor kanal qo'shilmagan.
+                </div>
+              )}
+
+              {channelsSaved && (
+                <div style={{ color: 'var(--color-success)', marginBottom: '15px', fontWeight: '500' }}>
+                  ✓ Kanallar muvaffaqiyatli saqlandi!
+                </div>
+              )}
+
+              <h4 style={{ marginBottom: '12px', fontFamily: 'var(--font-title)', color: 'var(--text-muted)' }}>➕ Yangi Kanal Qo'shish</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '12px', alignItems: 'end' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px' }}>Username</label>
+                  <input type="text" className="text-input" style={{ width: '100%' }} placeholder="@kanal_nomi" value={newChannelUsername} onChange={(e) => setNewChannelUsername(e.target.value)} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px' }}>Havola</label>
+                  <input type="url" className="text-input" style={{ width: '100%' }} placeholder="https://t.me/kanal_nomi" value={newChannelLink} onChange={(e) => setNewChannelLink(e.target.value)} />
+                </div>
+                <button className="btn" onClick={addChannel} disabled={!newChannelUsername || !newChannelLink || channelsList.length >= 5}>
+                  ➕ Qo'shish
+                </button>
+              </div>
+            </div>
+
+            {/* Legacy .env Sponsor */}
+            <div className="glass-card" style={{ marginTop: '20px' }}>
+              <h3 style={{ marginBottom: '15px', fontFamily: 'var(--font-title)' }}>⚙️ .env Sozlamalari (Zaxira)</h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '15px' }}>
+                Agar yuqoridagi kanallar ro'yxati bo'sh bo'lsa, bot ushbu sozlamalardan foydalanadi.
+              </p>
               <form onSubmit={saveConfig} className="login-form">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '25px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
                   <label className="switch">
-                    <input 
-                      type="checkbox" 
-                      checked={sponsorEnabled}
-                      onChange={(e) => setSponsorEnabled(e.target.checked)}
-                    />
+                    <input type="checkbox" checked={sponsorEnabled} onChange={(e) => setSponsorEnabled(e.target.checked)} />
                     <span className="slider-switch"></span>
                   </label>
-                  <div>
-                    <strong style={{ display: 'block' }}>Majburiy a'zolikni yoqish</strong>
-                    <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                      Yoqilganda, bot faqat homiy kanalga a'zo bo'lganlarga javob beradi.
-                    </span>
-                  </div>
+                  <span>Majburiy a'zolikni faollashtirish (.env)</span>
                 </div>
 
                 {sponsorEnabled && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '25px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
                     <div>
-                      <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>
-                        Kanal Username (Masalan: @kanal_nomi)
-                      </label>
-                      <input 
-                        type="text" 
-                        className="text-input" 
-                        style={{ width: '100%' }}
-                        placeholder="@mychannel"
-                        value={sponsorUsernameInput}
-                        onChange={(e) => setSponsorUsernameInput(e.target.value)}
-                        required={sponsorEnabled}
-                      />
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px' }}>Username</label>
+                      <input type="text" className="text-input" style={{ width: '100%' }} placeholder="@mychannel" value={sponsorUsernameInput} onChange={(e) => setSponsorUsernameInput(e.target.value)} />
                     </div>
                     <div>
-                      <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>
-                        Kanal Havolasi (Taklif havolasi)
-                      </label>
-                      <input 
-                        type="url" 
-                        className="text-input" 
-                        style={{ width: '100%' }}
-                        placeholder="https://t.me/mychannel"
-                        value={sponsorLinkInput}
-                        onChange={(e) => setSponsorLinkInput(e.target.value)}
-                        required={sponsorEnabled}
-                      />
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px' }}>Havola</label>
+                      <input type="url" className="text-input" style={{ width: '100%' }} placeholder="https://t.me/mychannel" value={sponsorLinkInput} onChange={(e) => setSponsorLinkInput(e.target.value)} />
                     </div>
                   </div>
                 )}
 
-                <button type="submit" className="btn" disabled={loading}>
-                  💾 Sozlamalarni Saqlash
+                <button type="submit" className="btn btn-secondary" disabled={loading}>
+                  💾 Saqlash
                 </button>
-
-                {configSaved && (
-                  <span style={{ color: 'var(--color-success)', marginLeft: '15px', fontWeight: '500' }}>
-                    ✓ Saqlandi
-                  </span>
-                )}
+                {configSaved && <span style={{ color: 'var(--color-success)', marginLeft: '10px' }}>✓ Saqlandi</span>}
               </form>
             </div>
           </div>
