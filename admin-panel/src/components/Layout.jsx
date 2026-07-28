@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, BarChart3, Film, Inbox, Megaphone, Radio,
-  Download, Bot, Settings, Menu, Moon, Sun, LogOut, Sparkles, Gift,
+  Download, Bot, Settings, Menu, Moon, Sun, LogOut, Sparkles, Gift, Users as UsersIcon,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
 import { movieApi, safe } from '../lib/api.js';
@@ -11,6 +11,7 @@ const NAV = [
   { section: 'Umumiy' },
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/analytics', label: 'Analitika', icon: BarChart3 },
+  { to: '/users', label: 'Foydalanuvchilar', icon: UsersIcon },
   { section: 'Kino bot' },
   { to: '/movies', label: 'Kinolar', icon: Film },
   { to: '/requests', label: "So'rovlar", icon: Inbox, badge: 'requests' },
@@ -27,6 +28,7 @@ const NAV = [
 const TITLES = {
   '/': ['Dashboard', 'Ikkala botning umumiy holati'],
   '/analytics': ['Analitika', "Foydalanuvchilar va faollik tahlili"],
+  '/users': ['Foydalanuvchilar', "Bloklash va shaxsiy xabar yuborish"],
   '/movies': ['Kinolar', 'Kino katalogini boshqarish'],
   '/requests': ["So'rovlar", "Foydalanuvchi kino so'rovlari"],
   '/broadcast': ['Broadcast', 'Ommaviy xabar yuborish'],

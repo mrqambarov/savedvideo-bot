@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import Analytics from './pages/Analytics.jsx';
 import Movies from './pages/Movies.jsx';
 import Requests from './pages/Requests.jsx';
+import Users from './pages/Users.jsx';
 import Broadcast from './pages/Broadcast.jsx';
 import Channels from './pages/Channels.jsx';
 import Referrals from './pages/Referrals.jsx';
@@ -32,6 +33,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/users" element={<Users />} />
           <Route path="/movies" element={<Movies />} />
           <Route path="/requests" element={<Requests />} />
           <Route path="/broadcast" element={<Broadcast />} />

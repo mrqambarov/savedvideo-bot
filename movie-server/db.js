@@ -257,6 +257,29 @@ function addUser(user, referredBy = null) {
   }
 }
 
+function setBanned(userId, banned) {
+  try {
+    const users = getUsers();
+    const user = users.find(u => Number(u.id) === Number(userId));
+    if (!user) return false;
+    user.banned = !!banned;
+    saveUsers(users);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function isBanned(userId) {
+  try {
+    const users = getUsers();
+    const user = users.find(u => Number(u.id) === Number(userId));
+    return !!(user && user.banned);
+  } catch (e) {
+    return false;
+  }
+}
+
 // Anti-cheat: a referral only counts once the invited user does something real
 // (views/searches a movie), not merely opening the bot. Idempotent per user.
 function qualifyReferral(userId) {
@@ -671,6 +694,8 @@ module.exports = {
   getSearchAnalytics,
   getUsers,
   addUser,
+  setBanned,
+  isBanned,
   qualifyReferral,
   getReferralInfo,
   getReferralLeaderboard,

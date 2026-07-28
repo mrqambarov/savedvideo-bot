@@ -117,6 +117,7 @@ function startBot(token) {
           }
           db.addUser(ctx.from, referredBy);
           db.trackActiveUser(ctx.from.id);
+          if (db.isBanned(ctx.from.id)) return; // bloklangan foydalanuvchini e'tiborsiz qoldirish
         }
 
         // Bypass checks for callback queries checking subscription, start/help commands, or if user is admin

@@ -180,6 +180,31 @@ router.get('/referrals', (req, res) => {
   res.json(db.getReferralLeaderboard(200));
 });
 
+// 1e. User management
+router.get('/users', (req, res) => {
+  res.json(db.getUsers());
+});
+
+router.post('/users/:id/ban', (req, res) => {
+  const { banned } = req.body;
+  const ok = db.setBanned(req.params.id, banned);
+  if (ok) res.json({ success: true });
+  else res.status(404).json({ error: 'Foydalanuvchi topilmadi.' });
+});
+
+router.post('/message-user', async (req, res) => {
+  const { id, text } = req.body;
+  if (!id || !text) return res.status(400).json({ error: 'id va matn kerak.' });
+  const instance = bot.getBotInstance();
+  if (!instance) return res.status(400).json({ error: 'Bot faol emas.' });
+  try {
+    await instance.api.sendMessage(id, text, { parse_mode: 'HTML' });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.delete('/movies/:code', (req, res) => {
   const { code } = req.params;
   const deleted = db.deleteMovie(code);
