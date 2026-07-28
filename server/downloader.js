@@ -22,6 +22,16 @@ const browserHeaders = [
   '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 ];
 
+// Network resilience for all yt-dlp calls. Previously used `--retries 0` and
+// `--socket-timeout 5`, which made any slow/transient response fail instantly.
+// player_client=default lets yt-dlp pick its recommended YouTube clients.
+const NET_ARGS = [
+  '--retries', '10',
+  '--fragment-retries', '10',
+  '--socket-timeout', '30',
+  '--extractor-args', 'youtube:player_client=default',
+];
+
 /**
  * Get video metadata from a URL
  * @param {string} url 
@@ -33,9 +43,7 @@ function getInfo(url) {
       '--dump-json', 
       '--no-playlist', 
       '--no-warnings', 
-      '--retries', '0',
-      '--socket-timeout', '5',
-      '--extractor-args', 'youtube:player-client=android,mweb',
+      ...NET_ARGS,
       ...browserHeaders
     ];
     const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
@@ -80,9 +88,7 @@ function downloadVideo(url, outputName) {
       '--merge-output-format', 'mp4',
       '--no-playlist',
       '--geo-bypass',
-      '--retries', '0',
-      '--socket-timeout', '5',
-      '--extractor-args', 'youtube:player-client=android,mweb',
+      ...NET_ARGS,
       '-o', templatePath,
       ...browserHeaders
     ];
@@ -129,9 +135,7 @@ function downloadAudio(url, outputName) {
       '--audio-quality', '5',
       '--no-playlist',
       '--geo-bypass',
-      '--retries', '0',
-      '--socket-timeout', '5',
-      '--extractor-args', 'youtube:player-client=android,mweb',
+      ...NET_ARGS,
       '-o', path.join(tempDir, `${outputName}.%(ext)s`),
       ...browserHeaders
     ];
@@ -168,9 +172,7 @@ function searchMusic(query, limit = 10) {
       '--dump-json',
       '--no-playlist',
       '--geo-bypass',
-      '--retries', '0',
-      '--socket-timeout', '5',
-      '--extractor-args', 'youtube:player-client=android,mweb',
+      ...NET_ARGS,
       ...browserHeaders
     ];
     const cookiesPath = path.join(__dirname, '..', 'cookies.txt');

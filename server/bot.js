@@ -171,6 +171,17 @@ async function queryShazamAPI(rawPcmPath, apiKey) {
     throw new Error('Shazam recognition failed: ' + (error.response?.data?.message || error.message));
   }
 }
+// getChatMember fails on every message when the bot is not an admin of the
+// sponsor channel ("member list is inaccessible"). Throttle that log to once
+// per 5 minutes and spell out the fix, instead of flooding the error log.
+let _lastSponsorWarn = 0;
+function warnSponsorCheck(channel, err) {
+  const now = Date.now();
+  if (now - _lastSponsorWarn < 5 * 60 * 1000) return;
+  _lastSponsorWarn = now;
+  console.error(`Sponsor check failed for ${channel}: ${err.message}. Botni "${channel}" kanaliga ADMIN qiling — getChatMember shuni talab qiladi.`);
+}
+
 /**
  * Helper to get the currently active sponsor channel based on 2-day rotation logic.
  * Reads channels list from shared channels.json file.
@@ -331,7 +342,7 @@ function startBot(token) {
               );
             }
           } catch (err) {
-            console.error('Sponsor channel check error for', activeChannel.username, ':', err.message);
+            warnSponsorCheck(activeChannel.username, err);
           }
         }
 
@@ -339,8 +350,6 @@ function startBot(token) {
       });
 
       const mainKeyboard = new Keyboard()
-        .text('📜 Yuklashlar Tarixi').text('📢 Botni Ulashish')
-        .row()
         .text('❓ Yordam')
         .resized();
 

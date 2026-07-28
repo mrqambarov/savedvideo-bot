@@ -10,6 +10,17 @@ const genres = ['Jangari', 'Komediya', 'Melodrama', 'Multfilm', 'Tarixiy', 'Tarj
 const userSession = new Map(); // userId -> state
 const userPendingActions = new Map(); // userId -> pending message context
 
+// getChatMember fails on every message when the bot is not an admin of the
+// sponsor channel ("member list is inaccessible"). Throttle that log to once
+// per 5 minutes and spell out the fix, instead of flooding the error log.
+let _lastSponsorWarn = 0;
+function warnSponsorCheck(channel, err) {
+  const now = Date.now();
+  if (now - _lastSponsorWarn < 5 * 60 * 1000) return;
+  _lastSponsorWarn = now;
+  console.error(`Sponsor check failed for ${channel}: ${err.message}. Botni "${channel}" kanaliga ADMIN qiling — getChatMember shuni talab qiladi.`);
+}
+
 function getActiveSponsorChannel() {
   try {
     const channelsPath = path.join(__dirname, '..', 'channels.json');
@@ -130,7 +141,7 @@ function startBot(token) {
               );
             }
           } catch (err) {
-            console.error('Movie Bot sponsor check error:', err.message);
+            warnSponsorCheck(activeChannel.username, err);
           }
         }
 
