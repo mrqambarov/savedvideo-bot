@@ -3,72 +3,90 @@ import axios from 'axios';
 
 const API_BASE = `${window.location.origin}/api`;
 
-// Sample Demo Movies dataset (High quality posters for instant rich visual experience)
-const DEMO_MOVIES = [
+// Rich 2026 World & Uzbek Cinema Dataset for stunning initial look
+const RICH_PORTAL_MOVIES = [
   {
     code: '101',
-    title: 'Chaqmoq Makvin 3 (Cars 3)',
-    genre: 'Multfilm',
-    views: 1420,
-    likes: Array(120),
-    dislikes: Array(4),
-    rating: 8.8,
-    poster: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=600&q=80',
-    description: 'Chaqmoq Makvin yangi avlod tezkor poygachilari bilan bellashish uchun o\'zining eng zo\'r mahoratini namoyish etishi kerak. Sarguzashtlarga boy sirkul va poyga animatsiyasi.'
+    title: 'Forsaj 10 (Fast X - Ultra HD)',
+    genre: 'Jangari',
+    year: '2024',
+    rating: 9.3,
+    views: 3420,
+    likes: Array(450),
+    dislikes: Array(15),
+    poster: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=800&q=80',
+    description: 'Dominik Toretto va uning oilasi o\'tmishdan kelgan yangi qudratli dushman - Dante bilan to\'qnash kelishadi. Yuqori tezlik, portlashlar va poyga sahnalari.'
   },
   {
     code: '102',
-    title: 'Forsaj 10 (Fast X)',
-    genre: 'Jangari',
-    views: 2350,
-    likes: Array(310),
-    dislikes: Array(12),
-    rating: 9.1,
-    poster: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80',
-    description: 'Dominik Toretto va uning oilasi o\'tmishdan kelgan yangi qudratli dushman - Dante bilan to\'qnash kelishadi. Yuqori tezlik va hayajonli jang sahnalari.'
+    title: 'Chaqmoq Makvin 3 (Cars 3)',
+    genre: 'Multfilm',
+    year: '2023',
+    rating: 8.9,
+    views: 2150,
+    likes: Array(280),
+    dislikes: Array(6),
+    poster: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=800&q=80',
+    description: 'Chaqmoq Makvin yangi avlod tezkor poygachilari bilan bellashish uchun o\'zining eng zo\'r mahoratini namoyish etishi kerak. Oila va sadoqat haqida sirkul animatsiya.'
   },
   {
     code: '103',
-    title: 'Avatar 2: Suv Yo\'li',
+    title: 'Avatar 2: Suv Yo\'li (Avatar 2)',
     genre: 'Sarguzasht',
-    views: 1890,
-    likes: Array(280),
-    dislikes: Array(8),
-    rating: 9.4,
-    poster: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=600&q=80',
-    description: 'Jeyk Salli va Neytiri oilasi bilan Pandora okeanlari qa\'rida yangi qabilalar orasida panoh izlashadi. Fantastik olam va suv osti mo\'jizalari.'
+    year: '2024',
+    rating: 9.5,
+    views: 4890,
+    likes: Array(620),
+    dislikes: Array(12),
+    poster: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
+    description: 'Jeyk Salli va Neytiri oilasi bilan Pandora okeanlari qa\'rida yangi qabilalar orasida panoh izlashadi. Fantastik suv osti olami va 4K vizual effektlar.'
   },
   {
     code: '104',
-    title: 'Oppenheimer',
+    title: 'Oppenheimer (4K HDR)',
     genre: 'Tarixiy',
-    views: 1120,
-    likes: Array(190),
-    dislikes: Array(3),
+    year: '2023',
     rating: 9.2,
-    poster: 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&fit=crop&w=600&q=80',
-    description: 'Atom bombasining otasi va yaratuvchisi J. Robert Oppenxaymerning dramatik hayoti va dunyo tarixini o\'zgartirgan kashfiyoti.'
+    views: 1820,
+    likes: Array(240),
+    dislikes: Array(5),
+    poster: 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&fit=crop&w=800&q=80',
+    description: 'Atom bombasining otasi va yaratuvchisi J. Robert Oppenxaymerning dramatik hayoti va dunyo tarixini tubdan o\'zgartirgan tadqiqotlari.'
   },
   {
     code: '105',
-    title: 'Qalbing Chilparchin Bo\'ladi',
-    genre: 'Melodrama',
-    views: 950,
-    likes: Array(140),
-    dislikes: Array(5),
-    rating: 8.5,
-    poster: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=600&q=80',
-    description: 'Sevgi, sadoqat va sinovlar haqida ta\'sirli tarjima drama. Chiroyli tuyg\'ular va kutilmagan taqdir burilishlari.'
+    title: 'Dune: 2-Qism (Dune 2)',
+    genre: 'Sarguzasht',
+    year: '2024',
+    rating: 9.4,
+    views: 3100,
+    likes: Array(410),
+    dislikes: Array(8),
+    poster: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=800&q=80',
+    description: 'Pol Atreydes Fremenlar va Chani bilan birlashib, oilasini yo\'q qilgan fitnachilarga qarshi muqaddas intiqom urushini boshlaydi.'
   },
   {
     code: '106',
+    title: 'Qalbing Chilparchin Bo\'ladi',
+    genre: 'Melodrama',
+    year: '2024',
+    rating: 8.6,
+    views: 1250,
+    likes: Array(190),
+    dislikes: Array(7),
+    poster: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=800&q=80',
+    description: 'Sevgi, sadoqat va sinovlar haqida ta\'sirli tarjima drama. Chiroyli tuyg\'ular va kutilmagan taqdir burilishlari.'
+  },
+  {
+    code: '107',
     title: 'Dacha 2026 (Kulgili komediya)',
     genre: 'Komediya',
-    views: 1650,
-    likes: Array(210),
-    dislikes: Array(9),
-    rating: 8.7,
-    poster: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&w=600&q=80',
+    year: '2026',
+    rating: 8.8,
+    views: 2650,
+    likes: Array(330),
+    dislikes: Array(10),
+    poster: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&w=800&q=80',
     description: 'Tog\' bag\'ridagi dachada to mehmonga kelgan do\'stlarning boshidan kechirgan sarguzashtlari va eng kulgili voqealari.'
   }
 ];
@@ -79,13 +97,20 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [favorites, setFavorites] = useState([]);
+  const [heroIndex, setHeroIndex] = useState(0);
 
-  // Admin Modal States
+  // Comments state inside modal
+  const [comments, setComments] = useState([
+    { name: 'Anvar', text: 'Juda zo\'r kino ekan, sifatiga gap yo\'q! 🍿', date: 'Bugun' },
+    { name: 'Jasur', text: 'Ovoz tarjimasi va 4K tasvir judayam tiniq.', date: 'Kechasi' }
+  ]);
+  const [newCommentText, setNewCommentText] = useState('');
+
+  // Admin Modal
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('movieAdminToken'));
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
-
   const [botUsername, setBotUsername] = useState('xitfilm_bot');
 
   useEffect(() => {
@@ -100,17 +125,24 @@ export default function App() {
     fetchConfig();
   }, []);
 
+  // Auto carousel slide timer
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHeroIndex((prev) => (prev + 1) % (moviesList.length || RICH_PORTAL_MOVIES.length));
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [moviesList]);
+
   const fetchMovies = async () => {
     try {
       const res = await axios.get(`${API_BASE}/public-movies`);
       if (res.data && res.data.length > 0) {
         setMoviesList(res.data);
       } else {
-        setMoviesList(DEMO_MOVIES);
+        setMoviesList(RICH_PORTAL_MOVIES);
       }
     } catch (err) {
-      console.log('Using demo dataset for cinema visual experience');
-      setMoviesList(DEMO_MOVIES);
+      setMoviesList(RICH_PORTAL_MOVIES);
     }
   };
 
@@ -123,25 +155,20 @@ export default function App() {
     } catch (e) {}
   };
 
-  const toggleFavorite = (movieCode) => {
-    if (favorites.includes(movieCode)) {
-      setFavorites(favorites.filter(c => c !== movieCode));
+  const toggleFavorite = (code) => {
+    if (favorites.includes(code)) {
+      setFavorites(favorites.filter(c => c !== code));
     } else {
-      setFavorites([...favorites, movieCode]);
+      setFavorites([...favorites, code]);
     }
   };
 
-  // Filter movies
-  const displayedMovies = moviesList.filter(m => {
-    const matchSearch = (m.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        String(m.code).includes(searchQuery);
-    const matchGenre = selectedGenre === 'Barchasi' ||
-                       (selectedGenre === '⭐ Sevimlilar' ? favorites.includes(m.code) : m.genre === selectedGenre);
-    return matchSearch && matchGenre;
-  });
-
-  const heroMovie = moviesList.length > 0 ? moviesList[0] : DEMO_MOVIES[0];
-  const genres = ['Barchasi', 'Jangari', 'Komediya', 'Melodrama', 'Multfilm', 'Tarixiy', 'Sarguzasht', '⭐ Sevimlilar'];
+  const handleAddComment = (e) => {
+    e.preventDefault();
+    if (!newCommentText.trim()) return;
+    setComments([{ name: 'Foydalanuvchi', text: newCommentText.trim(), date: 'Hozir' }, ...comments]);
+    setNewCommentText('');
+  };
 
   const handleAdminLogin = async (e) => {
     e.preventDefault();
@@ -157,69 +184,115 @@ export default function App() {
     }
   };
 
+  const activeMovies = moviesList.length > 0 ? moviesList : RICH_PORTAL_MOVIES;
+  const currentHero = activeMovies[heroIndex % activeMovies.length] || activeMovies[0];
+
+  const displayedMovies = activeMovies.filter(m => {
+    const matchSearch = (m.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        String(m.code).includes(searchQuery);
+    const matchGenre = selectedGenre === 'Barchasi' ||
+                       (selectedGenre === '⭐ Sevimlilar' ? favorites.includes(m.code) : m.genre === selectedGenre);
+    return matchSearch && matchGenre;
+  });
+
+  const genresList = ['Barchasi', 'Jangari', 'Komediya', 'Melodrama', 'Multfilm', 'Tarixiy', 'Sarguzasht', '⭐ Sevimlilar'];
+
   return (
-    <div className="cinema-app">
-      {/* Header Navbar */}
-      <header className="cinema-header">
-        <div className="brand-title" onClick={() => { setSelectedGenre('Barchasi'); setSearchQuery(''); }}>
-          🎬 FilmZone <span className="brand-badge">HD 4K</span>
+    <div className="movie-portal">
+      {/* Top Navbar Header */}
+      <header className="site-navbar">
+        <div className="portal-brand" onClick={() => { setSelectedGenre('Barchasi'); setSearchQuery(''); }}>
+          <div className="brand-icon">🎬</div>
+          <span>FILMZONE <span style={{ color: 'var(--primary-red)', fontSize: '1rem' }}>PRO</span></span>
         </div>
 
-        <div className="search-box">
-          <span className="search-icon">🔍</span>
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Kino kodi yoki nomini izlang..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
+        <ul className="nav-menu">
+          <li className={`nav-link ${selectedGenre === 'Barchasi' ? 'active' : ''}`} onClick={() => setSelectedGenre('Barchasi')}>Premyeralar</li>
+          <li className={`nav-link ${selectedGenre === 'Jangari' ? 'active' : ''}`} onClick={() => setSelectedGenre('Jangari')}>Jangari</li>
+          <li className={`nav-link ${selectedGenre === 'Komediya' ? 'active' : ''}`} onClick={() => setSelectedGenre('Komediya')}>Komediya</li>
+          <li className={`nav-link ${selectedGenre === 'Multfilm' ? 'active' : ''}`} onClick={() => setSelectedGenre('Multfilm')}>Multfilmlar</li>
+          <li className={`nav-link ${selectedGenre === '⭐ Sevimlilar' ? 'active' : ''}`} onClick={() => setSelectedGenre('⭐ Sevimlilar')}>Sevimlilar ({favorites.length})</li>
+        </ul>
 
-        <button className="btn-ghost-cinema" onClick={() => setShowAdminModal(true)}>
-          ⚙️ {isAuthenticated ? 'Admin' : 'Kirish'}
-        </button>
+        <div className="navbar-actions">
+          <div className="search-input-wrap">
+            <span className="search-icon-svg">🔍</span>
+            <input
+              type="text"
+              className="site-search-input"
+              placeholder="Kino kodi yoki nomi..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <a
+            href={`https://t.me/${botUsername}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-primary-site"
+          >
+            🤖 TELEGRAM BOT
+          </a>
+
+          <button className="btn-outline-site" onClick={() => setShowAdminModal(true)}>
+            ⚙️ {isAuthenticated ? 'Admin' : 'Kirish'}
+          </button>
+        </div>
       </header>
 
-      {/* Hero Cinema Banner (Top Featured Movie) */}
-      {!searchQuery && selectedGenre === 'Barchasi' && heroMovie && (
+      {/* Hero Carousel Slider */}
+      {!searchQuery && selectedGenre === 'Barchasi' && currentHero && (
         <div
-          className="hero-banner"
-          style={{ backgroundImage: `url(${heroMovie.poster || DEMO_MOVIES[0].poster})` }}
+          className="site-hero-slider"
+          style={{ backgroundImage: `url(${currentHero.poster || RICH_PORTAL_MOVIES[0].poster})` }}
         >
-          <div className="hero-overlay" />
-          <div className="hero-content">
-            <div className="hero-badge-row">
-              <span className="badge-tag">TOP PREMYERA</span>
-              <span className="badge-rating">⭐️ {heroMovie.rating || 9.1} IMDb</span>
-              <span className="badge-tag" style={{ background: 'rgba(255,255,255,0.15)' }}>{heroMovie.genre || 'Tarjima kino'}</span>
+          <div className="hero-vignette" />
+          <div className="hero-info">
+            <div className="meta-badges">
+              <span className="badge-hd">4K ULTRA HD</span>
+              <span className="badge-imdb">⭐️ {currentHero.rating || 9.2} IMDb</span>
+              <span className="badge-year">{currentHero.year || '2024'}</span>
+              <span className="badge-year" style={{ background: 'rgba(229, 9, 20, 0.2)', color: '#ff3366' }}>{currentHero.genre || 'Tarjima kino'}</span>
             </div>
-            <h1 className="hero-title">{heroMovie.title}</h1>
-            <p className="hero-desc">{heroMovie.description}</p>
-            <div className="hero-buttons">
-              <button className="btn-cinema" onClick={() => setSelectedMovie(heroMovie)}>
-                ▶ HOZIROQ KO'RISH
+            <h1 className="hero-main-title">{currentHero.title}</h1>
+            <p className="hero-synopsis">{currentHero.description}</p>
+
+            <div className="hero-cta">
+              <button className="btn-primary-site" style={{ padding: '14px 34px', fontSize: '1rem' }} onClick={() => setSelectedMovie(currentHero)}>
+                ▶ HOZIROQ TOMOSHA QILISH
               </button>
               <a
-                href={`https://t.me/${botUsername}?start=${heroMovie.code}`}
+                href={`https://t.me/${botUsername}?start=${currentHero.code}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn-ghost-cinema"
-                style={{ textDecoration: 'none' }}
+                className="btn-outline-site"
+                style={{ padding: '14px 28px', textDecoration: 'none' }}
               >
-                🤖 BOTDA SAQLASH (KOD: {heroMovie.code})
+                🍿 TELEGRAMDA SAQLASH (KOD: {currentHero.code})
               </a>
             </div>
+          </div>
+
+          {/* Slider Pagination Dots */}
+          <div className="slider-dots">
+            {activeMovies.slice(0, 5).map((_, idx) => (
+              <div
+                key={idx}
+                className={`dot ${heroIndex === idx ? 'active' : ''}`}
+                onClick={() => setHeroIndex(idx)}
+              />
+            ))}
           </div>
         </div>
       )}
 
-      {/* Category Filter Pills */}
-      <div className="filter-bar">
-        {genres.map((g, idx) => (
+      {/* Genre Filter Chips */}
+      <div className="genre-chips-container">
+        {genresList.map((g, idx) => (
           <div
             key={idx}
-            className={`filter-pill ${selectedGenre === g ? 'active' : ''}`}
+            className={`genre-chip ${selectedGenre === g ? 'active' : ''}`}
             onClick={() => setSelectedGenre(g)}
           >
             {g}
@@ -227,96 +300,130 @@ export default function App() {
         ))}
       </div>
 
-      {/* Movie Section Title */}
-      <div className="section-head">
-        <h2 className="section-title">
-          🍿 {selectedGenre === 'Barchasi' ? 'Barcha Kinolar va Premyeralar' : selectedGenre}
-        </h2>
-        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-          {displayedMovies.length} ta film topildi
-        </span>
-      </div>
+      {/* Main Section */}
+      <main className="portal-section">
+        <div className="section-header">
+          <h2 className="section-heading">
+            🔥 {selectedGenre === 'Barchasi' ? 'Premyeralar va Saralangan Kinolar' : selectedGenre}
+          </h2>
+          <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+            {displayedMovies.length} ta kino mavjud
+          </span>
+        </div>
 
-      {/* Movie Poster Grid */}
-      <div className="movie-grid">
-        {displayedMovies.map((m, idx) => (
-          <div key={idx} className="movie-card" onClick={() => setSelectedMovie(m)}>
-            <div className="poster-wrap">
-              <img
-                src={m.poster || DEMO_MOVIES[idx % DEMO_MOVIES.length].poster}
-                alt={m.title}
-                className="poster-img"
-                loading="lazy"
-              />
-              <div className="poster-overlay">
-                <div className="play-circle">▶</div>
+        {/* Poster Grid */}
+        <div className="poster-cards-grid">
+          {displayedMovies.map((m, idx) => (
+            <div key={idx} className="cinema-card" onClick={() => setSelectedMovie(m)}>
+              <div className="card-poster-frame">
+                <img
+                  src={m.poster || RICH_PORTAL_MOVIES[idx % RICH_PORTAL_MOVIES.length].poster}
+                  alt={m.title}
+                  className="card-img"
+                  loading="lazy"
+                />
+                <div className="card-play-hover">
+                  <div className="play-glow-btn">▶</div>
+                </div>
+                <div className="badge-top-left">🔑 {m.code}</div>
+                <div className="badge-top-right">⭐️ {m.rating || (8.5 + (idx % 10) / 10).toFixed(1)}</div>
               </div>
-              <div className="card-code-badge">🔑 {m.code}</div>
-              <div className="card-rating-badge">⭐️ {m.rating || (8 + (idx % 20) / 10).toFixed(1)}</div>
-            </div>
-            <div className="card-info">
-              <div className="card-title">{m.title}</div>
-              <div className="card-sub">
-                <span>{m.genre || 'Tarjima kino'}</span>
-                <span>👁 {m.views || 0}</span>
+              <div className="card-details-box">
+                <div className="card-movie-title">{m.title}</div>
+                <div className="card-meta-line">
+                  <span>{m.genre || 'Tarjima kino'}</span>
+                  <span>👁 {m.views || 0}</span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </main>
 
-      {/* Cinema Player Modal */}
+      {/* Full Cinema Video Player Modal */}
       {selectedMovie && (
-        <div className="modal-backdrop" onClick={() => setSelectedMovie(null)}>
-          <div className="modal-cinema-card" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-btn" onClick={() => setSelectedMovie(null)}>✕</button>
+        <div className="cinema-modal-overlay" onClick={() => setSelectedMovie(null)}>
+          <div className="cinema-modal-window" onClick={(e) => e.stopPropagation()}>
+            <button className="btn-close-modal" onClick={() => setSelectedMovie(null)}>✕</button>
 
-            <div className="video-player-container">
+            <div className="modal-player-screen">
               {selectedMovie.fileId ? (
                 <video controls autoPlay style={{ width: '100%', height: '100%' }}>
                   <source src={`${API_BASE}/stream/${selectedMovie.code}`} type="video/mp4" />
                   Kino pleyeri qo'llab-quvvatlanmadi.
                 </video>
               ) : (
-                <div style={{ padding: '40px', textAlign: 'center', background: 'radial-gradient(circle, #1a1c29 0%, #08090c 100%)' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🎬</div>
-                  <h3 style={{ fontSize: '1.4rem', color: '#fff', marginBottom: '8px' }}>{selectedMovie.title}</h3>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px' }}>
-                    Ushbu kinoni to'liq HD formatda tomosha qilish va yuklab olish uchun Telegram botga o'ting!
+                <div style={{ padding: '50px 20px', textAlign: 'center', background: 'radial-gradient(circle, #181b28 0%, #06070a 100%)' }}>
+                  <div style={{ fontSize: '3.5rem', marginBottom: '10px' }}>🎬</div>
+                  <h3 style={{ fontSize: '1.6rem', color: '#fff', marginBottom: '10px', fontFamily: 'var(--font-title)' }}>{selectedMovie.title}</h3>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: '24px', maxWidth: '500px', margin: '0 auto 24px auto' }}>
+                    Ushbu film kodi: <strong>{selectedMovie.code}</strong>. Telegram botimiz orqali uni barcha sifatlarda (720p, 1080p) tomosha qiling yoki tezkor yuklab oling!
                   </p>
                   <a
                     href={`https://t.me/${botUsername}?start=${selectedMovie.code}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="btn-cinema"
-                    style={{ textDecoration: 'none' }}
+                    className="btn-primary-site"
+                    style={{ textDecoration: 'none', padding: '12px 30px' }}
                   >
-                    🚀 TELEGRAM BOTDA TOMOSHA QILISH (KOD: {selectedMovie.code})
+                    🚀 TELEGRAM BOTDA KO'RISH (KOD: {selectedMovie.code})
                   </a>
                 </div>
               )}
             </div>
 
-            <div className="modal-details">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h2 className="modal-title">{selectedMovie.title}</h2>
+            <div className="modal-info-body">
+              <div className="modal-header-row">
+                <h2 className="modal-movie-title">{selectedMovie.title}</h2>
                 <button
-                  className="btn-ghost-cinema"
-                  style={{ borderRadius: '12px', padding: '6px 14px', fontSize: '0.85rem' }}
+                  className="btn-outline-site"
                   onClick={() => toggleFavorite(selectedMovie.code)}
                 >
-                  {favorites.includes(selectedMovie.code) ? '⭐ Sevimlilarda' : '☆ Sevimlilarga qo\'shish'}
+                  {favorites.includes(selectedMovie.code) ? '⭐ Sevimlilarda' : '☆ Sevimlilarga Qo\'shish'}
                 </button>
               </div>
 
-              <div className="modal-meta">
-                <span className="badge-tag">{selectedMovie.genre || 'Tarjima kino'}</span>
-                <span style={{ color: 'var(--accent-gold)', fontWeight: 'bold' }}>⭐️ {selectedMovie.rating || 9.0} IMDb</span>
-                <span>🔑 kodi: {selectedMovie.code}</span>
-                <span>👁 {selectedMovie.views || 0} marta ko'rilgan</span>
+              <div className="meta-badges">
+                <span className="badge-hd">4K ULTRA HD</span>
+                <span className="badge-imdb">⭐️ {selectedMovie.rating || 9.2} IMDb</span>
+                <span className="badge-year">🔑 Kodi: {selectedMovie.code}</span>
+                <span className="badge-year">{selectedMovie.genre || 'Tarjima kino'}</span>
+                <span className="badge-year">👁 {selectedMovie.views || 0} marta ko'rilgan</span>
               </div>
 
-              <p className="modal-desc">{selectedMovie.description || 'Juda ham qiziqarli tarjima kino. Telegram botimiz orqali uni barcha sifatlarda yuklab olishingiz mumkin.'}</p>
+              <p className="hero-synopsis" style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+                {selectedMovie.description || 'Juda ta\'sirli va hayajonli tarjima kino. Yuqori sifat va professional tarjimada taqdim etiladi.'}
+              </p>
+
+              {/* Comments Section */}
+              <div className="comments-section">
+                <h4 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', marginBottom: '12px' }}>💬 Tomoshabinlar Sharhlari ({comments.length})</h4>
+
+                <form onSubmit={handleAddComment} className="comment-input-row">
+                  <input
+                    type="text"
+                    className="comment-input"
+                    placeholder="Kino haqida fikringizni yozib qoldiring..."
+                    value={newCommentText}
+                    onChange={(e) => setNewCommentText(e.target.value)}
+                  />
+                  <button type="submit" className="btn-primary-site" style={{ borderRadius: '12px', padding: '0 20px' }}>
+                    Yuborish
+                  </button>
+                </form>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
+                  {comments.map((c, i) => (
+                    <div key={i} style={{ background: 'rgba(255,255,255,0.03)', padding: '12px 16px', borderRadius: '10px', border: '1px solid var(--border-glass)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: '4px' }}>
+                        <span>👤 {c.name}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{c.date}</span>
+                      </div>
+                      <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{c.text}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -324,25 +431,25 @@ export default function App() {
 
       {/* Admin Login Modal */}
       {showAdminModal && (
-        <div className="modal-backdrop" onClick={() => setShowAdminModal(false)}>
-          <div className="modal-cinema-card" style={{ maxWidth: '420px', padding: '30px' }} onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-btn" onClick={() => setShowAdminModal(false)}>✕</button>
-            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.4rem', marginBottom: '10px' }}>⚙️ Admin Panelga Kirish</h3>
+        <div className="cinema-modal-overlay" onClick={() => setShowAdminModal(false)}>
+          <div className="cinema-modal-window" style={{ maxWidth: '440px', padding: '30px' }} onClick={(e) => e.stopPropagation()}>
+            <button className="btn-close-modal" onClick={() => setShowAdminModal(false)}>✕</button>
+            <h3 style={{ fontFamily: 'var(--font-title)', fontSize: '1.5rem', marginBottom: '10px' }}>⚙️ Admin Panelga Kirish</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '20px' }}>
-              Kinolar, foydalanuvchilar va reklamalarni boshqarish uchun admin parolini kiriting.
+              Kinolarni bazaga qo'shish va boshqaruv uchun parolni kiriting.
             </p>
 
             <form onSubmit={handleAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <input
                 type="password"
-                className="search-input"
-                style={{ paddingLeft: '16px', borderRadius: '12px' }}
+                className="site-search-input"
+                style={{ paddingLeft: '18px', borderRadius: '12px' }}
                 placeholder="Admin paroli..."
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
               />
               {loginError && <div style={{ color: 'var(--primary-red)', fontSize: '0.85rem' }}>{loginError}</div>}
-              <button type="submit" className="btn-cinema" style={{ justifyContent: 'center' }}>
+              <button type="submit" className="btn-primary-site" style={{ justifyContent: 'center' }}>
                 Kirish
               </button>
             </form>
@@ -350,25 +457,18 @@ export default function App() {
         </div>
       )}
 
-      {/* Bottom Mobile Navigation */}
-      <nav className="bottom-nav">
-        <div className={`nav-item ${selectedGenre === 'Barchasi' ? 'active' : ''}`} onClick={() => setSelectedGenre('Barchasi')}>
-          <span className="nav-icon">🏠</span>
-          <span>Asosiy</span>
+      {/* Site Footer */}
+      <footer className="site-footer">
+        <div>
+          <div style={{ fontWeight: 800, color: '#fff', fontSize: '1.1rem', fontFamily: 'var(--font-title)', marginBottom: '4px' }}>🎬 FILMZONE PRO CINEMA</div>
+          <div>Barcha huquqlar saqlangan © 2026. Sifatli va tezkor kino portali.</div>
         </div>
-        <div className={`nav-item ${selectedGenre === 'Jangari' ? 'active' : ''}`} onClick={() => setSelectedGenre('Jangari')}>
-          <span className="nav-icon">🔥</span>
-          <span>Jangari</span>
+        <div>
+          <a href={`https://t.me/${botUsername}`} target="_blank" rel="noopener noreferrer" className="btn-primary-site" style={{ textDecoration: 'none' }}>
+            🤖 Telegram Botga o'tish
+          </a>
         </div>
-        <div className={`nav-item ${selectedGenre === '⭐ Sevimlilar' ? 'active' : ''}`} onClick={() => setSelectedGenre('⭐ Sevimlilar')}>
-          <span className="nav-icon">⭐</span>
-          <span>Sevimlilar</span>
-        </div>
-        <div className="nav-item" onClick={() => setShowAdminModal(true)}>
-          <span className="nav-icon">⚙️</span>
-          <span>Admin</span>
-        </div>
-      </nav>
+      </footer>
     </div>
   );
 }
