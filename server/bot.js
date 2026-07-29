@@ -987,11 +987,16 @@ function formatDownloadError(err) {
         fileCache.set(shortFileId, fileId);
 
         const keyboard = new InlineKeyboard()
+          .text('🌀 Dumaloq Video Qilish (Video Note)', `aud_to_round:${shortFileId}`)
+          .row()
+          .text('⚡️ 1.25x Tezlatish', `aud_speed:${shortFileId}:1.25`)
+          .text('🌌 0.75x Sekinlatish', `aud_speed:${shortFileId}:0.75`)
+          .row()
           .text('🎹 Musiqa Effektlari (FX)', `aud_effects:${shortFileId}`)
           .row()
           .text('🔍 Musiqani aniqlash (Shazam)', `aud_identify:${shortFileId}`);
 
-        await ctx.reply('📥 Musiqa qabul qilindi. Nima qilishni xohlaysiz?', { reply_markup: keyboard });
+        await ctx.reply('📥 Musiqa/Ovoz qabul qilindi. Nima qilishni xohlaysiz?', { reply_markup: keyboard });
       });
 
       // Handle callback queries
@@ -1320,6 +1325,62 @@ function formatDownloadError(err) {
           } catch (err) {
             console.error(err);
             await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Video aylantirishda xatolik: ${err.message}`);
+            if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
+          }
+        }
+
+        // 4.5 Audio to Round Video
+        if (action === 'aud_to_round') {
+          const shortFileId = param1;
+          const fileId = fileCache.get(shortFileId);
+          if (!fileId) return ctx.reply('❌ Kechirasiz, yuklash muddati o\'tgan. Iltimos audio faylni qayta yuboring.');
+
+          const waitMsg = await ctx.reply('🌀 Audio yuklanib, Dumaloq Video (Teleskop 1:1) tayyorlanmoqda...');
+          const tempInput = path.join(downloader.tempDir, `in_${shortFileId}.mp3`);
+
+          try {
+            await downloadTelegramFile(ctx, fileId, tempInput);
+            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '⚡️ FFmpeg audio vizualizatsiyasi va 1:1 kvadrat tayyorlanmoqda...');
+            const outPath = await processor.convertAudioToRoundVideo(tempInput, `round_aud_${shortFileId}`);
+
+            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '📤 Dumaloq video yuborilmoqda...');
+            await ctx.replyWithVideoNote(new InputFile(outPath));
+
+            await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
+            fs.unlinkSync(tempInput);
+            fs.unlinkSync(outPath);
+          } catch (err) {
+            console.error(err);
+            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Video aylantirishda xatolik: ${err.message}`);
+            if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
+          }
+        }
+
+        // 4.6 Audio Speed
+        if (action === 'aud_speed') {
+          const shortFileId = param1;
+          const factor = parseFloat(param2) || 1.25;
+          const fileId = fileCache.get(shortFileId);
+          if (!fileId) return ctx.reply('❌ Kechirasiz, yuklash muddati o\'tgan. Iltimos audio faylni qayta yuboring.');
+
+          const waitMsg = await ctx.reply(`⚡️ Audio tezligi ${factor}x ga o'zgartirilmoqda...`);
+          const tempInput = path.join(downloader.tempDir, `in_${shortFileId}.mp3`);
+
+          try {
+            await downloadTelegramFile(ctx, fileId, tempInput);
+            const outPath = await processor.changeAudioSpeed(tempInput, `speed_${factor}_${shortFileId}`, factor);
+
+            await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
+            await ctx.replyWithAudio(new InputFile(outPath), {
+              caption: `⚡️ **Audio tezligi:** ${factor}x\n❤️ @${ctx.me.username} orqali tahrirlandi`,
+              parse_mode: 'Markdown'
+            });
+
+            fs.unlinkSync(tempInput);
+            fs.unlinkSync(outPath);
+          } catch (err) {
+            console.error(err);
+            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Tezlikni o'zgartirishda xatolik: ${err.message}`);
             if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
           }
         }

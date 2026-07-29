@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Megaphone, CheckCircle2, XCircle, Users } from 'lucide-react';
+import { Send, Megaphone, CheckCircle2, XCircle, Users, Plus, Trash2 } from 'lucide-react';
 import { dlApi, movieApi, safe } from '../lib/api.js';
 import { useApp } from '../context/AppContext.jsx';
 import { Segmented } from '../components/ui.jsx';
@@ -9,13 +9,28 @@ export default function Broadcast() {
   const { toast } = useApp();
   const [bot, setBot] = useState('dl');
   const [msg, setMsg] = useState('');
-  const [btnText, setBtnText] = useState('');
-  const [btnUrl, setBtnUrl] = useState('');
+  const [mediaType, setMediaType] = useState('text'); // 'text', 'photo', 'video'
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [buttons, setButtons] = useState([{ label: '', url: '' }]);
   const [progress, setProgress] = useState(null);
   const [sending, setSending] = useState(false);
   const timer = useRef(null);
 
   const api = bot === 'dl' ? dlApi : movieApi;
+
+  const addButton = () => {
+    setButtons([...buttons, { label: '', url: '' }]);
+  };
+
+  const removeButton = (index) => {
+    setButtons(buttons.filter((_, i) => i !== index));
+  };
+
+  const updateButton = (index, field, val) => {
+    const updated = [...buttons];
+    updated[index][field] = val;
+    setButtons(updated);
+  };
 
   const poll = async () => {
     const { data } = await safe(api.get('/broadcast'));
@@ -46,11 +61,16 @@ export default function Broadcast() {
 
   const start = async () => {
     if (!msg.trim()) return toast('Xabar matnini kiriting', 'error');
-    if ((btnText && !btnUrl) || (!btnText && btnUrl)) return toast('Tugma matni va havolasi birga kiritilishi kerak', 'error');
+    const validButtons = buttons.filter(b => b.label.trim() && b.url.trim());
     setSending(true);
-    const { data, error } = await safe(api.post('/broadcast', { message: msg, buttonText: btnText || undefined, buttonUrl: btnUrl || undefined }));
+    const { data, error } = await safe(api.post('/broadcast', {
+      message: msg,
+      mediaType,
+      mediaUrl: mediaUrl.trim() || undefined,
+      buttons: validButtons
+    }));
     if (error) { setSending(false); return toast(error, 'error'); }
-    toast('Tarqatish boshlandi');
+    toast('Media reklama tarqatilishi boshlandi');
     if (data?.progress) setProgress(data.progress);
     timer.current = setInterval(poll, 1500);
   };
@@ -62,27 +82,79 @@ export default function Broadcast() {
     <div className="grid grid-2">
       <div className="card">
         <div className="card-head">
-          <h3>Yangi xabar</h3>
+          <h3>📢 Media & Multi-Button Reklama</h3>
           <div className="spacer" />
-          <Segmented options={[{ value: 'dl', label: 'Downloader' }, { value: 'movie', label: 'Kino bot' }]} value={bot} onChange={setBot} />
+          <Segmented options={[{ value: 'dl', label: 'Downloader Bot' }, { value: 'movie', label: 'Kino Bot' }]} value={bot} onChange={setBot} />
         </div>
         <div className="card-pad">
           <div className="field">
-            <label>Xabar matni (HTML)</label>
-            <textarea className="textarea" style={{ minHeight: 140 }} value={msg} onChange={(e) => setMsg(e.target.value)}
-              placeholder="Assalomu alaykum! Yangiliklar..." disabled={running} />
+            <label>Xabar turi</label>
+            <Segmented
+              options={[
+                { value: 'text', label: '💬 Matn' },
+                { value: 'photo', label: '🖼 Rasm (Photo)' },
+                { value: 'video', label: '🎥 Video' }
+              ]}
+              value={mediaType}
+              onChange={setMediaType}
+            />
           </div>
-          <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+
+          {mediaType !== 'text' && (
             <div className="field">
-              <label>Tugma matni (ixtiyoriy)</label>
-              <input className="input" value={btnText} onChange={(e) => setBtnText(e.target.value)} placeholder="Batafsil" disabled={running} />
+              <label>{mediaType === 'photo' ? 'Rasm havolasi (Direct URL)' : 'Video havolasi (Direct URL)'}</label>
+              <input
+                className="input"
+                value={mediaUrl}
+                onChange={(e) => setMediaUrl(e.target.value)}
+                placeholder="https://example.com/media.jpg"
+                disabled={running}
+              />
             </div>
-            <div className="field">
-              <label>Tugma havolasi</label>
-              <input className="input" value={btnUrl} onChange={(e) => setBtnUrl(e.target.value)} placeholder="https://..." disabled={running} />
-            </div>
+          )}
+
+          <div className="field">
+            <label>Xabar matni / Caption (HTML formatida)</label>
+            <textarea className="textarea" style={{ minHeight: 120 }} value={msg} onChange={(e) => setMsg(e.target.value)}
+              placeholder="Assalomu alaykum! Yangi chegirmalar va aksiyalar..." disabled={running} />
           </div>
-          <button className="btn btn-primary btn-block" onClick={start} disabled={sending || running}>
+
+          <div className="field">
+            <div className="between" style={{ marginBottom: 8 }}>
+              <label style={{ margin: 0 }}>Inline Tugmalar (Multi-Buttons)</label>
+              <button className="btn btn-ghost btn-sm" onClick={addButton} disabled={running}>
+                <Plus size={14} /> Tugma qo'shish
+              </button>
+            </div>
+
+            {buttons.map((b, idx) => (
+              <div key={idx} className="flex gap" style={{ marginBottom: 8, alignItems: 'center' }}>
+                <input
+                  className="input"
+                  style={{ flex: 1 }}
+                  placeholder="Tugma Nomi"
+                  value={b.label}
+                  onChange={(e) => updateButton(idx, 'label', e.target.value)}
+                  disabled={running}
+                />
+                <input
+                  className="input"
+                  style={{ flex: 1.5 }}
+                  placeholder="https://..."
+                  value={b.url}
+                  onChange={(e) => updateButton(idx, 'url', e.target.value)}
+                  disabled={running}
+                />
+                {buttons.length > 1 && (
+                  <button className="icon-btn" onClick={() => removeButton(idx)} disabled={running}>
+                    <Trash2 size={15} color="var(--danger)" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <button className="btn btn-primary btn-block" onClick={start} disabled={sending || running} style={{ marginTop: 14 }}>
             {running ? <><span className="spinner" /> Tarqatilmoqda...</> : <><Send size={16} /> Hammaga yuborish</>}
           </button>
         </div>

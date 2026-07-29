@@ -488,6 +488,83 @@ router.post('/channels', (req, res) => {
   }
 });
 
+// 3. Process Upload (Circular Video, Audio Extract, Effects, Identify, Trim, Speed, Audio-to-Round)
+router.post('/process-upload', upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded.' });
+  }
+
+  const inputPath = req.file.path;
+  const action = req.body.action; // 'extract-audio', 'round-video', 'audio-effect', 'identify-music', 'trim-audio', 'speed-audio', 'audio-to-round-video'
+  const style = req.body.style || 'circular'; // for round-video
+  const effect = req.body.effect; // for audio-effect
+  const fileId = Math.random().toString(36).substring(2, 8);
+
+  try {
+    if (action === 'extract-audio') {
+      const outputPath = await processor.extractAudio(inputPath, `web_ext_${fileId}`);
+      res.download(outputPath, path.basename(outputPath), () => {
+        fs.unlinkSync(inputPath);
+        fs.unlinkSync(outputPath);
+      });
+    } 
+    else if (action === 'trim-audio') {
+      const startSec = parseInt(req.body.startSec, 10) || 0;
+      const durationSec = parseInt(req.body.durationSec, 10) || 30;
+      const outputPath = await processor.trimAudio(inputPath, `web_trim_${fileId}`, startSec, durationSec);
+      res.download(outputPath, path.basename(outputPath), () => {
+        fs.unlinkSync(inputPath);
+        fs.unlinkSync(outputPath);
+      });
+    }
+    else if (action === 'speed-audio') {
+      const speedFactor = parseFloat(req.body.speedFactor) || 1.25;
+      const outputPath = await processor.changeAudioSpeed(inputPath, `web_speed_${fileId}`, speedFactor);
+      res.download(outputPath, path.basename(outputPath), () => {
+        fs.unlinkSync(inputPath);
+        fs.unlinkSync(outputPath);
+      });
+    }
+    else if (action === 'audio-to-round-video') {
+      const outputPath = await processor.convertAudioToRoundVideo(inputPath, `web_round_audio_${fileId}`);
+      res.download(outputPath, path.basename(outputPath), () => {
+        fs.unlinkSync(inputPath);
+        fs.unlinkSync(outputPath);
+      });
+    }
+    else if (action === 'round-video') {
+      const outputPath = await processor.convertToRoundVideo(inputPath, `web_round_${fileId}`, style);
+      res.download(outputPath, path.basename(outputPath), () => {
+        fs.unlinkSync(inputPath);
+        fs.unlinkSync(outputPath);
+      });
+    } else if (action === 'audio-effect') {
+      const outputPath = await processor.applyAudioEffect(inputPath, `web_fx_${fileId}`, effect);
+      res.download(outputPath, path.basename(outputPath), () => {
+        fs.unlinkSync(inputPath);
+        fs.unlinkSync(outputPath);
+      });
+    } else if (action === 'identify-music') {
+      const rawPath = await processor.generateRawPcmForShazam(inputPath, `web_shazam_${fileId}`);
+      try {
+        const result = await shazam.identifySong(rawPath);
+        res.json({ success: true, result });
+      } catch (shazamErr) {
+        res.status(404).json({ error: shazamErr.message });
+      } finally {
+        fs.unlinkSync(inputPath);
+        if (fs.existsSync(rawPath)) fs.unlinkSync(rawPath);
+      }
+    } else {
+      fs.unlinkSync(inputPath);
+      res.status(400).json({ error: 'Noma\'lum amalgam.' });
+    }
+  } catch (err) {
+    if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 let currentBroadcast = {
   total: 0,
   sent: 0,
@@ -503,7 +580,7 @@ router.get('/broadcast', (req, res) => {
 
 // Start broadcast
 router.post('/broadcast', async (req, res) => {
-  const { message, buttonText, buttonUrl } = req.body;
+  const { message, buttonText, buttonUrl, mediaType, mediaUrl, buttons } = req.body;
   if (!message) {
     return res.status(400).json({ error: 'Xabar matni kiritilishi shart.' });
   }
@@ -550,15 +627,32 @@ router.post('/broadcast', async (req, res) => {
     index++;
 
     try {
-      const options = {};
-      if (buttonText && buttonUrl) {
-        options.reply_markup = new InlineKeyboard().url(buttonText, buttonUrl);
+      const keyboard = new InlineKeyboard();
+      const btnList = Array.isArray(buttons) && buttons.length > 0
+        ? buttons
+        : (buttonText && buttonUrl ? [{ label: buttonText, url: buttonUrl }] : []);
+
+      btnList.forEach((btn, idx) => {
+        const label = btn.label || btn.text || 'Tugma';
+        const url = btn.url;
+        if (url) {
+          keyboard.url(label, url);
+          if ((idx + 1) % 2 === 0) keyboard.row();
+        }
+      });
+
+      const options = { parse_mode: 'HTML' };
+      if (btnList.length > 0) {
+        options.reply_markup = keyboard;
       }
 
-      await telegramBot.api.sendMessage(user.id, message, {
-        parse_mode: 'HTML',
-        ...options
-      });
+      if (mediaType === 'photo' && mediaUrl) {
+        await telegramBot.api.sendPhoto(user.id, mediaUrl, { caption: message, ...options });
+      } else if (mediaType === 'video' && mediaUrl) {
+        await telegramBot.api.sendVideo(user.id, mediaUrl, { caption: message, ...options });
+      } else {
+        await telegramBot.api.sendMessage(user.id, message, options);
+      }
       currentBroadcast.sent++;
     } catch (err) {
       currentBroadcast.failed++;

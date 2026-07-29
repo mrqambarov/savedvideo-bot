@@ -205,6 +205,53 @@ function trimAudio(inputPath, outputName, startSec = 0, durationSec = 30) {
 }
 
 /**
+ * Changes audio playback speed
+ * @param {string} inputPath 
+ * @param {string} outputName 
+ * @param {number} speedFactor (e.g. 0.75, 1.25, 1.5)
+ * @returns {Promise<string>} Path to output MP3 file
+ */
+function changeAudioSpeed(inputPath, outputName, speedFactor = 1.25) {
+  const outputPath = path.join(tempDir, `${outputName}.mp3`);
+  const filter = `asetrate=48000*${speedFactor},aresample=48000`;
+  const args = [
+    '-y',
+    '-threads', '0',
+    '-i', inputPath,
+    '-af', filter,
+    '-acodec', 'libmp3lame',
+    '-q:a', '3',
+    outputPath
+  ];
+  return runFFmpeg(args).then(() => outputPath);
+}
+
+/**
+ * Converts audio into a 1:1 circular Telegram Video Note (.mp4) with audio waveform animation
+ * @param {string} inputPath 
+ * @param {string} outputName 
+ * @returns {Promise<string>} Path to output MP4 Video Note
+ */
+function convertAudioToRoundVideo(inputPath, outputName) {
+  const outputPath = path.join(tempDir, `${outputName}.mp4`);
+  const args = [
+    '-y',
+    '-threads', '0',
+    '-i', inputPath,
+    '-filter_complex', '[0:a]showwaves=s=600x600:mode=line:colors=0x6366f1[v]',
+    '-map', '[v]',
+    '-map', '0:a',
+    '-c:v', 'libx264',
+    '-preset', 'superfast',
+    '-pix_fmt', 'yuv420p',
+    '-c:a', 'aac',
+    '-shortest',
+    outputPath
+  ];
+  return runFFmpeg(args).then(() => outputPath);
+}
+
+/**
  * Scans temp directory and removes files older than maxAgeMs (default: 1 hour)
  * @param {number} maxAgeMs
  */
@@ -235,6 +282,8 @@ module.exports = {
   applyAudioEffect,
   generateRawPcmForShazam,
   trimAudio,
+  changeAudioSpeed,
+  convertAudioToRoundVideo,
   cleanTempDirectory,
   ffmpegPath,
   ffprobePath
