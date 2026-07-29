@@ -294,6 +294,52 @@ function compressAudio(inputPath, outputName) {
 }
 
 /**
+ * Converts a video clip to an animated GIF/loop MP4
+ * @param {string} inputPath 
+ * @param {string} outputName 
+ * @returns {Promise<string>} Path to GIF MP4 file
+ */
+function convertToGif(inputPath, outputName) {
+  const outputPath = path.join(tempDir, `${outputName}.mp4`);
+  const args = [
+    '-y',
+    '-threads', '0',
+    '-i', inputPath,
+    '-vf', 'fps=15,scale=480:-1:flags=lanczos',
+    '-an',
+    '-c:v', 'libx264',
+    '-preset', 'superfast',
+    '-pix_fmt', 'yuv420p',
+    outputPath
+  ];
+  return runFFmpeg(args).then(() => outputPath);
+}
+
+/**
+ * Creates a slow-motion version of a video (0.5x speed)
+ * @param {string} inputPath 
+ * @param {string} outputName 
+ * @param {number} speedFactor
+ * @returns {Promise<string>} Path to slow-mo video file
+ */
+function slowMotionVideo(inputPath, outputName, speedFactor = 0.5) {
+  const outputPath = path.join(tempDir, `${outputName}.mp4`);
+  const ptsMult = (1 / speedFactor).toFixed(1);
+  const args = [
+    '-y',
+    '-threads', '0',
+    '-i', inputPath,
+    '-vf', `setpts=${ptsMult}*PTS`,
+    '-af', `atempo=${speedFactor}`,
+    '-c:v', 'libx264',
+    '-preset', 'superfast',
+    '-pix_fmt', 'yuv420p',
+    outputPath
+  ];
+  return runFFmpeg(args).then(() => outputPath);
+}
+
+/**
  * Scans temp directory and removes files older than maxAgeMs (default: 1 hour)
  * @param {number} maxAgeMs
  */
@@ -328,6 +374,8 @@ module.exports = {
   convertAudioToRoundVideo,
   compressVideo,
   compressAudio,
+  convertToGif,
+  slowMotionVideo,
   cleanTempDirectory,
   ffmpegPath,
   ffprobePath

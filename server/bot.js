@@ -632,6 +632,44 @@ function startBot(token) {
         await ctx.reply(`✅ **Reklama tarqatildi!**\n\n Muvaffaqiyatli: **${sent}**\n❌ Yetib bormadi: **${failed}**`, { parse_mode: 'Markdown' });
       });
 
+      // Language Command (/lang)
+      botInstance.command('lang', async (ctx) => {
+        const keyboard = new InlineKeyboard()
+          .text('🇺🇿 O\'zbekcha', 'set_lang:uz')
+          .text('🇷🇺 Русский', 'set_lang:ru')
+          .text('🇬🇧 English', 'set_lang:en');
+        await ctx.reply('🌐 **Tilni tanlang / Select Language / Выберите язык:**', { parse_mode: 'Markdown', reply_markup: keyboard });
+      });
+
+      // Top Hits / Charts Command (/top, /chart)
+      botInstance.command(['top', 'chart'], async (ctx) => {
+        const statusMsg = await ctx.reply('🎵 **Top Hit Musiqalar izlanmoqda...**', { parse_mode: 'Markdown' });
+        try {
+          const results = await downloader.searchMusic('Top Uzbek and World hits 2026', 10);
+          if (!results || results.length === 0) {
+            return await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, '❌ Musiqa charti yuklanmadi.');
+          }
+
+          let textMsg = `🔥 **TOP HIT MUSIQALAR (2026 CHART):**\n\n`;
+          const keyboard = new InlineKeyboard();
+
+          results.forEach((r, idx) => {
+            const searchId = Math.random().toString(36).substring(2, 8);
+            urlCache.set(searchId, r.url);
+            const medal = ['🥇', '🥈', '🥉'][idx] || `${idx + 1}.`;
+            textMsg += `${medal} **${escapeHTML(r.title)}** (${formatDuration(r.duration)})\n`;
+            keyboard.text(`${idx + 1} 🎵`, `dl_aud:${searchId}`);
+            if ((idx + 1) % 5 === 0) keyboard.row();
+          });
+
+          await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
+          await ctx.reply(textMsg, { parse_mode: 'Markdown', reply_markup: keyboard });
+        } catch (err) {
+          console.error(err);
+          await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, '❌ Chartni yuklashda xatolik yuz berdi.');
+        }
+      });
+
       // Trim Command (/trim <start> <duration>)
       botInstance.command('trim', async (ctx) => {
         const text = ctx.message.text.trim();
@@ -1402,6 +1440,65 @@ function formatDownloadError(err) {
             await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Video aylantirishda xatolik: ${err.message}`);
             if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
           }
+        }
+
+        if (data.startsWith('set_lang:')) {
+          const langCode = data.split(':')[1];
+          db.setUserLang(ctx.from.id, langCode);
+          const confirmText = {
+            uz: '✅ Til O\'zbekchaga o\'zgartirildi!',
+            ru: '✅ Язык успешно изменен на Русский!',
+            en: '✅ Language successfully set to English!'
+          }[langCode] || '✅ Til o\'zgartirildi!';
+          await ctx.answerCallbackQuery({ text: confirmText, show_alert: true });
+          try { await ctx.editMessageText(confirmText); } catch (e) {}
+          return;
+        }
+
+        if (data.startsWith('vid_gif:')) {
+          const shortFileId = data.split(':')[1];
+          const fileId = fileCache.get(shortFileId);
+          if (!fileId) return ctx.reply('❌ Kechirasiz, fayl muddati tugagan. Qayta yuboring.');
+          const waitMsg = await ctx.reply('🎞 Video GIF shakliga o\'tkazilmoqda...');
+          const tempInput = path.join(downloader.tempDir, `in_${shortFileId}.mp4`);
+          try {
+            await downloadTelegramFile(ctx, fileId, tempInput);
+            const outPath = await processor.convertToGif(tempInput, `gif_${shortFileId}`);
+            await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
+            await ctx.replyWithAnimation(new InputFile(outPath), {
+              caption: `🎞 **Videodan tayyorlangan GIF!**\n❤️ @${ctx.me.username} orqali tayyorlandi`,
+              parse_mode: 'Markdown'
+            });
+            fs.unlinkSync(tempInput);
+            fs.unlinkSync(outPath);
+          } catch (e) {
+            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ GIF tayyorlashda xatolik: ${e.message}`);
+            if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
+          }
+          return;
+        }
+
+        if (data.startsWith('vid_slowmo:')) {
+          const shortFileId = data.split(':')[1];
+          const fileId = fileCache.get(shortFileId);
+          if (!fileId) return ctx.reply('❌ Kechirasiz, fayl muddati tugagan. Qayta yuboring.');
+          const waitMsg = await ctx.reply('🐌 Video 0.5x Slow-Motion rejimiga sekinlashtirilmoqda...');
+          const tempInput = path.join(downloader.tempDir, `in_${shortFileId}.mp4`);
+          try {
+            await downloadTelegramFile(ctx, fileId, tempInput);
+            const outPath = await processor.slowMotionVideo(tempInput, `slowmo_${shortFileId}`, 0.5);
+            await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
+            await ctx.replyWithVideo(new InputFile(outPath), {
+              caption: `🐌 **Slow-Motion (0.5x) Video!**\n❤️ @${ctx.me.username} orqali tayyorlandi`,
+              parse_mode: 'Markdown'
+            });
+            fs.unlinkSync(tempInput);
+            fs.unlinkSync(outPath);
+          } catch (e) {
+            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Slow-Motion tayyorlashda xatolik: ${e.message}`);
+            if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
+          }
+          return;
         }
 
         // 4.4 Compress Video

@@ -89,14 +89,21 @@ function upsertUser(user, referredBy = null) {
     if (!stats.dailyUsage[todayStr]) {
       stats.dailyUsage[todayStr] = { videoDownloads: 0, audioDownloads: 0, searchQueries: 0, activeUsers: [], newUsers: 0 };
     }
-    stats.dailyUsage[todayStr].newUsers = (stats.dailyUsage[todayStr].newUsers || 0) + 1;
-    saveStats(stats);
+function getUserLang(userId) {
+  const users = getUsers();
+  const u = users.find(x => Number(x.id) === Number(userId));
+  return u && u.lang ? u.lang : 'uz';
+}
 
-    return { isNew: true, user: newUser };
-  } catch (e) {
-    console.error('Error in upsertUser:', e.message);
-    return { isNew: false, user: null };
+function setUserLang(userId, lang) {
+  const users = getUsers();
+  const u = users.find(x => Number(x.id) === Number(userId));
+  if (u) {
+    u.lang = lang;
+    saveUsers(users);
+    return true;
   }
+  return false;
 }
 
 // Adds a user if new. Compatibility wrapper around upsertUser.
@@ -444,5 +451,7 @@ module.exports = {
   trackActiveUser,
   trackUserDownload,
   getUserDownloads,
-  getAdvancedStats
+  getAdvancedStats,
+  getUserLang,
+  setUserLang
 };

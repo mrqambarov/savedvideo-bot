@@ -48,6 +48,7 @@ export default function App() {
   const [botTokenInput, setBotTokenInput] = useState('');
   const [adminIdsInput, setAdminIdsInput] = useState('');
   const [shazamKeyInput, setShazamKeyInput] = useState('');
+  const [customCaptionInput, setCustomCaptionInput] = useState('');
   const [configSaved, setConfigSaved] = useState(false);
   const [sponsorEnabled, setSponsorEnabled] = useState(false);
   const [sponsorUsernameInput, setSponsorUsernameInput] = useState('');
@@ -180,6 +181,7 @@ export default function App() {
       if (res.data.botToken) setBotTokenInput(res.data.botToken);
       if (res.data.adminIds !== undefined) setAdminIdsInput(res.data.adminIds);
       if (res.data.shazamKey) setShazamKeyInput(res.data.shazamKey);
+      if (res.data.customCaption !== undefined) setCustomCaptionInput(res.data.customCaption);
       setSponsorEnabled(res.data.sponsorEnabled);
       setSponsorUsernameInput(res.data.sponsorUsername || '');
       setSponsorLinkInput(res.data.sponsorLink || '');
@@ -198,7 +200,8 @@ export default function App() {
         shazamKey: shazamKeyInput.includes('...') ? undefined : shazamKeyInput,
         sponsorEnabled,
         sponsorUsername: sponsorUsernameInput,
-        sponsorLink: sponsorLinkInput
+        sponsorLink: sponsorLinkInput,
+        customCaption: customCaptionInput
       });
       setBotStatus(res.data.status);
       setConfigSaved(true);
@@ -872,6 +875,22 @@ export default function App() {
                     />
                     <small style={{ color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                       Musiqani tahlil qilib topish uchun kerak (Shazam detect API).
+                    </small>
+                  </div>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>
+                      Shaxsiy Media Caption (Watermark Imzo Matni)
+                    </label>
+                    <textarea
+                      className="text-input"
+                      style={{ width: '100%', minHeight: '70px' }}
+                      placeholder="❤️ @kanalingiz_nomi orqali yuklab olindi 🚀"
+                      value={customCaptionInput}
+                      onChange={(e) => setCustomCaptionInput(e.target.value)}
+                    />
+                    <small style={{ color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                      Bot orqali yuklanadigan barcha video, rasm va musiqalar ostiga qo'shiladigan imzo matni.
                     </small>
                   </div>
 

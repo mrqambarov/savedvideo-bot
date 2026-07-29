@@ -124,6 +124,15 @@ function updateEnv(botToken, shazamKey, sponsorEnabled, sponsorUsername, sponsor
     process.env.SPONSOR_CHANNEL_LINK = sponsorLink;
   }
 
+  if (customCaption !== undefined) {
+    if (content.includes('CUSTOM_CAPTION=')) {
+      content = content.replace(/CUSTOM_CAPTION=.*/, `CUSTOM_CAPTION=${customCaption}`);
+    } else {
+      content += `\nCUSTOM_CAPTION=${customCaption}`;
+    }
+    process.env.CUSTOM_CAPTION = customCaption;
+  }
+
   fs.writeFileSync(envPath, content, 'utf8');
 }
 
@@ -364,13 +373,14 @@ router.get('/config', (req, res) => {
     shazamKey: shazam ? `${shazam.substring(0, 4)}...${shazam.substring(shazam.length - 4)}` : '',
     sponsorEnabled: process.env.SPONSOR_CHANNEL_ENABLED === 'true',
     sponsorUsername: process.env.SPONSOR_CHANNEL_USERNAME || '',
-    sponsorLink: process.env.SPONSOR_CHANNEL_LINK || ''
+    sponsorLink: process.env.SPONSOR_CHANNEL_LINK || '',
+    customCaption: process.env.CUSTOM_CAPTION || ''
   });
 });
 
 // 7. Update Config
 router.post('/config', async (req, res) => {
-  const { botToken, shazamKey, sponsorEnabled, sponsorUsername, sponsorLink, adminIds } = req.body;
+  const { botToken, shazamKey, sponsorEnabled, sponsorUsername, sponsorLink, adminIds, customCaption } = req.body;
   try {
     const isBotActive = bot.getBotStatus().running;
     
@@ -379,7 +389,7 @@ router.post('/config', async (req, res) => {
       await bot.stopBot();
     }
 
-    updateEnv(botToken, shazamKey, sponsorEnabled, sponsorUsername, sponsorLink, adminIds);
+    updateEnv(botToken, shazamKey, sponsorEnabled, sponsorUsername, sponsorLink, adminIds, customCaption);
 
     // Restart bot if it was active
     if (isBotActive && process.env.TELEGRAM_BOT_TOKEN) {
