@@ -75,16 +75,27 @@ function getInfo(url) {
 }
 
 /**
- * Download a video as MP4
+ * Download a video as MP4 with quality selection
  * @param {string} url 
  * @param {string} outputName 
+ * @param {'1080' | '720' | '480' | '360'} quality
  * @returns {Promise<string>} Path to the downloaded video file
  */
-function downloadVideo(url, outputName) {
+function downloadVideo(url, outputName, quality = '720') {
   return new Promise((resolve, reject) => {
     const templatePath = path.join(tempDir, `${outputName}.%(ext)s`);
+    let formatFilter = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[ext=mp4]/best';
+
+    if (quality === '1080') {
+      formatFilter = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[ext=mp4]/best';
+    } else if (quality === '480') {
+      formatFilter = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best[ext=mp4]/best';
+    } else if (quality === '360') {
+      formatFilter = 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[ext=mp4]/best';
+    }
+
     const args = [
-      '-f', 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[ext=mp4]/best',
+      '-f', formatFilter,
       '--merge-output-format', 'mp4',
       '--no-playlist',
       '--geo-bypass',

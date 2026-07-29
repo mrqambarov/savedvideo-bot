@@ -385,7 +385,19 @@ function startBot(token) {
               if (rid && rid !== ctx.from.id) referredBy = rid;
             }
           }
-          db.upsertUser(ctx.from, referredBy);
+          const upsertRes = db.upsertUser(ctx.from, referredBy);
+          if (upsertRes.isNew && referredBy) {
+            try {
+              const newUserName = getDisplayName(ctx.from);
+              botInstance.api.sendMessage(
+                referredBy,
+                `🎁 **Yangi taklif!**\n\n` +
+                `Do'stingiz **${escapeHTML(newUserName)}** sizning havolangiz orqali botga qo'shildi!\n\n` +
+                `💡 *Eslatma: Do'stingiz bot orqali 1 ta fayl (video yoki audio) yuklasa, taklifingiz muvaffaqiyatli hisoblanadi.*`,
+                { parse_mode: 'Markdown' }
+              ).catch(() => {});
+            } catch (e) {}
+          }
           db.trackActiveUser(ctx.from.id);
           if (db.isBanned(ctx.from.id)) return; // ignore banned user
         }
@@ -558,9 +570,96 @@ function startBot(token) {
         ctx.reply(`🔓 **Foydalanuvchi blokdan chiqarildi:** ${u.first_name} (\`${u.id}\`)`, { parse_mode: 'Markdown' });
       });
 
-      // Handle Admin Callback Queries
+      // Trim Command (/trim <start> <duration>)
+      botInstance.command('trim', async (ctx) => {
+        const text = ctx.message.text.trim();
+        const args = text.split(' ').slice(1);
+
+        const replyMsg = ctx.message.reply_to_message;
+        if (!replyMsg || (!replyMsg.audio && !replyMsg.voice && !replyMsg.document)) {
+          return ctx.reply(
+            `✂️ **Musiqani Qirqish Yo'riqnomasi:**\n\n` +
+            `1. Botga yuborilgan har qanday musiqa yoki audio faylga **Reply (Javob)** bosing.\n` +
+            `2. Matniga \`/trim <boshlanish> <davomiylik>\` deb yozing.\n\n` +
+            `Misol uchun: \`/trim 15 30\` (15-sekunddan boshlab 30 sekund qirqib beradi) yoki \`/trim 0:30 0:45\``,
+            { parse_mode: 'Markdown' }
+          );
+        }
+
+        const parseTimeStr = (s) => {
+          if (!s) return 0;
+          if (String(s).includes(':')) {
+            const p = String(s).split(':');
+            return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
+          }
+          return parseInt(s, 10) || 0;
+        };
+
+        const startSec = parseTimeStr(args[0] || '0');
+        const durationSec = parseTimeStr(args[1] || '30');
+
+        const audioObj = replyMsg.audio || replyMsg.voice || replyMsg.document;
+        const statusMsg = await ctx.reply('✂️ Musiqa qirqilmoqda...');
+
+        try {
+          const fileId = Math.random().toString(36).substring(2, 8);
+          const downloadedPath = path.join(downloader.tempDir, `trim_in_${fileId}`);
+          await downloadTelegramFile(ctx, audioObj.file_id, downloadedPath);
+
+          const trimmedPath = await processor.trimAudio(downloadedPath, `trim_out_${fileId}`, startSec, durationSec);
+
+          await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
+          await ctx.replyWithAudio(new InputFile(trimmedPath), {
+            caption: `✂️ **Qirqilgan audio:** (${startSec}s - ${startSec + durationSec}s)\n❤️ @${ctx.me.username} orqali tahrirlandi`,
+            parse_mode: 'Markdown'
+          });
+
+          try {
+            if (fs.existsSync(downloadedPath)) fs.unlinkSync(downloadedPath);
+            if (fs.existsSync(trimmedPath)) fs.unlinkSync(trimmedPath);
+          } catch (e) {}
+        } catch (err) {
+          console.error('Trim error:', err);
+          await ctx.reply(`❌ Qirqishda xatolik: ${escapeHTML(err.message)}`, { parse_mode: 'HTML' });
+        }
+      });
+
+      // Handle Admin & Quality Callback Queries
       botInstance.on('callback_query:data', async (ctx, next) => {
         const data = ctx.callbackQuery.data;
+
+        if (data.startsWith('dl_vid_q:')) {
+          const parts = data.split(':');
+          const shortId = parts[1];
+          const quality = parts[2] || '720';
+          const url = urlCache.get(shortId);
+          if (!url) {
+            return await ctx.answerCallbackQuery({ text: 'Havola muddati o\'tgan. Qayta yuboring.', show_alert: true });
+          }
+          await ctx.answerCallbackQuery({ text: `${quality}p sifatda yuklanmoqda...` });
+          const statusMsg = await ctx.reply(`📥 Video ${quality}p formatida yuklanmoqda...`);
+          try {
+            const mediaPath = await downloader.downloadVideo(url, `dl_q_${quality}_${shortId}`, quality);
+            const botUsername = ctx.me.username;
+            const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
+            const captionText = `❤️ @${botUsername} orqali (${quality}p) yuklab olindi 🚀\n\n🍿 Yangi kinolar bepul: @${movieBotUsername}`;
+            
+            await ctx.replyWithVideo(new InputFile(mediaPath), {
+              caption: captionText
+            });
+            db.trackDownload('video');
+            db.trackUserDownload(ctx.from.id, `Video ${quality}p`, 'video', url);
+            await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
+            try {
+              if (fs.existsSync(mediaPath)) fs.unlinkSync(mediaPath);
+            } catch (e) {}
+          } catch (err) {
+            try {
+              await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, formatDownloadError(err), { parse_mode: 'HTML' });
+            } catch (e) {}
+          }
+          return;
+        }
 
         if (data === 'adm_stats' || data === 'adm_refresh_stats') {
           if (!isAdmin(ctx.from.id)) {

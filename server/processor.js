@@ -183,6 +183,28 @@ function generateRawPcmForShazam(inputPath, outputName) {
 }
 
 /**
+ * Trims an audio file starting at startSec for durationSec seconds
+ * @param {string} inputPath 
+ * @param {string} outputName 
+ * @param {number} startSec 
+ * @param {number} durationSec 
+ * @returns {Promise<string>} Path to trimmed MP3 file
+ */
+function trimAudio(inputPath, outputName, startSec = 0, durationSec = 30) {
+  const outputPath = path.join(tempDir, `${outputName}.mp3`);
+  const args = [
+    '-y',
+    '-ss', String(startSec),
+    '-t', String(durationSec),
+    '-i', inputPath,
+    '-acodec', 'libmp3lame',
+    '-q:a', '2',
+    outputPath
+  ];
+  return runFFmpeg(args).then(() => outputPath);
+}
+
+/**
  * Scans temp directory and removes files older than maxAgeMs (default: 1 hour)
  * @param {number} maxAgeMs
  */
@@ -212,6 +234,7 @@ module.exports = {
   convertToRoundVideo,
   applyAudioEffect,
   generateRawPcmForShazam,
+  trimAudio,
   cleanTempDirectory,
   ffmpegPath,
   ffprobePath

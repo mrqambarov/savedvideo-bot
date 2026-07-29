@@ -297,10 +297,23 @@ export default function App() {
     }
   };
 
-  const triggerLinkDownload = (format) => {
+  const triggerLinkDownload = (format, quality = '720') => {
     if (!videoInfo) return;
-    const downloadUrl = `${API_BASE}/download?url=${encodeURIComponent(videoInfo.url)}&format=${format}`;
+    const downloadUrl = `${API_BASE}/download?url=${encodeURIComponent(videoInfo.url)}&format=${format}&quality=${quality}`;
     window.open(downloadUrl, '_blank');
+  };
+
+  // Audio Trimmer States
+  const [trimFile, setTrimFile] = useState(null);
+  const [trimStart, setTrimStart] = useState(0);
+  const [trimDuration, setTrimDuration] = useState(30);
+  const [trimmedAudioUrl, setTrimmedAudioUrl] = useState('');
+
+  const handleTrimAudio = async () => {
+    if (!trimFile) return;
+    setTrimmedAudioUrl('');
+    const url = await processUpload(trimFile, 'trim-audio', { startSec: trimStart, durationSec: trimDuration });
+    if (url) setTrimmedAudioUrl(url);
   };
 
   // Generic File Upload and Process Handler
@@ -492,12 +505,18 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '15px', marginTop: '15px' }}>
-                      <button className="btn" onClick={() => triggerLinkDownload('mp4')}>
-                        📥 Yuklash (MP4)
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '15px', flexWrap: 'wrap' }}>
+                      <button className="btn" onClick={() => triggerLinkDownload('mp4', '1080')}>
+                        🎬 1080p Full HD
+                      </button>
+                      <button className="btn" onClick={() => triggerLinkDownload('mp4', '720')}>
+                        🎥 720p HD
+                      </button>
+                      <button className="btn btn-secondary" onClick={() => triggerLinkDownload('mp4', '480')}>
+                        📹 480p SD
                       </button>
                       <button className="btn btn-secondary" onClick={() => triggerLinkDownload('mp3')}>
-                        🎵 Yuklash (MP3)
+                        🎵 Audio MP3
                       </button>
                     </div>
                   </div>

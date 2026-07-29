@@ -173,7 +173,7 @@ router.post('/info', async (req, res) => {
 
 // 2. Download from Link
 router.get('/download', async (req, res) => {
-  const { url, format } = req.query;
+  const { url, format, quality } = req.query;
   if (!url) {
     return res.status(400).send('URL query parameter is required.');
   }
@@ -184,7 +184,7 @@ router.get('/download', async (req, res) => {
     if (format === 'mp3') {
       filePath = await downloader.downloadAudio(url, `web_dl_${fileId}`);
     } else {
-      filePath = await downloader.downloadVideo(url, `web_dl_${fileId}`);
+      filePath = await downloader.downloadVideo(url, `web_dl_${fileId}`, quality || '720');
     }
 
     if (!fs.existsSync(filePath)) {
@@ -192,7 +192,6 @@ router.get('/download', async (req, res) => {
     }
 
     res.download(filePath, path.basename(filePath), (err) => {
-      // Clean up after file is downloaded
       try {
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
@@ -206,14 +205,14 @@ router.get('/download', async (req, res) => {
   }
 });
 
-// 3. Process Upload (Circular Video, Audio Extract, Effects, Identify)
+// 3. Process Upload (Circular Video, Audio Extract, Effects, Identify, Trim)
 router.post('/process-upload', upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded.' });
   }
 
   const inputPath = req.file.path;
-  const action = req.body.action; // 'extract-audio', 'round-video', 'audio-effect', 'identify-music'
+  const action = req.body.action; // 'extract-audio', 'round-video', 'audio-effect', 'identify-music', 'trim-audio'
   const style = req.body.style || 'circular'; // for round-video
   const effect = req.body.effect; // for audio-effect
   const fileId = Math.random().toString(36).substring(2, 8);
@@ -221,6 +220,15 @@ router.post('/process-upload', upload.single('file'), async (req, res) => {
   try {
     if (action === 'extract-audio') {
       const outputPath = await processor.extractAudio(inputPath, `web_ext_${fileId}`);
+      res.download(outputPath, path.basename(outputPath), () => {
+        fs.unlinkSync(inputPath);
+        fs.unlinkSync(outputPath);
+      });
+    } 
+    else if (action === 'trim-audio') {
+      const startSec = parseInt(req.body.startSec, 10) || 0;
+      const durationSec = parseInt(req.body.durationSec, 10) || 30;
+      const outputPath = await processor.trimAudio(inputPath, `web_trim_${fileId}`, startSec, durationSec);
       res.download(outputPath, path.basename(outputPath), () => {
         fs.unlinkSync(inputPath);
         fs.unlinkSync(outputPath);
