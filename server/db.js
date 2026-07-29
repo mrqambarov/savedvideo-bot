@@ -89,6 +89,16 @@ function upsertUser(user, referredBy = null) {
     if (!stats.dailyUsage[todayStr]) {
       stats.dailyUsage[todayStr] = { videoDownloads: 0, audioDownloads: 0, searchQueries: 0, activeUsers: [], newUsers: 0 };
     }
+    stats.dailyUsage[todayStr].newUsers = (stats.dailyUsage[todayStr].newUsers || 0) + 1;
+    saveStats(stats);
+
+    return { isNew: true, user: newUser };
+  } catch (e) {
+    console.error('Error in upsertUser:', e.message);
+    return { isNew: false, user: null };
+  }
+}
+
 function getUserLang(userId) {
   const users = getUsers();
   const u = users.find(x => Number(x.id) === Number(userId));
