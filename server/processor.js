@@ -364,6 +364,31 @@ function cleanTempDirectory(maxAgeMs = 3600000) {
   }
 }
 
+/**
+ * Creates a visualizer MP4 video from an audio track with a soundwave waveform
+ * @param {string} inputAudioPath 
+ * @param {string} outputName 
+ * @returns {Promise<string>} Path to generated visualizer video
+ */
+function createAudioVisualizer(inputAudioPath, outputName) {
+  const outputPath = path.join(tempDir, `${outputName}.mp4`);
+  const args = [
+    '-y',
+    '-threads', '0',
+    '-i', inputAudioPath,
+    '-filter_complex', '[0:a]showwaves=s=1280x720:mode=line:colors=0x00f2fe[v]',
+    '-map', '[v]',
+    '-map', '0:a',
+    '-c:v', 'libx264',
+    '-preset', 'superfast',
+    '-pix_fmt', 'yuv420p',
+    '-c:a', 'aac',
+    '-shortest',
+    outputPath
+  ];
+  return runFFmpeg(args).then(() => outputPath);
+}
+
 module.exports = {
   extractAudio,
   convertToRoundVideo,
@@ -374,6 +399,7 @@ module.exports = {
   convertAudioToRoundVideo,
   compressVideo,
   compressAudio,
+  createAudioVisualizer,
   convertToGif,
   slowMotionVideo,
   cleanTempDirectory,

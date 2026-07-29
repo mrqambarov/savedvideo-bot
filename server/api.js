@@ -10,6 +10,7 @@ const axios = require('axios');
 const { execFile } = require('child_process');
 const { InlineKeyboard } = require('grammy');
 const db = require('./db');
+const sponsorManager = require('./sponsorManager');
 
 const tempUploads = path.join(downloader.tempDir, 'uploads');
 if (!fs.existsSync(tempUploads)) {
@@ -463,17 +464,11 @@ router.post('/message-user', async (req, res) => {
   }
 });
 
-// 8b. Channels Management (shared channels.json for sponsor rotation)
-const channelsPath = path.join(__dirname, '..', 'channels.json');
-
+// 8b. Channels Management (Smart Sponsor System)
 router.get('/channels', (req, res) => {
   try {
-    if (fs.existsSync(channelsPath)) {
-      const channels = JSON.parse(fs.readFileSync(channelsPath, 'utf8'));
-      res.json(channels);
-    } else {
-      res.json([]);
-    }
+    const channels = sponsorManager.getChannels();
+    res.json(channels);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -485,14 +480,21 @@ router.post('/channels', (req, res) => {
     if (!Array.isArray(channels)) {
       return res.status(400).json({ error: 'channels massivi yuborilishi kerak.' });
     }
-    // Max 5 channels
-    const limited = channels.slice(0, 5).map(c => ({
+
+    const updated = channels.map((c, idx) => ({
+      id: c.id || `ch_${Date.now()}_${idx}`,
       username: String(c.username || '').trim(),
-      link: String(c.link || '').trim()
+      link: String(c.link || '').trim(),
+      targetCount: Number(c.targetCount) || 0,
+      joinedCount: Number(c.joinedCount) || 0,
+      joinedUsers: Array.isArray(c.joinedUsers) ? c.joinedUsers : [],
+      dailyStats: c.dailyStats || {},
+      monthlyStats: c.monthlyStats || {},
+      active: c.active !== undefined ? Boolean(c.active) : true
     })).filter(c => c.username && c.link);
 
-    fs.writeFileSync(channelsPath, JSON.stringify(limited, null, 2));
-    res.json({ success: true, channels: limited });
+    sponsorManager.saveChannels(updated);
+    res.json({ success: true, channels: updated });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

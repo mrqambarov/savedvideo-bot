@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const API_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1') 
   ? 'http://localhost:5001/api' 
-  : '/movies/api';
+  : 'http://94.237.103.133:5001/api';
 
 // Axios Authorization Header Interceptor
 axios.interceptors.request.use((config) => {
@@ -23,6 +23,15 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState('movies');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (window.Telegram && window.Telegram.WebApp) {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+      }
+    } catch (e) {}
+  }, []);
 
   // Movie management states
   const [moviesList, setMoviesList] = useState([]);

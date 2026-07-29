@@ -1,5 +1,7 @@
 const { Bot, InlineKeyboard, Keyboard } = require('grammy');
 const db = require('./db');
+const i18n = require('./i18n');
+const sponsorManager = require('../server/sponsorManager');
 const fs = require('fs');
 const path = require('path');
 
@@ -22,30 +24,8 @@ function warnSponsorCheck(channel, err) {
 
 function getActiveSponsorChannel() {
   try {
-    const channelsPath = path.join(__dirname, '..', 'channels.json');
-    if (fs.existsSync(channelsPath)) {
-      const channels = JSON.parse(fs.readFileSync(channelsPath, 'utf8'));
-      if (channels && channels.length > 0) {
-        const epochDays = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
-        const activeIndex = Math.floor(epochDays / 2) % channels.length;
-        const channel = channels[activeIndex];
-
-        let cleanUsername = channel.username.trim().replace(/\s+/g, '');
-        if (cleanUsername.includes('t.me/')) {
-          const parts = cleanUsername.split('t.me/');
-          cleanUsername = '@' + parts[parts.length - 1].split('/')[0];
-        } else if (!cleanUsername.startsWith('@')) {
-          cleanUsername = '@' + cleanUsername;
-        }
-
-        if (/^@[a-zA-Z0-9_]+$/.test(cleanUsername)) {
-          return {
-            username: cleanUsername,
-            link: channel.link || `https://t.me/${cleanUsername.replace('@', '')}`
-          };
-        }
-      }
-    }
+    const active = sponsorManager.getActiveSponsorChannel();
+    if (active) return active;
   } catch (e) {
     console.error('Movie bot: error reading active sponsor channel:', e.message);
   }
@@ -157,6 +137,8 @@ function startBot(token) {
         await next();
       });
 
+      const webAppUrl = process.env.MOVIE_MINI_APP_URL || 'https://movie-client.vercel.app';
+
       // Keyboard
       const mainKeyboard = new Keyboard()
         .text('🔍 Kino Qidirish').text('🗂 Janrlar')
@@ -165,7 +147,9 @@ function startBot(token) {
         .row()
         .text('⭐ Sevimlilarim').text('📅 Kunlik bonus')
         .row()
-        .text('🎁 Do\'stlarni taklif qilish')
+        .webApp('🍿 Mini App (Kino Veb-Ilova)', webAppUrl)
+        .row()
+        .text('🤖 AI Kino Tavsiya').text('🎁 Do\'stlarni taklif qilish')
         .row()
         .text('🙋‍♂️ Buyurtma berish').text('ℹ️ Yordam')
         .resized();
@@ -181,18 +165,28 @@ function startBot(token) {
           }
         }
 
-        let msg = `👋 **Salom, ${ctx.from.first_name || 'foydalanuvchi'}!**\n\n` +
-          `Men **Kino Note (Film) Bot**man.\n\n` +
-          `🍿 Menga istalgan kino kodini yuboring (masalan: \`101\`), men sizga kinoni yuboraman!\n` +
-          `🔍 Kino qidirish uchun **Kino Qidirish** tugmasini bosing yoki shunchaki kino nomini yozing.\n\n` +
-          `🆔 Sizning Telegram IDingiz: \`${ctx.from.id}\``;
+        const keyboard = new InlineKeyboard()
+          .text('🇺🇿 O\'zbekcha', 'set_lang:uz')
+          .text('🇷🇺 Русский', 'set_lang:ru')
+          .text('🇬🇧 English', 'set_lang:en');
 
-        if (isAdmin(ctx.from.id)) {
-          msg += `\n\n⚙️ **Admin buyruqlari:**\n` +
-            `• Videoni yuboring, so'ngra javob tariqasida (reply) \`/add [kod] [nomi] | [tavsifi] | [janri]\` deb yozib kinoni bazaga qo'shing.`;
-        }
+        await ctx.reply('🌐 **Iltimos, tilni tanlang / Пожалуйста, выберите язык / Please select language:**', {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+      });
 
-        ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: mainKeyboard });
+      // Language Command (/lang)
+      botInstance.command('lang', async (ctx) => {
+        const keyboard = new InlineKeyboard()
+          .text('🇺🇿 O\'zbekcha', 'set_lang:uz')
+          .text('🇷🇺 Русский', 'set_lang:ru')
+          .text('🇬🇧 English', 'set_lang:en');
+
+        await ctx.reply('🌐 **Tilni tanlang / Select Language / Выберите язык:**', {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
       });
 
       // Help Command
@@ -229,6 +223,36 @@ function startBot(token) {
           } else {
             return await ctx.reply('❌ Buyurtmani saqlashda xatolik yuz berdi. Keyinroq urinib ko\'ring.');
           }
+        }
+
+        if (state === 'waiting_for_ai_mood') {
+          userSession.delete(userId);
+          const results = db.recommendMoviesByMood(text);
+          if (!results || results.length === 0) {
+            return await ctx.reply('🤖 Kechirasiz, sizning so\'rovingiz bo\'yicha kino topilmadi. Boshqa so\'zlar bilan yozib ko\'ring.');
+          }
+
+          let replyText = `🤖 **"${text}" so'rovingiz bo'yicha mos keladigan kinolar:**\n\n`;
+          const keyboard = new InlineKeyboard();
+          results.slice(0, 8).forEach((m, idx) => {
+            replyText += `${idx + 1}. *${m.title}* — Kod: \`${m.code}\`\n`;
+            keyboard.text(`${idx + 1} 🎬`, `mv:${m.code}`);
+            if (idx % 4 === 3) keyboard.row();
+          });
+          return await ctx.reply(replyText, { parse_mode: 'Markdown', reply_markup: keyboard });
+        }
+
+        if (text === '🤖 AI Kino Tavsiya') {
+          userSession.set(userId, 'waiting_for_ai_mood');
+          return await ctx.reply(
+            '🤖 **AI Kino Tavsiya Etuvchi**\n\n' +
+            'Bugun qanday kino ko\'rmoqchisiz? Kayfiyatingizni yoki istagingizni yozing:\n\n' +
+            '• *Masalan: "Menga kulgili oilaviy komediya topib ber"*\n' +
+            '• *Masalan: "Jangari va sarguzasht kino"*\n' +
+            '• *Masalan: "Qo\'rqinchli kino"*\n\n' +
+            '👇 Matn ko\'rinishida yozib yuboring:',
+            { parse_mode: 'Markdown' }
+          );
         }
 
         if (text === '🔍 Kino Qidirish') {
@@ -433,6 +457,37 @@ function startBot(token) {
       botInstance.on('callback_query:data', async (ctx) => {
         const data = ctx.callbackQuery.data;
 
+        if (data.startsWith('set_lang:')) {
+          const langCode = data.split(':')[1];
+          db.setUserLang(ctx.from.id, langCode);
+
+          const confirmText = {
+            uz: '✅ Til O\'zbekchaga o\'zgartirildi!',
+            ru: '✅ Язык успешно изменен на Русский!',
+            en: '✅ Language successfully set to English!'
+          }[langCode] || '✅ Til o\'zgartirildi!';
+
+          await ctx.answerCallbackQuery({ text: confirmText, show_alert: true }).catch(() => {});
+          try { await ctx.editMessageText(confirmText); } catch (e) {}
+
+          const name = ctx.from.first_name || 'foydalanuvchi';
+          let welcomeMsg = i18n.t(langCode, 'welcome', { name });
+          if (isAdmin(ctx.from.id)) {
+            welcomeMsg += i18n.t(langCode, 'admin_help');
+          }
+
+          const userKb = new Keyboard()
+            .text(i18n.t(langCode, 'search_btn'))
+            .text(i18n.t(langCode, 'genre_btn'))
+            .row()
+            .text(i18n.t(langCode, 'req_btn'))
+            .text(i18n.t(langCode, 'help_btn'))
+            .resized();
+
+          await ctx.reply(welcomeMsg, { parse_mode: 'Markdown', reply_markup: userKb });
+          return;
+        }
+
         // Sponsor Check
         if (data === 'chk_sub') {
           await ctx.answerCallbackQuery().catch(() => {});
@@ -452,6 +507,7 @@ function startBot(token) {
             const chatMember = await ctx.api.getChatMember(activeChannel.username, ctx.from.id);
             const isMember = ['creator', 'administrator', 'member', 'restricted'].includes(chatMember.status);
             if (isMember) {
+              sponsorManager.recordMemberJoin(activeChannel.username, ctx.from.id);
               try { await ctx.deleteMessage(); } catch (e) {}
               const pending = userPendingActions.get(ctx.from.id);
               if (pending) {
@@ -576,9 +632,19 @@ function startBot(token) {
       });
 
       botInstance.start({
-        onStart: (botInfo) => {
+        onStart: async (botInfo) => {
           botUsername = botInfo.username;
           console.log(`Movie Telegram Bot @${botInfo.username} started successfully.`);
+          try {
+            const webAppUrl = process.env.MOVIE_MINI_APP_URL || 'https://movie-client.vercel.app';
+            await botInstance.api.setChatMenuButton({
+              menu_button: {
+                type: 'web_app',
+                text: '🍿 Kinolar App',
+                web_app: { url: webAppUrl }
+              }
+            }).catch(() => {});
+          } catch (e) {}
         }
       }).catch((err) => {
         console.error('Movie Bot polling error:', err.message);

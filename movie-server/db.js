@@ -208,6 +208,55 @@ function getFavorites(userId) {
   }
 }
 
+function recommendMoviesByMood(moodText) {
+  try {
+    const movies = getMovies();
+    if (!movies || movies.length === 0) return [];
+
+    const query = String(moodText || '').toLowerCase().trim();
+    if (!query) return movies.slice(0, 5);
+
+    const keywords = query.split(/\s+/).filter(w => w.length > 2);
+
+    const scored = movies.map(m => {
+      let score = 0;
+      const title = (m.title || '').toLowerCase();
+      const desc = (m.description || '').toLowerCase();
+      const genre = (m.genre || '').toLowerCase();
+
+      keywords.forEach(kw => {
+        if (title.includes(kw)) score += 5;
+        if (genre.includes(kw)) score += 4;
+        if (desc.includes(kw)) score += 2;
+      });
+
+      if (query.includes('kulgili') || query.includes('komediya') || query.includes('kulish')) {
+        if (genre.includes('komediya')) score += 5;
+      }
+      if (query.includes('jangari') || query.includes('urush') || query.includes('jang')) {
+        if (genre.includes('jangari')) score += 5;
+      }
+      if (query.includes('qorqincli') || query.includes('daxshat') || query.includes('tasir')) {
+        if (genre.includes('daxshat') || desc.includes('daxshat')) score += 5;
+      }
+      if (query.includes('sevgi') || query.includes('romantika') || query.includes('dram')) {
+        if (genre.includes('melodrama') || genre.includes('drama')) score += 5;
+      }
+      if (query.includes('bolalar') || query.includes('multfilm') || query.includes('multik')) {
+        if (genre.includes('multfilm')) score += 5;
+      }
+
+      return { movie: m, score };
+    });
+
+    const filtered = scored.filter(s => s.score > 0);
+    const sorted = (filtered.length > 0 ? filtered : scored).sort((a, b) => b.score - a.score);
+    return sorted.map(s => s.movie).slice(0, 10);
+  } catch (e) {
+    return [];
+  }
+}
+
 // Users CRUD
 function getUsers() {
   try {
@@ -257,6 +306,31 @@ function addUser(user, referredBy = null) {
     return true;
   } catch (e) {
     console.error('Error adding user:', e.message);
+    return false;
+  }
+}
+
+function getUserLang(userId) {
+  try {
+    const users = getUsers();
+    const u = users.find(x => Number(x.id) === Number(userId));
+    return u && u.lang ? u.lang : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function setUserLang(userId, lang) {
+  try {
+    const users = getUsers();
+    const u = users.find(x => Number(x.id) === Number(userId));
+    if (u) {
+      u.lang = lang;
+      saveUsers(users);
+      return true;
+    }
+    return false;
+  } catch (e) {
     return false;
   }
 }
@@ -762,12 +836,15 @@ module.exports = {
   toggleFavorite,
   isFavorite,
   getFavorites,
+  recommendMoviesByMood,
   getGenres,
   saveGenres,
   trackSearchQuery,
   getSearchAnalytics,
   getUsers,
   addUser,
+  getUserLang,
+  setUserLang,
   setBanned,
   isBanned,
   qualifyReferral,

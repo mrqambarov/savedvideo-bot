@@ -6,6 +6,8 @@ const { execFile } = require('child_process');
 const downloader = require('./downloader');
 const processor = require('./processor');
 const db = require('./db');
+const i18n = require('./i18n');
+const sponsorManager = require('./sponsorManager');
 
 let botInstance = null;
 let isBotRunning = false;
@@ -260,31 +262,8 @@ function warnSponsorCheck(channel, err) {
  */
 function getActiveSponsorChannel() {
   try {
-    const channelsPath = path.join(__dirname, '..', 'channels.json');
-    if (fs.existsSync(channelsPath)) {
-      const channels = JSON.parse(fs.readFileSync(channelsPath, 'utf8'));
-      if (channels && channels.length > 0) {
-        const epochDays = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
-        const activeIndex = Math.floor(epochDays / 2) % channels.length;
-        const channel = channels[activeIndex];
-
-        let cleanUsername = channel.username.trim().replace(/\s+/g, '');
-        if (cleanUsername.includes('t.me/')) {
-          const parts = cleanUsername.split('t.me/');
-          cleanUsername = '@' + parts[parts.length - 1].split('/')[0];
-        } else if (!cleanUsername.startsWith('@')) {
-          cleanUsername = '@' + cleanUsername;
-        }
-
-        const isValidUsername = cleanUsername && /^@[a-zA-Z0-9_]+$/.test(cleanUsername);
-        if (isValidUsername) {
-          return {
-            username: cleanUsername,
-            link: channel.link || `https://t.me/${cleanUsername.replace('@', '')}`
-          };
-        }
-      }
-    }
+    const active = sponsorManager.getActiveSponsorChannel();
+    if (active) return active;
   } catch (e) {
     console.error('Error reading active sponsor channel:', e.message);
   }
@@ -463,19 +442,15 @@ function startBot(token) {
 
       // Start Command
       botInstance.command('start', (ctx) => {
-        const name = getDisplayName(ctx.from);
-        ctx.reply(
-          `👋 **Salom, ${escapeHTML(name)}!**\n\n` +
-          `Men video va musiqalar bilan ishlovchi aqlli botman.\n\n` +
-          `⚙️ **Imkoniyatlarim:**\n` +
-          `1️⃣ **Link Downloader:** Menga YouTube, Instagram yoki TikTok havolasini yuboring - men uni video yoki MP3 ko'rinishida yuklab beraman.\n` +
-          `2️⃣ **Dumaloq Video (Teleskop):** Menga kvadrat yoki ixtiyoriy video yuboring - men uni Telegram dumaloq videosiga (Video Note) aylantiraman.\n` +
-          `3️⃣ **Ovozni ajratish:** Videodan MP3 musiqasini ajratib beraman.\n` +
-          `4️⃣ **Musiqa effektlari:** Ovoz fayllarini Concert, Bass Boost, Nightcore, Slowed & Reverb, 8D, Karaoke va Auto-Pan formatlariga o'tkazib beraman.\n` +
-          `5️⃣ **Musiqani aniqlash:** Noma'lum musiqani yuboring, men uni kim aytganini topib beraman!\n\n` +
-          `🎁 **Do'stlaringizni taklif qiling va sovg'alar yuting!** Havolangizni olish uchun /referal buyrug'ini yuboring.`,
-          { parse_mode: 'Markdown', reply_markup: mainKeyboard }
-        );
+        const keyboard = new InlineKeyboard()
+          .text('🇺🇿 O\'zbekcha', 'set_lang:uz')
+          .text('🇷🇺 Русский', 'set_lang:ru')
+          .text('🇬🇧 English', 'set_lang:en');
+
+        ctx.reply('🌐 **Iltimos, tilni tanlang / Пожалуйста, выберите язык / Please select language:**', {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
       });
 
       // Admin commands (/admin, /stats, /analytics, /user, /ban, /unban)
@@ -1076,6 +1051,8 @@ function formatDownloadError(err) {
           const keyboard = new InlineKeyboard()
             .text('🌀 Dumaloq Video Qilish (Video Note)', `aud_to_round:${shortFileId}`)
             .row()
+            .text('🎨 Visualizer Video qilish', `aud_visualizer:${shortFileId}`)
+            .row()
             .text('⚡️ 1.25x Tezlatish', `aud_speed:${shortFileId}:1.25`)
             .text('🌌 0.75x Sekinlatish', `aud_speed:${shortFileId}:0.75`)
             .row()
@@ -1099,6 +1076,8 @@ function formatDownloadError(err) {
 
         const keyboard = new InlineKeyboard()
           .text('🌀 Dumaloq Video Qilish (Video Note)', `aud_to_round:${shortFileId}`)
+          .row()
+          .text('🎨 Visualizer Video qilish', `aud_visualizer:${shortFileId}`)
           .row()
           .text('⚡️ 1.25x Tezlatish', `aud_speed:${shortFileId}:1.25`)
           .text('🌌 0.75x Sekinlatish', `aud_speed:${shortFileId}:0.75`)
@@ -1138,6 +1117,7 @@ function formatDownloadError(err) {
             const chatMember = await ctx.api.getChatMember(activeChannel.username, ctx.from.id);
             const isMember = ['creator', 'administrator', 'member', 'restricted'].includes(chatMember.status);
             if (isMember) {
+              sponsorManager.recordMemberJoin(activeChannel.username, ctx.from.id);
               try { await ctx.deleteMessage(); } catch (e) {}
               const pending = userPendingActions.get(ctx.from.id);
               if (pending) {
@@ -1452,6 +1432,10 @@ function formatDownloadError(err) {
           }[langCode] || '✅ Til o\'zgartirildi!';
           await ctx.answerCallbackQuery({ text: confirmText, show_alert: true });
           try { await ctx.editMessageText(confirmText); } catch (e) {}
+
+          const name = getDisplayName(ctx.from);
+          const welcomeMsg = i18n.t(langCode, 'welcome', { name: escapeHTML(name) });
+          await ctx.reply(welcomeMsg, { parse_mode: 'Markdown', reply_markup: mainKeyboard });
           return;
         }
 
@@ -1546,6 +1530,31 @@ function formatDownloadError(err) {
             fs.unlinkSync(outPath);
           } catch (e) {
             await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Kichraytirishda xatolik: ${e.message}`);
+            if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
+          }
+          return;
+        }
+
+        // 4.46 Audio Visualizer Video
+        if (action === 'aud_visualizer') {
+          const shortFileId = param1;
+          const fileId = fileCache.get(shortFileId);
+          if (!fileId) return ctx.reply('❌ Kechirasiz, fayl muddati tugagan. Qayta yuboring.');
+
+          const waitMsg = await ctx.reply('🎨 Musiqa uchun Visualizer video (soundwave) yaratilmoqda...');
+          const tempInput = path.join(downloader.tempDir, `in_${shortFileId}.mp3`);
+          try {
+            await downloadTelegramFile(ctx, fileId, tempInput);
+            const outPath = await processor.createAudioVisualizer(tempInput, `vis_${shortFileId}`);
+            await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
+            await ctx.replyWithVideo(new InputFile(outPath), {
+              caption: `🎨 **Visualizer Video tayyor!**\n❤️ @${ctx.me.username} orqali tayyorlandi`,
+              parse_mode: 'Markdown'
+            });
+            fs.unlinkSync(tempInput);
+            fs.unlinkSync(outPath);
+          } catch (e) {
+            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Visualizer tayyorlashda xatolik: ${e.message}`);
             if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
           }
           return;

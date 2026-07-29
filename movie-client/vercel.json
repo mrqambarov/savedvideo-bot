@@ -1,0 +1,18 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/movies/api/(.*)",
+      "destination": "http://94.237.103.133:5001/api/$1"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "http://94.237.103.133:5001/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
