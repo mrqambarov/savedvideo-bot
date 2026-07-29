@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Users, UserPlus, Activity, Video, Search, TrendingUp, SearchX } from 'lucide-react';
+import { Users, UserPlus, Activity, Video, Search, SearchX } from 'lucide-react';
 import { useStats, useResource } from '../lib/useData.js';
 import { movieApi } from '../lib/api.js';
 import { StatCard, Loader, Segmented, Empty } from '../components/ui.jsx';
@@ -28,7 +28,7 @@ function SearchList({ items, icon: Icon, accent, emptyText }) {
 export default function Analytics() {
   const { dl, movie, loading } = useStats();
   const search = useResource(() => movieApi.get('/search-analytics'), 30000);
-  const [period, setPeriod] = useState('week');
+  const [period, setPeriod] = useState('today');
   const [bot, setBot] = useState('dl');
 
   const src = bot === 'dl' ? dl : movie;
@@ -38,8 +38,11 @@ export default function Analytics() {
     return list.map((u) => ({
       id: u.id,
       username: u.username ? '@' + String(u.username).replace(/^@/, '') : '—',
-      name: u.firstName || u.first_name || u.name || '',
+      name: u.first_name || u.firstName || u.name || 'Foydalanuvchi',
       dateJoined: u.dateJoined || u.joinedAt || '',
+      lastSeen: u.lastSeen || '',
+      refCount: u.refCount || 0,
+      banned: !!u.banned
     }));
   }, [src]);
 
@@ -57,19 +60,27 @@ export default function Analytics() {
         <div className="avatar-cell">
           <div className="avatar" style={{ background: avatarColor(r.username || r.id) }}>{initials(r.name || r.username)}</div>
           <div>
-            <div className="cell-title">{r.username}</div>
-            <div className="cell-sub mono">{r.id}</div>
+            <div className="cell-title">{r.name}</div>
+            <div className="cell-sub mono">{r.username !== '—' ? r.username : r.id}</div>
           </div>
         </div>
       ),
     },
     { key: 'dateJoined', label: "Qo'shilgan sana", sortable: true, render: (r) => fmtDate(r.dateJoined) },
+    { key: 'lastSeen', label: "Oxirgi faollik", sortable: true, render: (r) => r.lastSeen ? fmtDate(r.lastSeen) : '—' },
+    { key: 'refCount', label: "Takliflar", sortable: true, align: 'center', render: (r) => `${r.refCount} ta` },
+    {
+      key: 'banned', label: "Holat", sortable: true, align: 'center',
+      render: (r) => r.banned
+        ? <span className="badge badge-danger">Bloklangan</span>
+        : <span className="badge badge-success">Faol</span>
+    }
   ];
 
   return (
     <div>
       <div className="between wrap gap" style={{ marginBottom: 18 }}>
-        <Segmented options={[{ value: 'dl', label: 'Downloader' }, { value: 'movie', label: 'Kino bot' }]} value={bot} onChange={setBot} />
+        <Segmented options={[{ value: 'dl', label: 'Downloader Bot' }, { value: 'movie', label: 'Kino Bot' }]} value={bot} onChange={setBot} />
         <Segmented options={[{ value: 'today', label: 'Bugun' }, { value: 'week', label: 'Hafta' }, { value: 'month', label: 'Oy' }]} value={period} onChange={setPeriod} />
       </div>
 
@@ -84,10 +95,61 @@ export default function Analytics() {
         )}
       </div>
 
+      {/* 30-Day Breakdown Table */}
+      <div className="card mt">
+        <div className="card-head">
+          <h3>📅 Kunlik Analitika Jadvali (Oxirgi 30 Kun)</h3>
+          <span className="sub">batafsil ko'rsatkichlar</span>
+        </div>
+        <div style={{ padding: '0 16px 16px 16px', maxHeight: '350px', overflowY: 'auto' }}>
+          <table className="user-table" style={{ width: '100%' }}>
+            <thead>
+              <tr>
+                <th>Sana</th>
+                <th>Yangi A'zolar</th>
+                <th>Faol Userlar</th>
+                {bot === 'dl' ? (
+                  <>
+                    <th>🎥 Video</th>
+                    <th>🎵 Audio</th>
+                    <th>🔍 Qidiruv</th>
+                  </>
+                ) : (
+                  <th>🎬 Ko'rishlar</th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {(src?.trend || []).map((t, i) => {
+                const isToday = t.date === new Date().toISOString().split('T')[0];
+                return (
+                  <tr key={i} style={{ background: isToday ? 'rgba(99, 102, 241, 0.12)' : 'transparent' }}>
+                    <td style={{ fontWeight: isToday ? 700 : 400 }}>
+                      {t.date} {isToday && <span style={{ fontSize: '0.75rem', color: '#6366f1', marginLeft: 4 }}>(Bugun)</span>}
+                    </td>
+                    <td style={{ color: t.newUsers > 0 ? '#10b981' : 'inherit', fontWeight: t.newUsers > 0 ? 600 : 400 }}>+{t.newUsers || 0}</td>
+                    <td style={{ fontWeight: t.activeUsers > 0 ? 600 : 400 }}>{t.activeUsers || 0}</td>
+                    {bot === 'dl' ? (
+                      <>
+                        <td>{t.downloadsVideo || 0}</td>
+                        <td>{t.downloadsAudio || 0}</td>
+                        <td>{t.searches || 0}</td>
+                      </>
+                    ) : (
+                      <td>{t.views || t.movieViews || 0}</td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="card mt">
         <div className="card-head">
           <h3>Foydalanuvchilar o'sishi va faolligi</h3>
-          <span className="sub">so'nggi 14 kun</span>
+          <span className="sub">so'nggi 30 kun</span>
         </div>
         <div className="card-pad">
           <TrendArea data={src?.trend || []} series={[
@@ -100,7 +162,7 @@ export default function Analytics() {
       {bot === 'dl' && (
         <div className="card mt">
           <div className="card-head">
-            <h3>Kunlik yuklamalar</h3>
+            <h3>Kunlik yuklamalar grafigi</h3>
             <span className="sub">video / audio / qidiruv</span>
           </div>
           <div className="card-pad">
