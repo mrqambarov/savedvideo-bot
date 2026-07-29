@@ -570,6 +570,68 @@ function startBot(token) {
         ctx.reply(`🔓 **Foydalanuvchi blokdan chiqarildi:** ${u.first_name} (\`${u.id}\`)`, { parse_mode: 'Markdown' });
       });
 
+      // Admin Status Command (/status)
+      botInstance.command('status', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return;
+        const os = require('os');
+        const memTotal = Math.round(os.totalmem() / (1024 * 1024));
+        const memFree = Math.round(os.freemem() / (1024 * 1024));
+        const memUsed = memTotal - memFree;
+        const uptimeHours = (os.uptime() / 3600).toFixed(1);
+        const usersCount = db.getUsers().length;
+        const stats = db.getAdvancedStats();
+
+        const msg =
+          `🖥 **SERVER VA BOT SALOMATLIGI (${os.hostname()})**\n\n` +
+          `⚙️ OS Platformasi: **${os.type()} ${os.arch()}**\n` +
+          `⏱ Server Uptime: **${uptimeHours} soat**\n` +
+          `💾 RAM Xotira: **${memUsed} MB / ${memTotal} MB**\n` +
+          `👥 Jami Foydalanuvchilar: **${usersCount} ta**\n` +
+          `⚡️ Bugun Faol: **${stats.active?.today || 0} ta**\n` +
+          `📥 Bugungi Yuklamalar: **${(stats.usage?.today?.downloadsVideo || 0) + (stats.usage?.today?.downloadsAudio || 0)} ta**\n\n` +
+          `🟢 Bot Servisi: **Onlayn va ishlamoqda**`;
+
+        await ctx.reply(msg, { parse_mode: 'Markdown' });
+      });
+
+      // Admin Broadcast Command (/broadcast)
+      botInstance.command('broadcast', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return;
+        const text = ctx.message.text.split(' ').slice(1).join(' ').trim();
+        const replyMsg = ctx.message.reply_to_message;
+
+        if (!text && !replyMsg) {
+          return ctx.reply(
+            `📢 **Telegram Broadcaster Yo'riqnomasi:**\n\n` +
+            `1. Istalgan post, rasm yoki videoga **Reply (Javob)** bosing va \`/broadcast\` deb yozing.\n` +
+            `2. Yoki matnli reklama uchun: \`/broadcast Assalomu alaykum!...\``,
+            { parse_mode: 'Markdown' }
+          );
+        }
+
+        const users = db.getUsers();
+        await ctx.reply(`🚀 Reklama **${users.length} ta** foydalanuvchiga yuborilmoqda...`);
+
+        let sent = 0;
+        let failed = 0;
+
+        for (const user of users) {
+          try {
+            if (replyMsg) {
+              await ctx.api.copyMessage(user.id, ctx.chat.id, replyMsg.message_id);
+            } else {
+              await ctx.api.sendMessage(user.id, text, { parse_mode: 'HTML' });
+            }
+            sent++;
+          } catch (e) {
+            failed++;
+          }
+          await new Promise(r => setTimeout(r, 40));
+        }
+
+        await ctx.reply(`✅ **Reklama tarqatildi!**\n\n Muvaffaqiyatli: **${sent}**\n❌ Yetib bormadi: **${failed}**`, { parse_mode: 'Markdown' });
+      });
+
       // Trim Command (/trim <start> <duration>)
       botInstance.command('trim', async (ctx) => {
         const text = ctx.message.text.trim();
@@ -948,7 +1010,9 @@ function formatDownloadError(err) {
           .row()
           .text('🌀 Dumaloq Video (Qora burchaklar bilan)', `vid_round_circle:${shortFileId}:${duration}`)
           .row()
-          .text('🎵 MP3 Ovozini ajratish', `vid_extract:${shortFileId}`);
+          .text('🎵 MP3 Ovozini ajratish', `vid_extract:${shortFileId}`)
+          .row()
+          .text('📉 MB Hajmini Kichraytirish (Compress)', `vid_compress:${shortFileId}`);
 
         await ctx.reply('📥 Video qabul qilindi. Nima qilishni xohlaysiz?', { reply_markup: keyboard });
       });
@@ -966,10 +1030,19 @@ function formatDownloadError(err) {
             .row()
             .text('🌀 Dumaloq Video (Qora burchaklar)', `vid_round_circle:${shortFileId}:0`)
             .row()
-            .text('🎵 MP3 Ovozini ajratish', `vid_extract:${shortFileId}`);
+            .text('🎵 MP3 Ovozini ajratish', `vid_extract:${shortFileId}`)
+            .row()
+            .text('📉 MB Hajmini Kichraytirish (Compress)', `vid_compress:${shortFileId}`);
           return ctx.reply('📥 Video hujjati qabul qilindi. Tanlang:', { reply_markup: keyboard });
         } else if (mime.startsWith('audio/') || mime.includes('mpeg') || mime.includes('mp3') || mime.includes('wav')) {
           const keyboard = new InlineKeyboard()
+            .text('🌀 Dumaloq Video Qilish (Video Note)', `aud_to_round:${shortFileId}`)
+            .row()
+            .text('⚡️ 1.25x Tezlatish', `aud_speed:${shortFileId}:1.25`)
+            .text('🌌 0.75x Sekinlatish', `aud_speed:${shortFileId}:0.75`)
+            .row()
+            .text('📉 MB Kichraytirish (96kbps)', `aud_compress:${shortFileId}`)
+            .row()
             .text('🎹 Musiqa Effektlari (FX)', `aud_effects:${shortFileId}`)
             .row()
             .text('🔍 Musiqani aniqlash (Shazam)', `aud_identify:${shortFileId}`);
@@ -991,6 +1064,8 @@ function formatDownloadError(err) {
           .row()
           .text('⚡️ 1.25x Tezlatish', `aud_speed:${shortFileId}:1.25`)
           .text('🌌 0.75x Sekinlatish', `aud_speed:${shortFileId}:0.75`)
+          .row()
+          .text('📉 MB Kichraytirish (96kbps)', `aud_compress:${shortFileId}`)
           .row()
           .text('🎹 Musiqa Effektlari (FX)', `aud_effects:${shortFileId}`)
           .row()
@@ -1329,6 +1404,56 @@ function formatDownloadError(err) {
           }
         }
 
+        // 4.4 Compress Video
+        if (action === 'vid_compress') {
+          const shortFileId = param1;
+          const fileId = fileCache.get(shortFileId);
+          if (!fileId) return ctx.reply('❌ Kechirasiz, fayl muddati tugagan. Qayta yuboring.');
+
+          const waitMsg = await ctx.reply('📉 Video hajmi (MB) 50-70% ga kichraytirilmoqda, iltimos kuting...');
+          const tempInput = path.join(downloader.tempDir, `in_${shortFileId}.mp4`);
+          try {
+            await downloadTelegramFile(ctx, fileId, tempInput);
+            const outPath = await processor.compressVideo(tempInput, `compressed_${shortFileId}`);
+            await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
+            await ctx.replyWithVideo(new InputFile(outPath), {
+              caption: `📉 **Video hajmi kichraytirildi!**\n❤️ @${ctx.me.username} orqali siqildi`,
+              parse_mode: 'Markdown'
+            });
+            fs.unlinkSync(tempInput);
+            fs.unlinkSync(outPath);
+          } catch (e) {
+            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Kichraytirishda xatolik: ${e.message}`);
+            if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
+          }
+          return;
+        }
+
+        // 4.45 Compress Audio
+        if (action === 'aud_compress') {
+          const shortFileId = param1;
+          const fileId = fileCache.get(shortFileId);
+          if (!fileId) return ctx.reply('❌ Kechirasiz, fayl muddati tugagan. Qayta yuboring.');
+
+          const waitMsg = await ctx.reply('📉 Audio hajmi (MB) 96kbps formatga kichraytirilmoqda...');
+          const tempInput = path.join(downloader.tempDir, `in_${shortFileId}.mp3`);
+          try {
+            await downloadTelegramFile(ctx, fileId, tempInput);
+            const outPath = await processor.compressAudio(tempInput, `compressed_${shortFileId}`);
+            await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
+            await ctx.replyWithAudio(new InputFile(outPath), {
+              caption: `📉 **Audio hajmi kichraytirildi! (96kbps)**\n❤️ @${ctx.me.username} orqali siqildi`,
+              parse_mode: 'Markdown'
+            });
+            fs.unlinkSync(tempInput);
+            fs.unlinkSync(outPath);
+          } catch (e) {
+            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Kichraytirishda xatolik: ${e.message}`);
+            if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
+          }
+          return;
+        }
+
         // 4.5 Audio to Round Video
         if (action === 'aud_to_round') {
           const shortFileId = param1;
@@ -1517,6 +1642,7 @@ function formatDownloadError(err) {
       });
 
       isBotRunning = true;
+      scheduleAutoBackup();
       resolve(true);
     } catch (err) {
       isBotRunning = false;
@@ -1525,6 +1651,33 @@ function formatDownloadError(err) {
       reject(err);
     }
   });
+}
+
+function scheduleAutoBackup() {
+  setInterval(async () => {
+    if (!botInstance) return;
+    const adminIdsStr = process.env.ADMIN_IDS || '';
+    const adminIds = adminIdsStr.split(',').map(id => Number(id.trim())).filter(Boolean);
+    if (adminIds.length === 0) return;
+
+    try {
+      const usersPath = path.join(__dirname, 'data', 'users.json');
+      const statsPath = path.join(__dirname, 'data', 'stats.json');
+      if (!fs.existsSync(usersPath) || !fs.existsSync(statsPath)) return;
+
+      const usersData = fs.readFileSync(usersPath, 'utf8');
+      const statsData = fs.readFileSync(statsPath, 'utf8');
+      const backupText = `📦 **KUNLIK AVTO-ZAXIRA (DATABASE BACKUP)**\n\n📅 Sana: ${new Date().toISOString().split('T')[0]}\n👥 Jami Foydalanuvchilar: ${db.getUsers().length} ta`;
+
+      for (const adminId of adminIds) {
+        await botInstance.api.sendMessage(adminId, backupText, { parse_mode: 'Markdown' }).catch(() => {});
+        await botInstance.api.sendDocument(adminId, new InputFile(Buffer.from(usersData), `users_backup_${new Date().toISOString().split('T')[0]}.json`)).catch(() => {});
+        await botInstance.api.sendDocument(adminId, new InputFile(Buffer.from(statsData), `stats_backup_${new Date().toISOString().split('T')[0]}.json`)).catch(() => {});
+      }
+    } catch (err) {
+      console.error('Auto Backup Error:', err.message);
+    }
+  }, 24 * 60 * 60 * 1000);
 }
 
 /**

@@ -252,6 +252,48 @@ function convertAudioToRoundVideo(inputPath, outputName) {
 }
 
 /**
+ * Compresses video file to reduce MB size by 50-70%
+ * @param {string} inputPath 
+ * @param {string} outputName 
+ * @returns {Promise<string>} Path to compressed MP4 file
+ */
+function compressVideo(inputPath, outputName) {
+  const outputPath = path.join(tempDir, `${outputName}.mp4`);
+  const args = [
+    '-y',
+    '-threads', '0',
+    '-i', inputPath,
+    '-c:v', 'libx264',
+    '-crf', '30',
+    '-preset', 'superfast',
+    '-pix_fmt', 'yuv420p',
+    '-c:a', 'aac',
+    '-b:a', '96k',
+    outputPath
+  ];
+  return runFFmpeg(args).then(() => outputPath);
+}
+
+/**
+ * Compresses audio file to reduced 96kbps MP3
+ * @param {string} inputPath 
+ * @param {string} outputName 
+ * @returns {Promise<string>} Path to compressed MP3 file
+ */
+function compressAudio(inputPath, outputName) {
+  const outputPath = path.join(tempDir, `${outputName}.mp3`);
+  const args = [
+    '-y',
+    '-threads', '0',
+    '-i', inputPath,
+    '-acodec', 'libmp3lame',
+    '-b:a', '96k',
+    outputPath
+  ];
+  return runFFmpeg(args).then(() => outputPath);
+}
+
+/**
  * Scans temp directory and removes files older than maxAgeMs (default: 1 hour)
  * @param {number} maxAgeMs
  */
@@ -284,6 +326,8 @@ module.exports = {
   trimAudio,
   changeAudioSpeed,
   convertAudioToRoundVideo,
+  compressVideo,
+  compressAudio,
   cleanTempDirectory,
   ffmpegPath,
   ffprobePath
