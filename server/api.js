@@ -63,7 +63,7 @@ router.use(authMiddleware);
 /**
  * Utility to write variables back to .env
  */
-function updateEnv(botToken, shazamKey, sponsorEnabled, sponsorUsername, sponsorLink) {
+function updateEnv(botToken, shazamKey, sponsorEnabled, sponsorUsername, sponsorLink, adminIds) {
   let content = '';
   if (fs.existsSync(envPath)) {
     content = fs.readFileSync(envPath, 'utf8');
@@ -76,6 +76,15 @@ function updateEnv(botToken, shazamKey, sponsorEnabled, sponsorUsername, sponsor
       content += `\nTELEGRAM_BOT_TOKEN=${botToken}`;
     }
     process.env.TELEGRAM_BOT_TOKEN = botToken;
+  }
+
+  if (adminIds !== undefined) {
+    if (content.includes('ADMIN_IDS=')) {
+      content = content.replace(/ADMIN_IDS=.*/, `ADMIN_IDS=${adminIds}`);
+    } else {
+      content += `\nADMIN_IDS=${adminIds}`;
+    }
+    process.env.ADMIN_IDS = adminIds;
   }
 
   if (shazamKey !== undefined) {
@@ -343,6 +352,7 @@ router.get('/config', (req, res) => {
   
   res.json({
     botToken: token ? `${token.substring(0, 6)}...${token.substring(token.length - 4)}` : '',
+    adminIds: process.env.ADMIN_IDS || '',
     shazamKey: shazam ? `${shazam.substring(0, 4)}...${shazam.substring(shazam.length - 4)}` : '',
     sponsorEnabled: process.env.SPONSOR_CHANNEL_ENABLED === 'true',
     sponsorUsername: process.env.SPONSOR_CHANNEL_USERNAME || '',
@@ -352,7 +362,7 @@ router.get('/config', (req, res) => {
 
 // 7. Update Config
 router.post('/config', async (req, res) => {
-  const { botToken, shazamKey, sponsorEnabled, sponsorUsername, sponsorLink } = req.body;
+  const { botToken, shazamKey, sponsorEnabled, sponsorUsername, sponsorLink, adminIds } = req.body;
   try {
     const isBotActive = bot.getBotStatus().running;
     
@@ -361,7 +371,7 @@ router.post('/config', async (req, res) => {
       await bot.stopBot();
     }
 
-    updateEnv(botToken, shazamKey, sponsorEnabled, sponsorUsername, sponsorLink);
+    updateEnv(botToken, shazamKey, sponsorEnabled, sponsorUsername, sponsorLink, adminIds);
 
     // Restart bot if it was active
     if (isBotActive && process.env.TELEGRAM_BOT_TOKEN) {

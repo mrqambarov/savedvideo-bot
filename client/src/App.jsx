@@ -46,6 +46,7 @@ export default function App() {
   // Bot Manager & Sponsor States
   const [botStatus, setBotStatus] = useState({ running: false, hasToken: false });
   const [botTokenInput, setBotTokenInput] = useState('');
+  const [adminIdsInput, setAdminIdsInput] = useState('');
   const [shazamKeyInput, setShazamKeyInput] = useState('');
   const [configSaved, setConfigSaved] = useState(false);
   const [sponsorEnabled, setSponsorEnabled] = useState(false);
@@ -54,6 +55,7 @@ export default function App() {
 
   // Analytics States
   const [statsData, setStatsData] = useState(null);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
 
   // Channels (Multi-Sponsor) States
   const [channelsList, setChannelsList] = useState([]);
@@ -118,6 +120,15 @@ export default function App() {
     }
   };
 
+  const handleToggleBan = async (userId, currentBanned) => {
+    try {
+      await axios.post(`${API_BASE}/users/${userId}/ban`, { banned: !currentBanned });
+      fetchStats();
+    } catch (err) {
+      alert('Foydalanuvchi holatini o\'zgartirishda xatolik: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
   const fetchChannels = async () => {
     try {
       const res = await axios.get(`${API_BASE}/channels`);
@@ -167,6 +178,7 @@ export default function App() {
     try {
       const res = await axios.get(`${API_BASE}/config`);
       if (res.data.botToken) setBotTokenInput(res.data.botToken);
+      if (res.data.adminIds !== undefined) setAdminIdsInput(res.data.adminIds);
       if (res.data.shazamKey) setShazamKeyInput(res.data.shazamKey);
       setSponsorEnabled(res.data.sponsorEnabled);
       setSponsorUsernameInput(res.data.sponsorUsername || '');
@@ -182,6 +194,7 @@ export default function App() {
     try {
       const res = await axios.post(`${API_BASE}/config`, {
         botToken: botTokenInput.includes('...') ? undefined : botTokenInput,
+        adminIds: adminIdsInput,
         shazamKey: shazamKeyInput.includes('...') ? undefined : shazamKeyInput,
         sponsorEnabled,
         sponsorUsername: sponsorUsernameInput,
@@ -811,6 +824,23 @@ export default function App() {
 
                   <div style={{ marginBottom: '20px' }}>
                     <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>
+                      Telegram Admin ID lari (Masalan: 12345678, 98765432)
+                    </label>
+                    <input
+                      type="text"
+                      className="text-input"
+                      style={{ width: '100%' }}
+                      placeholder="Telegram ID laringiz (vergul bilan)"
+                      value={adminIdsInput}
+                      onChange={(e) => setAdminIdsInput(e.target.value)}
+                    />
+                    <small style={{ color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                      Telegram bot ichida /admin va /stats komandalaridan foydalana oladigan adminlar ID lari.
+                    </small>
+                  </div>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '8px' }}>
                       RapidAPI Shazam Key (Ixtiyoriy)
                     </label>
                     <input
@@ -913,8 +943,8 @@ export default function App() {
         {activeTab === 'analytics' && (
           <div>
             <div className="page-header">
-              <h1 className="page-title">Bot Analitikasi</h1>
-              <p className="page-subtitle">Bot foydalanuvchilari, o'sish dinamikasi va yuklash statistikasi.</p>
+              <h1 className="page-title">Bot Analitikasi & Boshqaruvi</h1>
+              <p className="page-subtitle">Kunlik ko'rsatkichlar, foydalanuvchilar o'sishi va faollik tahlili.</p>
             </div>
 
             {statsData ? (
@@ -943,133 +973,183 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Growth & Active Users Cards */}
+                {/* Today vs Yesterday & Growth Cards */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginTop: '25px' }}>
                   <div className="glass-card">
-                    <h3 style={{ marginBottom: '15px', fontFamily: 'var(--font-title)', fontSize: '1rem' }}>📈 Yangi A'zolar (O'sish)</h3>
-                    <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                      <div style={{ flex: 1, textAlign: 'center', padding: '12px', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '12px' }}>
-                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-primary)' }}>{statsData.growth?.newUsersToday || 0}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Bugun</div>
+                    <h3 style={{ marginBottom: '15px', fontFamily: 'var(--font-title)', fontSize: '1rem' }}>📈 Yangi Foydalanuvchilar</h3>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, textAlign: 'center', padding: '10px', background: 'rgba(99, 102, 241, 0.12)', borderRadius: '10px' }}>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--color-primary)' }}>{statsData.growth?.newUsersToday || 0}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Bugun</div>
                       </div>
-                      <div style={{ flex: 1, textAlign: 'center', padding: '12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px' }}>
-                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#3b82f6' }}>{statsData.growth?.newUsersWeek || 0}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Haftalik</div>
+                      <div style={{ flex: 1, textAlign: 'center', padding: '10px', background: 'rgba(99, 102, 241, 0.06)', borderRadius: '10px' }}>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-muted)' }}>{statsData.growth?.newUsersYesterday || 0}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Kecha</div>
                       </div>
-                      <div style={{ flex: 1, textAlign: 'center', padding: '12px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '12px' }}>
-                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981' }}>{statsData.growth?.newUsersMonth || 0}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Oylik</div>
+                      <div style={{ flex: 1, textAlign: 'center', padding: '10px', background: 'rgba(59, 130, 246, 0.12)', borderRadius: '10px' }}>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#3b82f6' }}>{statsData.growth?.newUsersWeek || 0}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>7 Kun</div>
                       </div>
                     </div>
                   </div>
 
                   <div className="glass-card">
                     <h3 style={{ marginBottom: '15px', fontFamily: 'var(--font-title)', fontSize: '1rem' }}>🟢 Faol Foydalanuvchilar</h3>
-                    <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                      <div style={{ flex: 1, textAlign: 'center', padding: '12px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '12px' }}>
-                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f59e0b' }}>{statsData.active?.today || 0}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Bugun</div>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, textAlign: 'center', padding: '10px', background: 'rgba(245, 158, 11, 0.12)', borderRadius: '10px' }}>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f59e0b' }}>{statsData.active?.today || 0}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Bugun</div>
                       </div>
-                      <div style={{ flex: 1, textAlign: 'center', padding: '12px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '12px' }}>
-                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ef4444' }}>{statsData.active?.week || 0}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Haftalik</div>
+                      <div style={{ flex: 1, textAlign: 'center', padding: '10px', background: 'rgba(245, 158, 11, 0.06)', borderRadius: '10px' }}>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-muted)' }}>{statsData.active?.yesterday || 0}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Kecha</div>
                       </div>
-                      <div style={{ flex: 1, textAlign: 'center', padding: '12px', background: 'rgba(168, 85, 247, 0.1)', borderRadius: '12px' }}>
-                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#a855f7' }}>{statsData.active?.month || 0}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Oylik</div>
+                      <div style={{ flex: 1, textAlign: 'center', padding: '10px', background: 'rgba(168, 85, 247, 0.12)', borderRadius: '10px' }}>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#a855f7' }}>{statsData.active?.month || 0}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>30 Kun</div>
                       </div>
                     </div>
                   </div>
 
                   <div className="glass-card">
-                    <h3 style={{ marginBottom: '15px', fontFamily: 'var(--font-title)', fontSize: '1rem' }}>📊 Foydalanish (Bugun / Hafta / Oy)</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(99, 102, 241, 0.06)', borderRadius: '8px' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>🎥 Video Yuklash</span>
-                        <span style={{ fontWeight: 600 }}>{statsData.usage?.today?.downloadsVideo || 0} / {statsData.usage?.week?.downloadsVideo || 0} / {statsData.usage?.month?.downloadsVideo || 0}</span>
+                    <h3 style={{ marginBottom: '15px', fontFamily: 'var(--font-title)', fontSize: '1rem' }}>📊 Kunlik yuklashlar taqqoslamasi</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(99, 102, 241, 0.06)', borderRadius: '6px', fontSize: '0.85rem' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>🎥 Video (Bugun / Kecha)</span>
+                        <span style={{ fontWeight: 600 }}>{statsData.usage?.today?.downloadsVideo || 0} / {statsData.usage?.yesterday?.downloadsVideo || 0}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(99, 102, 241, 0.06)', borderRadius: '8px' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>🎵 Audio Yuklash</span>
-                        <span style={{ fontWeight: 600 }}>{statsData.usage?.today?.downloadsAudio || 0} / {statsData.usage?.week?.downloadsAudio || 0} / {statsData.usage?.month?.downloadsAudio || 0}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(99, 102, 241, 0.06)', borderRadius: '6px', fontSize: '0.85rem' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>🎵 Audio (Bugun / Kecha)</span>
+                        <span style={{ fontWeight: 600 }}>{statsData.usage?.today?.downloadsAudio || 0} / {statsData.usage?.yesterday?.downloadsAudio || 0}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(99, 102, 241, 0.06)', borderRadius: '8px' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>🔍 Qidiruvlar</span>
-                        <span style={{ fontWeight: 600 }}>{statsData.usage?.today?.searches || 0} / {statsData.usage?.week?.searches || 0} / {statsData.usage?.month?.searches || 0}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(99, 102, 241, 0.06)', borderRadius: '6px', fontSize: '0.85rem' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>🔍 Qidiruv (Bugun / Kecha)</span>
+                        <span style={{ fontWeight: 600 }}>{statsData.usage?.today?.searches || 0} / {statsData.usage?.yesterday?.searches || 0}</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* 14-Day Trend Table */}
+                {/* 30-Day Trend Table */}
                 <div className="glass-card" style={{ marginTop: '25px' }}>
-                  <h3 style={{ marginBottom: '20px', fontFamily: 'var(--font-title)' }}>📅 Oxirgi 14 kunlik o'sish dinamikasi</h3>
-                  <div className="table-responsive">
+                  <h3 style={{ marginBottom: '20px', fontFamily: 'var(--font-title)' }}>📅 Kunlik Analitika Jadvali (Oxirgi 30 Kun)</h3>
+                  <div className="table-responsive" style={{ maxHeight: '350px', overflowY: 'auto' }}>
                     <table className="user-table">
                       <thead>
                         <tr>
                           <th>Sana</th>
                           <th>Yangi A'zolar</th>
-                          <th>Faol</th>
+                          <th>Faol Userlar</th>
                           <th>🎥 Video</th>
                           <th>🎵 Audio</th>
                           <th>🔍 Qidiruv</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {statsData.trend && statsData.trend.map((t, i) => (
-                          <tr key={i}>
-                            <td style={{ fontWeight: t.date === new Date().toISOString().split('T')[0] ? 700 : 400 }}>{t.date}</td>
-                            <td style={{ color: t.newUsers > 0 ? '#10b981' : 'inherit', fontWeight: t.newUsers > 0 ? 600 : 400 }}>+{t.newUsers}</td>
-                            <td>{t.activeUsers}</td>
-                            <td>{t.downloadsVideo}</td>
-                            <td>{t.downloadsAudio}</td>
-                            <td>{t.searches}</td>
-                          </tr>
-                        ))}
+                        {statsData.trend && statsData.trend.map((t, i) => {
+                          const isToday = t.date === new Date().toISOString().split('T')[0];
+                          return (
+                            <tr key={i} style={{ background: isToday ? 'rgba(99, 102, 241, 0.12)' : 'transparent' }}>
+                              <td style={{ fontWeight: isToday ? 700 : 400 }}>
+                                {t.date} {isToday && <span style={{ fontSize: '0.7rem', color: 'var(--color-primary)', marginLeft: '4px' }}>(Bugun)</span>}
+                              </td>
+                              <td style={{ color: t.newUsers > 0 ? '#10b981' : 'inherit', fontWeight: t.newUsers > 0 ? 600 : 400 }}>+{t.newUsers}</td>
+                              <td style={{ fontWeight: t.activeUsers > 0 ? 600 : 400 }}>{t.activeUsers}</td>
+                              <td>{t.downloadsVideo}</td>
+                              <td>{t.downloadsAudio}</td>
+                              <td>{t.searches}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
                 </div>
 
-                {/* Users List */}
+                {/* Users List & Search */}
                 <div className="glass-card" style={{ marginTop: '25px' }}>
-                  <h3 style={{ marginBottom: '20px', fontFamily: 'var(--font-title)' }}>Bot A'zolari Ro'yxati ({statsData.totalUsers})</h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+                    <h3 style={{ fontFamily: 'var(--font-title)', margin: 0 }}>
+                      Bot A'zolari Ro'yxati ({statsData.usersList ? statsData.usersList.length : 0})
+                    </h3>
+                    <input
+                      type="text"
+                      className="text-input"
+                      style={{ minWidth: '280px' }}
+                      placeholder="🔍 ID, username yoki ismdan izlash..."
+                      value={userSearchQuery}
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                    />
+                  </div>
+
                   <div className="table-responsive">
                     <table className="user-table">
                       <thead>
                         <tr>
                           <th>ID</th>
-                          <th>Username</th>
-                          <th>Ismi</th>
-                          <th>Sana</th>
-                          <th>Yuklagan fayllari (Oxirgi 5 ta)</th>
+                          <th>Foydalanuvchi</th>
+                          <th>Qo'shilgan Sana</th>
+                          <th>Oxirgi Faollik</th>
+                          <th>Takliflar</th>
+                          <th>Holati</th>
+                          <th>Boshqaruv</th>
                         </tr>
                       </thead>
                       <tbody>
                         {statsData.usersList && statsData.usersList.length > 0 ? (
-                          statsData.usersList.map((u, i) => (
-                            <tr key={i}>
-                              <td><code>{u.id}</code></td>
-                              <td>{u.username ? `@${u.username}` : '—'}</td>
-                              <td>{u.first_name || 'Foydalanuvchi'}</td>
-                              <td>{new Date(u.dateJoined).toLocaleString()}</td>
-                              <td>
-                                {u.history && u.history.length > 0 ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.8rem' }}>
-                                    {u.history.map((h, hIdx) => (
-                                      <span key={hIdx} style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px' }}>
-                                        {h.type === 'audio' ? '🎵' : '🎥'} {h.title}
-                                      </span>
-                                    ))}
+                          statsData.usersList
+                            .filter(u => {
+                              if (!userSearchQuery) return true;
+                              const q = userSearchQuery.toLowerCase();
+                              return (
+                                String(u.id).includes(q) ||
+                                (u.username && u.username.toLowerCase().includes(q)) ||
+                                (u.first_name && u.first_name.toLowerCase().includes(q)) ||
+                                (u.last_name && u.last_name.toLowerCase().includes(q))
+                              );
+                            })
+                            .map((u, i) => (
+                              <tr key={i}>
+                                <td><code>{u.id}</code></td>
+                                <td>
+                                  <div>
+                                    <strong>{u.first_name || 'Foydalanuvchi'} {u.last_name || ''}</strong>
+                                    {u.username && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>@{u.username}</div>}
                                   </div>
-                                ) : '—'}
-                              </td>
-                            </tr>
-                          ))
+                                </td>
+                                <td style={{ fontSize: '0.85rem' }}>
+                                  {u.dateJoined ? u.dateJoined.replace('T', ' ').substring(0, 16) : '—'}
+                                </td>
+                                <td style={{ fontSize: '0.85rem' }}>
+                                  {u.lastSeen ? u.lastSeen.replace('T', ' ').substring(0, 16) : '—'}
+                                </td>
+                                <td>
+                                  <span style={{ fontWeight: 600, color: u.refCount > 0 ? '#10b981' : 'inherit' }}>
+                                    {u.refCount || 0} ta
+                                  </span>
+                                </td>
+                                <td>
+                                  {u.banned ? (
+                                    <span style={{ color: '#ef4444', fontWeight: 600, fontSize: '0.85rem' }}>⛔ Bloklangan</span>
+                                  ) : (
+                                    <span style={{ color: '#10b981', fontWeight: 500, fontSize: '0.85rem' }}>✅ Faol</span>
+                                  )}
+                                </td>
+                                <td>
+                                  <button
+                                    className={`btn btn-secondary ${u.banned ? '' : 'btn-danger'}`}
+                                    style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                                    onClick={() => handleToggleBan(u.id, u.banned)}
+                                  >
+                                    {u.banned ? '🔓 Unban' : '⛔ Ban'}
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
                         ) : (
                           <tr>
-                            <td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-                              Ro'yxatdan o'tgan a'zolar yo'q
+                            <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                              Ro'yxatdan o'tgan a'zolar topilmadi
                             </td>
                           </tr>
                         )}

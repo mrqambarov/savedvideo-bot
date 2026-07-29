@@ -197,6 +197,52 @@ async function sendReferralInfo(ctx) {
   await ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: kb });
 }
 
+function isAdmin(userId) {
+  if (!userId) return false;
+  const adminIdsStr = process.env.ADMIN_IDS || '';
+  const adminIds = adminIdsStr.split(',').map(id => Number(id.trim())).filter(Boolean);
+  return adminIds.includes(Number(userId));
+}
+
+function getDisplayName(from) {
+  if (!from) return 'Foydalanuvchi';
+  let name = (from.first_name || '').trim();
+  if (from.last_name) {
+    name += ' ' + from.last_name.trim();
+  }
+  if (!name && from.username) {
+    name = '@' + from.username;
+  }
+  return name || 'Foydalanuvchi';
+}
+
+async function sendStatsReport(ctx) {
+  const advStats = db.getAdvancedStats();
+  const msg =
+    `📊 **KUNLIK VA UMUMIY ANALITIKA**\n\n` +
+    `📅 **Bugungi ko'rsatkichlar:**\n` +
+    `• Yangi foydalanuvchilar: **${advStats.growth.newUsersToday}**\n` +
+    `• Faol foydalanuvchilar: **${advStats.active.today}**\n` +
+    `• Video yuklashlar: **${advStats.usage.today.downloadsVideo}**\n` +
+    `• Audio yuklashlar: **${advStats.usage.today.downloadsAudio}**\n` +
+    `• Qidiruvlar: **${advStats.usage.today.searches}**\n\n` +
+    `📆 **Kechagi ko'rsatkichlar:**\n` +
+    `• Yangi foydalanuvchilar: **${advStats.growth.newUsersYesterday}**\n` +
+    `• Faol foydalanuvchilar: **${advStats.active.yesterday}**\n` +
+    `• Video yuklashlar: **${advStats.usage.yesterday.downloadsVideo}**\n` +
+    `• Audio yuklashlar: **${advStats.usage.yesterday.downloadsAudio}**\n` +
+    `• Qidiruvlar: **${advStats.usage.yesterday.searches}**\n\n` +
+    `📈 **Dinamika (Oylik/Haftalik):**\n` +
+    `• 7 kunlik faol foydalanuvchilar: **${advStats.active.week}**\n` +
+    `• 30 kunlik faol foydalanuvchilar: **${advStats.active.month}**\n` +
+    `• Jami foydalanuvchilar: **${advStats.totalUsers}**\n` +
+    `• Jami video yuklashlar: **${advStats.stats.totalDownloadsVideo || 0}**\n` +
+    `• Jami audio yuklashlar: **${advStats.stats.totalDownloadsAudio || 0}**`;
+  
+  const kb = new InlineKeyboard().text('🔄 Yangilash', 'adm_refresh_stats');
+  await ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: kb });
+}
+
 // getChatMember fails on every message when the bot is not an admin of the
 // sponsor channel ("member list is inaccessible"). Throttle that log to once
 // per 5 minutes and spell out the fix, instead of flooding the error log.
@@ -339,16 +385,29 @@ function startBot(token) {
               if (rid && rid !== ctx.from.id) referredBy = rid;
             }
           }
-          db.addUser(ctx.from, referredBy);
+          db.upsertUser(ctx.from, referredBy);
           db.trackActiveUser(ctx.from.id);
-          if (db.isBanned(ctx.from.id)) return; // bloklangan foydalanuvchini e'tiborsiz qoldirish
+          if (db.isBanned(ctx.from.id)) return; // ignore banned user
         }
 
-        // Bypass for membership check callback or start/help commands
-        if (ctx.callbackQuery && ctx.callbackQuery.data === 'chk_sub') {
+        // Bypass for admin commands & membership check callback
+        if (ctx.callbackQuery && (ctx.callbackQuery.data === 'chk_sub' || ctx.callbackQuery.data.startsWith('adm_'))) {
           return await next();
         }
-        if (ctx.message && ctx.message.text && (ctx.message.text.startsWith('/start') || ctx.message.text.startsWith('/help') || ctx.message.text === '❓ Yordam' || ctx.message.text === '📢 Botni Ulashish' || ctx.message.text === '🎁 Do\'stlarni taklif qilish' || ctx.message.text.startsWith('/referal'))) {
+        if (ctx.message && ctx.message.text && (
+          ctx.message.text.startsWith('/start') ||
+          ctx.message.text.startsWith('/help') ||
+          ctx.message.text === '❓ Yordam' ||
+          ctx.message.text === '📢 Botni Ulashish' ||
+          ctx.message.text === '🎁 Do\'stlarni taklif qilish' ||
+          ctx.message.text.startsWith('/referal') ||
+          ctx.message.text.startsWith('/admin') ||
+          ctx.message.text.startsWith('/stats') ||
+          ctx.message.text.startsWith('/analytics') ||
+          ctx.message.text.startsWith('/user') ||
+          ctx.message.text.startsWith('/ban') ||
+          ctx.message.text.startsWith('/unban')
+        )) {
           return await next();
         }
 
@@ -359,7 +418,6 @@ function startBot(token) {
             const chatMember = await ctx.api.getChatMember(activeChannel.username, ctx.from.id);
             const isMember = ['creator', 'administrator', 'member', 'restricted'].includes(chatMember.status);
             if (!isMember) {
-              // Save the pending action so we can process it after verification
               if (ctx.message) {
                 userPendingActions.set(ctx.from.id, {
                   type: ctx.message.text ? 'text' : (ctx.message.video ? 'video' : (ctx.message.audio ? 'audio' : (ctx.message.voice ? 'voice' : (ctx.message.document ? 'document' : 'text')))),
@@ -393,9 +451,10 @@ function startBot(token) {
 
       // Start Command
       botInstance.command('start', (ctx) => {
+        const name = getDisplayName(ctx.from);
         ctx.reply(
-          `👋 **Salom, ${ctx.from.first_name || 'foydalanuvchi'}!**\n\n` +
-          `Men video va musiqalar bilan ishlovchi botman.\n\n` +
+          `👋 **Salom, ${escapeHTML(name)}!**\n\n` +
+          `Men video va musiqalar bilan ishlovchi aqlli botman.\n\n` +
           `⚙️ **Imkoniyatlarim:**\n` +
           `1️⃣ **Link Downloader:** Menga YouTube, Instagram yoki TikTok havolasini yuboring - men uni video yoki MP3 ko'rinishida yuklab beraman.\n` +
           `2️⃣ **Dumaloq Video (Teleskop):** Menga kvadrat yoki ixtiyoriy video yuboring - men uni Telegram dumaloq videosiga (Video Note) aylantiraman.\n` +
@@ -405,6 +464,129 @@ function startBot(token) {
           `🎁 **Do'stlaringizni taklif qiling va sovg'alar yuting!** Havolangizni olish uchun /referal buyrug'ini yuboring.`,
           { parse_mode: 'Markdown', reply_markup: mainKeyboard }
         );
+      });
+
+      // Admin commands (/admin, /stats, /analytics, /user, /ban, /unban)
+      botInstance.command('admin', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) {
+          return ctx.reply('⚠️ **Siz admin emassiz!**\nAdmin huquqlarini faol qilish uchun Web Admin paneldan Telegram ID-ingizni kiritib saqlang.', { parse_mode: 'Markdown' });
+        }
+
+        const advStats = db.getAdvancedStats();
+        const kb = new InlineKeyboard()
+          .text('📊 Kunlik Analitika', 'adm_stats').text('🔄 Yangilash', 'adm_refresh_stats');
+
+        await ctx.reply(
+          `⚙️ **ADMIN PANELI BOSH QARUVI**\n\n` +
+          `👋 Xush kelibsiz, Admin!\n\n` +
+          `📊 **Hozirgi ko'rsatkichlar:**\n` +
+          `• Jami userlar: **${advStats.totalUsers}**\n` +
+          `• Bugungi faol userlar: **${advStats.active.today}**\n` +
+          `• Bugungi yangi userlar: **${advStats.growth.newUsersToday}**\n\n` +
+          `👇 **Mavjud buyruqlar:**\n` +
+          `• \`/stats\` - Kunlik va oylik batafsil analitika\n` +
+          `• \`/user <id/username>\` - Foydalanuvchini izlash va profilini ko'rish\n` +
+          `• \`/ban <id>\` - Foydalanuvchini bloklash\n` +
+          `• \`/unban <id>\` - Blokdan chiqarish`,
+          { parse_mode: 'Markdown', reply_markup: kb }
+        );
+      });
+
+      botInstance.command(['stats', 'analytics'], async (ctx) => {
+        if (!isAdmin(ctx.from.id)) {
+          return ctx.reply('⚠️ Siz admin emassiz!', { parse_mode: 'Markdown' });
+        }
+        await sendStatsReport(ctx);
+      });
+
+      botInstance.command('user', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return;
+        const args = ctx.message.text.split(' ').slice(1).join(' ').trim();
+        if (!args) {
+          return ctx.reply('⚠️ **Foydalanuvchi ID yoki username kiritilmadi.**\nMisol: `/user 12345678` yoki `/user @username`', { parse_mode: 'Markdown' });
+        }
+
+        const u = db.findUser(args);
+        if (!u) {
+          return ctx.reply(`❌ **Foydalanuvchi topilmadi:** \`${args}\``, { parse_mode: 'Markdown' });
+        }
+
+        const name = `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Noma\'lum';
+        const statusStr = u.banned ? '⛔ Bloklangan' : '✅ Faol';
+        const banBtnText = u.banned ? '🔓 Blokdan chiqarish' : '⛔ Bloklash';
+        const banBtnData = u.banned ? `adm_unban:${u.id}` : `adm_ban:${u.id}`;
+
+        const kb = new InlineKeyboard().text(banBtnText, banBtnData);
+
+        let msg =
+          `👤 **FOYDALANUVCHI MA'LUMOTLARI**\n\n` +
+          `🆔 ID: \`${u.id}\`\n` +
+          `👤 Ismi: **${escapeHTML(name)}**\n` +
+          `🔗 Username: ${u.username ? '@' + u.username : 'mavjud emas'}\n` +
+          `📅 Qo'shilgan: \`${u.dateJoined ? u.dateJoined.replace('T', ' ').substring(0, 16) : 'noma\'lum'}\`\n` +
+          `🕒 Oxirgi faollik: \`${u.lastSeen ? u.lastSeen.replace('T', ' ').substring(0, 16) : 'noma\'lum'}\`\n` +
+          `🎁 Taklif qilgan do'stlari: **${u.refCount || 0}**\n` +
+          `🚫 Holati: **${statusStr}**`;
+
+        if (u.history && u.history.length > 0) {
+          msg += `\n\n📜 **Oxirgi 5 ta yuklamasi:**\n`;
+          u.history.forEach((h, i) => {
+            msg += `${i + 1}. ${h.type === 'audio' ? '🎵' : '🎥'} ${escapeHTML(h.title || 'Fayl')}\n`;
+          });
+        }
+
+        await ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: kb });
+      });
+
+      botInstance.command('ban', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return;
+        const args = ctx.message.text.split(' ').slice(1).join(' ').trim();
+        if (!args) return ctx.reply('⚠️ ID yoki username kiriting. Misol: `/ban 12345678`', { parse_mode: 'Markdown' });
+        const u = db.findUser(args);
+        if (!u) return ctx.reply(`❌ Foydalanuvchi topilmadi: \`${args}\``, { parse_mode: 'Markdown' });
+        db.setBanned(u.id, true);
+        ctx.reply(`⛔ **Foydalanuvchi bloklandi:** ${u.first_name} (\`${u.id}\`)`, { parse_mode: 'Markdown' });
+      });
+
+      botInstance.command('unban', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return;
+        const args = ctx.message.text.split(' ').slice(1).join(' ').trim();
+        if (!args) return ctx.reply('⚠️ ID yoki username kiriting. Misol: `/unban 12345678`', { parse_mode: 'Markdown' });
+        const u = db.findUser(args);
+        if (!u) return ctx.reply(`❌ Foydalanuvchi topilmadi: \`${args}\``, { parse_mode: 'Markdown' });
+        db.setBanned(u.id, false);
+        ctx.reply(`🔓 **Foydalanuvchi blokdan chiqarildi:** ${u.first_name} (\`${u.id}\`)`, { parse_mode: 'Markdown' });
+      });
+
+      // Handle Admin Callback Queries
+      botInstance.on('callback_query:data', async (ctx, next) => {
+        const data = ctx.callbackQuery.data;
+
+        if (data === 'adm_stats' || data === 'adm_refresh_stats') {
+          if (!isAdmin(ctx.from.id)) {
+            return await ctx.answerCallbackQuery({ text: 'Siz admin emassiz!', show_alert: true });
+          }
+          await ctx.answerCallbackQuery({ text: 'Analitika yangilandi' });
+          return await sendStatsReport(ctx);
+        }
+
+        if (data.startsWith('adm_ban:')) {
+          if (!isAdmin(ctx.from.id)) return await ctx.answerCallbackQuery({ text: 'Siz admin emassiz!', show_alert: true });
+          const targetId = data.split(':')[1];
+          db.setBanned(targetId, true);
+          await ctx.answerCallbackQuery({ text: 'Foydalanuvchi bloklandi!' });
+          return await ctx.editMessageText(`⛔ **Foydalanuvchi (${targetId}) bloklandi!**`, { parse_mode: 'Markdown' });
+        }
+
+        if (data.startsWith('adm_unban:')) {
+          if (!isAdmin(ctx.from.id)) return await ctx.answerCallbackQuery({ text: 'Siz admin emassiz!', show_alert: true });
+          const targetId = data.split(':')[1];
+          db.setBanned(targetId, false);
+          await ctx.answerCallbackQuery({ text: 'Foydalanuvchi blokdan chiqarildi!' });
+          return await ctx.editMessageText(`🔓 **Foydalanuvchi (${targetId}) blokdan chiqarildi!**`, { parse_mode: 'Markdown' });
+        }
+
+        await next();
       });
 
       // Referral / contest command

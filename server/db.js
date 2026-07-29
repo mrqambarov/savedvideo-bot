@@ -40,25 +40,39 @@ function saveUsers(users) {
   }
 }
 
-// Adds a user if new. Optionally attributes them to a referrer (their invite
-// is counted as "pending" until the new user performs a real action — see
-// qualifyReferral). Returns true if the user was newly created.
-function addUser(user, referredBy = null) {
+// Adds or updates a user. Returns { isNew, user }.
+function upsertUser(user, referredBy = null) {
   try {
     const users = getUsers();
-    if (users.some(u => Number(u.id) === Number(user.id))) {
-      return false;
+    const existingIndex = users.findIndex(u => Number(u.id) === Number(user.id));
+    const nowIso = new Date().toISOString();
+    const todayStr = nowIso.split('T')[0];
+
+    if (existingIndex !== -1) {
+      const existing = users[existingIndex];
+      if (user.first_name !== undefined) existing.first_name = user.first_name || '';
+      if (user.last_name !== undefined) existing.last_name = user.last_name || '';
+      if (user.username !== undefined) existing.username = user.username || '';
+      existing.lastSeen = nowIso;
+
+      saveUsers(users);
+      return { isNew: false, user: existing };
     }
+
     const newUser = {
-      id: user.id,
+      id: Number(user.id),
       username: user.username || '',
       first_name: user.first_name || '',
-      dateJoined: new Date().toISOString(),
+      last_name: user.last_name || '',
+      dateJoined: nowIso,
+      lastSeen: nowIso,
       referredBy: null,
       refCount: 0,
       refPending: 0,
-      refQualified: false
+      refQualified: false,
+      banned: false
     };
+
     if (referredBy && Number(referredBy) !== Number(user.id)) {
       const referrer = users.find(u => Number(u.id) === Number(referredBy));
       if (referrer) {
@@ -66,12 +80,49 @@ function addUser(user, referredBy = null) {
         referrer.refPending = (referrer.refPending || 0) + 1;
       }
     }
+
     users.push(newUser);
     saveUsers(users);
-    return true;
+
+    // Track daily new users
+    const stats = getStats();
+    if (!stats.dailyUsage[todayStr]) {
+      stats.dailyUsage[todayStr] = { videoDownloads: 0, audioDownloads: 0, searchQueries: 0, activeUsers: [], newUsers: 0 };
+    }
+    stats.dailyUsage[todayStr].newUsers = (stats.dailyUsage[todayStr].newUsers || 0) + 1;
+    saveStats(stats);
+
+    return { isNew: true, user: newUser };
   } catch (e) {
-    console.error('Error adding user:', e.message);
-    return false;
+    console.error('Error in upsertUser:', e.message);
+    return { isNew: false, user: null };
+  }
+}
+
+// Adds a user if new. Compatibility wrapper around upsertUser.
+function addUser(user, referredBy = null) {
+  const result = upsertUser(user, referredBy);
+  return result.isNew;
+}
+
+function findUser(query) {
+  try {
+    const users = getUsers();
+    if (!query) return null;
+    const qStr = String(query).trim().toLowerCase().replace(/^@/, '');
+
+    if (!isNaN(qStr)) {
+      const foundById = users.find(u => Number(u.id) === Number(qStr));
+      if (foundById) return foundById;
+    }
+
+    return users.find(u =>
+      (u.username && u.username.toLowerCase() === qStr) ||
+      (u.first_name && u.first_name.toLowerCase().includes(qStr)) ||
+      (u.last_name && u.last_name.toLowerCase().includes(qStr))
+    ) || null;
+  } catch (e) {
+    return null;
   }
 }
 
@@ -184,10 +235,9 @@ function trackDownload(type) {
       stats.totalDownloadsAudio = (stats.totalDownloadsAudio || 0) + 1;
     }
     
-    // Track daily usage
     const today = new Date().toISOString().split('T')[0];
     if (!stats.dailyUsage[today]) {
-      stats.dailyUsage[today] = { videoDownloads: 0, audioDownloads: 0, searchQueries: 0, activeUsers: [] };
+      stats.dailyUsage[today] = { videoDownloads: 0, audioDownloads: 0, searchQueries: 0, activeUsers: [], newUsers: 0 };
     }
     if (type === 'video') stats.dailyUsage[today].videoDownloads = (stats.dailyUsage[today].videoDownloads || 0) + 1;
     if (type === 'audio') stats.dailyUsage[today].audioDownloads = (stats.dailyUsage[today].audioDownloads || 0) + 1;
@@ -205,7 +255,7 @@ function trackSearch() {
 
     const today = new Date().toISOString().split('T')[0];
     if (!stats.dailyUsage[today]) {
-      stats.dailyUsage[today] = { videoDownloads: 0, audioDownloads: 0, searchQueries: 0, activeUsers: [] };
+      stats.dailyUsage[today] = { videoDownloads: 0, audioDownloads: 0, searchQueries: 0, activeUsers: [], newUsers: 0 };
     }
     stats.dailyUsage[today].searchQueries = (stats.dailyUsage[today].searchQueries || 0) + 1;
 
@@ -220,7 +270,7 @@ function trackActiveUser(userId) {
     const stats = getStats();
     const today = new Date().toISOString().split('T')[0];
     if (!stats.dailyUsage[today]) {
-      stats.dailyUsage[today] = { videoDownloads: 0, audioDownloads: 0, searchQueries: 0, activeUsers: [] };
+      stats.dailyUsage[today] = { videoDownloads: 0, audioDownloads: 0, searchQueries: 0, activeUsers: [], newUsers: 0 };
     }
     if (!stats.dailyUsage[today].activeUsers) {
       stats.dailyUsage[today].activeUsers = [];
@@ -229,6 +279,14 @@ function trackActiveUser(userId) {
       stats.dailyUsage[today].activeUsers.push(userId);
       saveStats(stats);
     }
+
+    // Also update lastSeen on user profile
+    const users = getUsers();
+    const uIndex = users.findIndex(u => Number(u.id) === Number(userId));
+    if (uIndex !== -1) {
+      users[uIndex].lastSeen = new Date().toISOString();
+      saveUsers(users);
+    }
   } catch (e) {
     console.error('Error tracking active user:', e.message);
   }
@@ -236,7 +294,6 @@ function trackActiveUser(userId) {
 
 function trackUserDownload(userId, title, type, url) {
   try {
-    // A completed download is the qualifying action for the inviter's referral.
     qualifyReferral(userId);
     const users = getUsers();
     const userIndex = users.findIndex(u => Number(u.id) === Number(userId));
@@ -245,15 +302,13 @@ function trackUserDownload(userId, title, type, url) {
         users[userIndex].history = [];
       }
       
-      // Add recent download to the top
       users[userIndex].history.unshift({
         title,
-        type, // 'audio' or 'video'
+        type,
         url,
         timestamp: new Date().toISOString()
       });
       
-      // Keep only last 5 items
       if (users[userIndex].history.length > 5) {
         users[userIndex].history = users[userIndex].history.slice(0, 5);
       }
@@ -278,7 +333,7 @@ function getUserDownloads(userId) {
 
 /**
  * Computes advanced analytics: growth (daily/weekly/monthly new users),
- * active users, usage stats, and 14-day trend data for the dashboard.
+ * active users, usage stats, and 30-day trend data for the dashboard.
  */
 function getAdvancedStats() {
   const users = getUsers();
@@ -286,47 +341,50 @@ function getAdvancedStats() {
   const now = new Date();
   const todayStr = now.toISOString().split('T')[0];
 
-  // Helper: date string N days ago
   function daysAgo(n) {
     const d = new Date(now);
     d.setDate(d.getDate() - n);
     return d.toISOString().split('T')[0];
   }
 
+  const yesterdayStr = daysAgo(1);
   const weekAgoStr = daysAgo(7);
   const monthAgoStr = daysAgo(30);
 
-  // Count new users by period
-  let newUsersToday = 0, newUsersWeek = 0, newUsersMonth = 0;
+  let newUsersToday = 0, newUsersYesterday = 0, newUsersWeek = 0, newUsersMonth = 0;
   users.forEach(u => {
     if (!u.dateJoined) return;
     const joinDate = u.dateJoined.split('T')[0];
     if (joinDate === todayStr) newUsersToday++;
+    if (joinDate === yesterdayStr) newUsersYesterday++;
     if (joinDate >= weekAgoStr) newUsersWeek++;
     if (joinDate >= monthAgoStr) newUsersMonth++;
   });
 
-  // Calculate active users and usage by period
   const dailyUsage = stats.dailyUsage || {};
-  let activeToday = 0, activeWeek = 0, activeMonth = 0;
-  let usageToday = { downloadsVideo: 0, downloadsAudio: 0, searches: 0 };
-  let usageWeek = { downloadsVideo: 0, downloadsAudio: 0, searches: 0 };
-  let usageMonth = { downloadsVideo: 0, downloadsAudio: 0, searches: 0 };
+  let activeToday = (dailyUsage[todayStr]?.activeUsers || []).length;
+  let activeYesterday = (dailyUsage[yesterdayStr]?.activeUsers || []).length;
 
-  // Collect unique active user sets for week and month
+  let usageToday = {
+    downloadsVideo: dailyUsage[todayStr]?.videoDownloads || 0,
+    downloadsAudio: dailyUsage[todayStr]?.audioDownloads || 0,
+    searches: dailyUsage[todayStr]?.searchQueries || 0
+  };
+
+  let usageYesterday = {
+    downloadsVideo: dailyUsage[yesterdayStr]?.videoDownloads || 0,
+    downloadsAudio: dailyUsage[yesterdayStr]?.audioDownloads || 0,
+    searches: dailyUsage[yesterdayStr]?.searchQueries || 0
+  };
+
   const activeWeekSet = new Set();
   const activeMonthSet = new Set();
+  let usageWeek = { downloadsVideo: 0, downloadsAudio: 0, searches: 0 };
+  let usageMonth = { downloadsVideo: 0, downloadsAudio: 0, searches: 0 };
 
   Object.keys(dailyUsage).forEach(dateStr => {
     const day = dailyUsage[dateStr];
     const activeUsers = day.activeUsers || [];
-
-    if (dateStr === todayStr) {
-      activeToday = activeUsers.length;
-      usageToday.downloadsVideo = day.videoDownloads || 0;
-      usageToday.downloadsAudio = day.audioDownloads || 0;
-      usageToday.searches = day.searchQueries || 0;
-    }
 
     if (dateStr >= weekAgoStr) {
       activeUsers.forEach(id => activeWeekSet.add(id));
@@ -343,15 +401,11 @@ function getAdvancedStats() {
     }
   });
 
-  activeWeek = activeWeekSet.size;
-  activeMonth = activeMonthSet.size;
-
-  // Build 14-day trend data
   const trend = [];
-  for (let i = 13; i >= 0; i--) {
+  for (let i = 29; i >= 0; i--) {
     const dateStr = daysAgo(i);
     const day = dailyUsage[dateStr] || {};
-    const newUsersOnDay = users.filter(u => u.dateJoined && u.dateJoined.split('T')[0] === dateStr).length;
+    const newUsersOnDay = day.newUsers || users.filter(u => u.dateJoined && u.dateJoined.split('T')[0] === dateStr).length;
 
     trend.push({
       date: dateStr,
@@ -365,9 +419,9 @@ function getAdvancedStats() {
 
   return {
     totalUsers: users.length,
-    growth: { newUsersToday, newUsersWeek, newUsersMonth },
-    active: { today: activeToday, week: activeWeek, month: activeMonth },
-    usage: { today: usageToday, week: usageWeek, month: usageMonth },
+    growth: { newUsersToday, newUsersYesterday, newUsersWeek, newUsersMonth },
+    active: { today: activeToday, yesterday: activeYesterday, week: activeWeekSet.size, month: activeMonthSet.size },
+    usage: { today: usageToday, yesterday: usageYesterday, week: usageWeek, month: usageMonth },
     trend,
     usersList: users,
     stats
@@ -377,6 +431,8 @@ function getAdvancedStats() {
 module.exports = {
   getUsers,
   addUser,
+  upsertUser,
+  findUser,
   setBanned,
   isBanned,
   qualifyReferral,
