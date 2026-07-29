@@ -44,7 +44,7 @@ app.listen(PORT, async () => {
   }
 
   // Automatically start Telegram Bot on boot if token is present
-  const botToken = process.env.MOVIE_BOT_TOKEN;
+  const botToken = process.env.MOVIE_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
   if (botToken) {
     console.log('MOVIE_BOT_TOKEN found. Booting Movie Telegram bot...');
     bot.startBot(botToken)
