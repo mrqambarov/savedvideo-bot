@@ -17,6 +17,8 @@ app.use(express.json());
 // API Routes
 app.use('/api', apiRouter);
 
+const tunnelManager = require('./tunnelManager');
+
 // Serve Static Frontend files of movie-client (if compiled)
 const clientDist = path.join(__dirname, '..', 'movie-client', 'dist');
 if (fs.existsSync(clientDist)) {
@@ -33,6 +35,13 @@ if (fs.existsSync(clientDist)) {
 // Start Server
 app.listen(PORT, async () => {
   console.log(`Movie API Server running on port ${PORT}`);
+
+  // Auto-establish HTTPS tunnel for Telegram Mini App
+  try {
+    await tunnelManager.ensureHttpsTunnel(PORT);
+  } catch (tunnelErr) {
+    console.warn('Tunnel init warning:', tunnelErr.message);
+  }
 
   // Automatically start Telegram Bot on boot if token is present
   const botToken = process.env.MOVIE_BOT_TOKEN;
