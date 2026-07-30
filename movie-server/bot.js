@@ -200,114 +200,288 @@ function startBot(token) {
         );
       });
 
+      // Helper for Visual Progress Bar
+      function makeProgressBar(value, total, length = 10) {
+        if (!total || total <= 0) return '░'.repeat(length) + ' 0%';
+        const ratio = Math.min(Math.max(value / total, 0), 1);
+        const filledCount = Math.round(ratio * length);
+        const emptyCount = length - filledCount;
+        const percent = Math.round(ratio * 100);
+        return '█'.repeat(filledCount) + '░'.repeat(emptyCount) + ` ${percent}%`;
+      }
+
+      function buildAdminDashboardMessage() {
+        const advStats = db.getAdvancedStats();
+        const requests = db.getRequests();
+        const pendingReqs = (requests || []).filter(r => r.status === 'pending');
+        const uptimeHours = (process.uptime() / 3600).toFixed(1);
+        const memMb = (process.memoryUsage().rss / (1024 * 1024)).toFixed(1);
+        const webAppUrl = process.env.MOVIE_MINI_APP_URL || 'https://movie-client.vercel.app';
+
+        const text =
+          `👑 **XIT FILM — ENTERPRISE ADMIN DASHBOARD**\n` +
+          `═════════════════════════\n` +
+          `🟢 **Server:** Online  |  ⏱ **Uptime:** ${uptimeHours} soat  |  💾 **RAM:** ${memMb} MB\n\n` +
+          `📊 **ASOSIY MONITORING:**\n` +
+          ` ┣ 👥 Jami foydalanuvchilar: **${advStats.totalUsers.toLocaleString()}** ta\n` +
+          ` ┣ 🎬 Jami kinolar bazasi: **${advStats.totalMovies.toLocaleString()}** ta\n` +
+          ` ┣ 👁 Total ko'rishlar: **${(advStats.stats.totalViews || 0).toLocaleString()}** marta\n` +
+          ` ┣ 📝 Kutilayotgan buyurtmalar: **${pendingReqs.length}** ta\n` +
+          ` ┗ ⚡ Bugungi yangi userlar: **+${advStats.growth.newUsersToday}** ta\n\n` +
+          `⚙️ **ADMIN BUYRUQLARI:**\n` +
+          `• \`/add [kod] [nomi] | [tavsif] | [janr]\` — Videoga reply qilib kino qo'shish\n` +
+          `• \`/del [kod]\` — Kinoni bazadan o'chirish\n` +
+          `• \`/user [id/@username]\` — Foydalanuvchi ma'lumotlari\n` +
+          `• \`/ban [id]\` / \`/unban [id]\` — Qoidabuzarlarni bloklash\n` +
+          `• \`/broadcast [xabar]\` — Barcha foydalanuvchilarga e'lon\n\n` +
+          `👇 *Bo'limni tanlash uchun quyidagi tugmalarni bosing:*`;
+
+        const keyboard = new InlineKeyboard()
+          .text('📊 Analitika & Grafik', 'adm_stats')
+          .text(`📝 Buyurtmalar (${pendingReqs.length})`, 'adm_requests')
+          .row()
+          .text('🎬 Kinolar Top-5', 'adm_movies')
+          .text('👤 Foydalanuvchilar', 'adm_users')
+          .row()
+          .url('🍿 Web Admin Panel', webAppUrl)
+          .text('🔄 Yangilash', 'adm_refresh');
+
+        return { text, keyboard };
+      }
+
+      function buildAdminStatsMessage() {
+        const advStats = db.getAdvancedStats();
+        const searchAnalytics = db.getSearchAnalytics();
+        const todayViews = advStats.usage.today.movieViews || 0;
+        const todaySearches = advStats.usage.today.searches || 0;
+
+        let text =
+          `📈 **BATAHSIL ANALITIKA VA STATISTIKA**\n` +
+          `═════════════════════════\n\n` +
+          `👥 **FOYDALANUVCHILAR O'SISHI:**\n` +
+          ` ┣ Bugun: **+${advStats.growth.newUsersToday}** ta\n` +
+          ` ┣ Shu hafta: **+${advStats.growth.newUsersWeek}** ta\n` +
+          ` ┗ Shu oy: **+${advStats.growth.newUsersMonth}** ta\n\n` +
+          `🎯 **AKTIVLIK KO'RSATKICHLARI:**\n` +
+          ` ┣ Bugungi ko'rishlar: **${todayViews}** marta\n` +
+          ` ┣ Bugungi qidiruvlar: **${todaySearches}** marta\n` +
+          ` ┗ Oylik aktiv userlar: **${advStats.active.month}** ta\n\n` +
+          `📊 **TOP QIDIRUVLAR (PROGRESS BAR):**\n`;
+
+        if (searchAnalytics.top && searchAnalytics.top.length > 0) {
+          const maxCount = searchAnalytics.top[0].count || 1;
+          searchAnalytics.top.slice(0, 5).forEach((item, idx) => {
+            const bar = makeProgressBar(item.count, maxCount, 8);
+            text += `${idx + 1}. \`${item.query}\` (${item.count} marta)\n   ${bar}\n`;
+          });
+        } else {
+          text += `_Hozircha qidiruv statistikasi mavjud emas_\n`;
+        }
+
+        const keyboard = new InlineKeyboard()
+          .text('🔙 Asosiy Menyu', 'adm_home')
+          .text('🔄 Yangilash', 'adm_stats');
+
+        return { text, keyboard };
+      }
+
+      function buildAdminMoviesMessage() {
+        const movies = db.getMovies();
+        const topMovies = db.getTopMovies(5);
+
+        let text =
+          `🎬 **KINOLAR BAZASI VA TOP FILMLAR**\n` +
+          `═════════════════════════\n` +
+          `📦 Bazadagi jami kinolar: **${movies.length}** ta\n\n` +
+          `🔥 **ENG KO'P KO'RILGAN TOP-5 FILMLAR:**\n\n`;
+
+        if (topMovies && topMovies.length > 0) {
+          topMovies.forEach((m, idx) => {
+            text += `${idx + 1}. *${m.title}*\n   🔑 Kod: \`${m.code}\` | 👁 Ko'rishlar: **${m.views || 0}** | 🗂 ${m.genre || 'Tarjima'}\n\n`;
+          });
+        } else {
+          text += `_Hozircha kinolar mavjud emas_\n\n`;
+        }
+
+        text +=
+          `💡 **Boshqaruv maslahati:**\n` +
+          `• Yangi kino qo'shish: Videoga reply qilib \`/add [kod] [nomi] | [tavsif] | [janr]\` yozing.\n` +
+          `• Kinoni o'chirish: \`/del [kod]\` buyrug'ini yuboring.`;
+
+        const keyboard = new InlineKeyboard()
+          .text('🔙 Asosiy Menyu', 'adm_home')
+          .text('🔄 Yangilash', 'adm_movies');
+
+        return { text, keyboard };
+      }
+
+      function buildAdminRequestsMessage() {
+        const requests = db.getRequests();
+        const pending = (requests || []).filter(r => r.status === 'pending');
+
+        let text =
+          `📝 **KINO BUYURTMALARI BOSHQARUVI**\n` +
+          `═════════════════════════\n` +
+          `📊 Jami buyurtmalar: **${requests ? requests.length : 0}** | ⏳ Kutilmoqda: **${pending.length}**\n\n`;
+
+        const keyboard = new InlineKeyboard();
+
+        if (pending.length === 0) {
+          text += `✅ *Barcha buyurtmalar bajarilgan! Kutilayotgan so'rovlar yo'q.*\n`;
+        } else {
+          pending.slice(-5).reverse().forEach((r, idx) => {
+            const userStr = r.username ? `@${r.username}` : `ID: \`${r.userId}\``;
+            text += `${idx + 1}. 🎬 *${r.title}*\n   👤 Kimdan: ${userStr} | 🆔 ID: \`${r.id}\`\n\n`;
+            keyboard.text(`✅ Bajarildi #${r.id}`, `req_done:${r.id}`).text(`🗑 O'chirish #${r.id}`, `req_del:${r.id}`).row();
+          });
+        }
+
+        keyboard.text('🔙 Asosiy Menyu', 'adm_home').text('🔄 Yangilash', 'adm_requests');
+
+        return { text, keyboard };
+      }
+
+      function buildAdminUsersMessage() {
+        const users = db.getUsers();
+        const bannedCount = users.filter(u => db.isBanned(u.id)).length;
+
+        let text =
+          `👤 **FOYDALANUVCHILAR BOSHQARUVI**\n` +
+          `═════════════════════════\n` +
+          `👥 Jami foydalanuvchilar: **${users.length}** ta\n` +
+          `🚫 Bloklanganlar: **${bannedCount}** ta\n\n` +
+          `🛠 **Boshqaruv buyruqlari:**\n` +
+          `• \`/user [id yoki @username]\` — Foydalanuvchi profilini ko'rish\n` +
+          `• \`/ban [id]\` — Foydalanuvchini bloklash\n` +
+          `• \`/unban [id]\` — Blokdan chiqarish\n` +
+          `• \`/broadcast [xabar]\` — Barcha foydalanuvchilarga xabar yuborish`;
+
+        const keyboard = new InlineKeyboard()
+          .text('🔙 Asosiy Menyu', 'adm_home')
+          .text('🔄 Yangilash', 'adm_users');
+
+        return { text, keyboard };
+      }
+
       // Admin Dashboard Command (/admin, /panel)
       botInstance.command(['admin', 'panel'], async (ctx) => {
         if (!isAdmin(ctx.from.id)) {
           return ctx.reply('⚠️ **Siz admin emassiz!**\nAdmin huquqlariga ega bo\'lish uchun administratorga murojaat qiling.', { parse_mode: 'Markdown' });
         }
-
-        const advStats = db.getAdvancedStats();
-        const requests = db.getRequests();
-        const pendingReqs = (requests || []).filter(r => r.status === 'pending');
-
-        const keyboard = new InlineKeyboard()
-          .text('📊 Batafsil Analitika', 'adm_stats')
-          .text(`📝 Buyurtmalar (${pendingReqs.length})`, 'adm_requests')
-          .row()
-          .text('🔄 Yangilash', 'adm_refresh');
-
-        await ctx.reply(
-          `⚙️ **XIT FILM — ADMIN PANELI**\n\n` +
-          `👋 Xush kelibsiz, Admin!\n\n` +
-          `📊 **Asosiy ko'rsatkichlar:**\n` +
-          `• 👥 Jami foydalanuvchilar: **${advStats.totalUsers}** ta\n` +
-          `• 🎬 Jami kinolar: **${advStats.totalMovies}** ta\n` +
-          `• 👁 Total ko'rishlar: **${advStats.stats.totalViews || 0}** marta\n` +
-          `• 📝 Kutilayotgan buyurtmalar: **${pendingReqs.length}** ta\n` +
-          `• ⚡ Bugungi yangi userlar: **${advStats.growth.newUsersToday}** ta\n\n` +
-          `👇 **Mavjud buyruqlar:**\n` +
-          `• \`/add [kod] [nomi] | [tavsif] | [janr]\` — Videoga reply qilib yangi kino qo'shish\n` +
-          `• \`/stats\` — Batafsil analitika va statistika\n` +
-          `• \`/requests\` — Foydalanuvchilar kino buyurtmalari\n` +
-          `• \`/broadcast [xabar]\` — Barcha foydalanuvchilarga xabar yuborish`,
-          { parse_mode: 'Markdown', reply_markup: keyboard }
-        );
+        const { text, keyboard } = buildAdminDashboardMessage();
+        await ctx.reply(text, { parse_mode: 'Markdown', reply_markup: keyboard });
       });
 
       // Admin Stats Command (/stats)
       botInstance.command('stats', async (ctx) => {
         if (!isAdmin(ctx.from.id)) return;
-        const advStats = db.getAdvancedStats();
-        const searchAnalytics = db.getSearchAnalytics();
-
-        let replyText =
-          `📊 **BATAHSIL STATISTIKA**\n\n` +
-          `👥 **Foydalanuvchilar:**\n` +
-          `• Jami: **${advStats.totalUsers}**\n` +
-          `• Bugun qo'shilgan: **${advStats.growth.newUsersToday}**\n` +
-          `• Shu hafta: **${advStats.growth.newUsersWeek}**\n` +
-          `• Shu oy: **${advStats.growth.newUsersMonth}**\n\n` +
-          `🎬 **Kinolar & Ko'rishlar:**\n` +
-          `• Jami kinolar: **${advStats.totalMovies}**\n` +
-          `• Jami ko'rishlar: **${advStats.stats.totalViews || 0}**\n` +
-          `• Bugungi ko'rishlar: **${advStats.usage.today.movieViews}**\n` +
-          `• Bugungi qidiruvlar: **${advStats.usage.today.searches}**\n\n` +
-          `🔍 **Top Qidiruvlar:**\n`;
-
-        if (searchAnalytics.top && searchAnalytics.top.length > 0) {
-          searchAnalytics.top.slice(0, 5).forEach((item, idx) => {
-            replyText += `${idx + 1}. \`${item.query}\` — ${item.count} marta\n`;
-          });
-        } else {
-          replyText += `_Ma'lumot yo'q_\n`;
-        }
-
-        const kb = new InlineKeyboard().text('🔄 Yangilash', 'adm_stats');
-        await ctx.reply(replyText, { parse_mode: 'Markdown', reply_markup: kb });
+        const { text, keyboard } = buildAdminStatsMessage();
+        await ctx.reply(text, { parse_mode: 'Markdown', reply_markup: keyboard });
       });
 
       // Admin Requests Command (/requests)
       botInstance.command('requests', async (ctx) => {
         if (!isAdmin(ctx.from.id)) return;
-        const requests = db.getRequests();
-        if (!requests || requests.length === 0) {
-          return await ctx.reply('📝 Hozircha kino buyurtmalari yo\'q.');
+        const { text, keyboard } = buildAdminRequestsMessage();
+        await ctx.reply(text, { parse_mode: 'Markdown', reply_markup: keyboard });
+      });
+
+      // Admin Delete Movie Command (/del)
+      botInstance.command('del', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return;
+        const code = ctx.match ? ctx.match.trim() : '';
+        if (!code) {
+          return await ctx.reply('⚠️ **Formati:** `/del [kino_kodi]`', { parse_mode: 'Markdown' });
         }
-
-        const pending = requests.filter(r => r.status === 'pending');
-        let text = `📝 **KINO BUYURTMALARI** (Jami: ${requests.length}, Kutilmoqda: ${pending.length}):\n\n`;
-
-        if (pending.length === 0) {
-          text += `_Hozircha kutilayotgan buyurtmalar yo'q._`;
+        const res = db.deleteMovie(code);
+        if (res) {
+          await ctx.reply(`✅ **Kino bazadan o'chirildi!**\n\n🔑 Kod: \`${code}\``, { parse_mode: 'Markdown' });
         } else {
-          pending.slice(-10).reverse().forEach((r, idx) => {
-            const userStr = r.username ? `@${r.username}` : `ID: ${r.userId}`;
-            text += `${idx + 1}. *${r.title}*\n   👤 Kimdan: ${userStr} | 📅 ${r.createdAt ? r.createdAt.split('T')[0] : ''}\n\n`;
-          });
+          await ctx.reply(`❌ **Xatolik:** \`${code}\` kodli kino topilmadi.`, { parse_mode: 'Markdown' });
         }
+      });
+
+      // Admin User Info Command (/user)
+      botInstance.command('user', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return;
+        const query = ctx.match ? ctx.match.trim() : '';
+        if (!query) {
+          return await ctx.reply('⚠️ **Formati:** `/user [ID yoki @username]`', { parse_mode: 'Markdown' });
+        }
+        const users = db.getUsers();
+        const cleanQ = query.replace('@', '').toLowerCase();
+        const target = users.find(u => String(u.id) === cleanQ || (u.username && u.username.toLowerCase() === cleanQ));
+
+        if (!target) {
+          return await ctx.reply(`❌ Foydalanuvchi **"${query}"** topilmadi.`, { parse_mode: 'Markdown' });
+        }
+
+        const favs = db.getFavorites(target.id);
+        const refInfo = db.getReferralInfo(target.id);
+        const bannedStr = db.isBanned(target.id) ? '🔴 BLOKLANGAN (Banned)' : '🟢 FAOL (Active)';
+
+        const text =
+          `👤 **FOYDALANUVCHl MA'LUMOTLARI**\n` +
+          `═════════════════════════\n` +
+          `🆔 Telegram ID: \`${target.id}\`\n` +
+          `👤 Ism: **${target.first_name || 'Noma\'lum'}**\n` +
+          `🌐 Username: ${target.username ? '@' + target.username : '_Mavjud emas_'}\n` +
+          `🌐 Til: \`${target.lang || 'uz'}\`\n` +
+          `📅 Qo'shilgan: \`${target.dateJoined ? target.dateJoined.split('T')[0] : 'Noma\'lum'}\`\n` +
+          `⭐ Sevimlilar: **${favs ? favs.length : 0}** ta kino\n` +
+          `🎁 Taklif qilganlar: **${refInfo.refCount || 0}** ta user\n` +
+          `🛡 Status: **${bannedStr}**`;
 
         await ctx.reply(text, { parse_mode: 'Markdown' });
       });
 
-      // Admin Broadcast Command (/broadcast)
-      botInstance.command('broadcast', async (ctx) => {
+      // Admin Ban & Unban Commands (/ban, /unban)
+      botInstance.command('ban', async (ctx) => {
         if (!isAdmin(ctx.from.id)) return;
-        const broadcastText = ctx.match;
+        const targetId = ctx.match ? ctx.match.trim() : '';
+        if (!targetId || isNaN(Number(targetId))) {
+          return await ctx.reply('⚠️ **Formati:** `/ban [Telegram_ID]`', { parse_mode: 'Markdown' });
+        }
+        db.setBanned(Number(targetId), true);
+        await ctx.reply(`🔴 **Foydalanuvchi [${targetId}] bloklandi!**`, { parse_mode: 'Markdown' });
+      });
+
+      botInstance.command('unban', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return;
+        const targetId = ctx.match ? ctx.match.trim() : '';
+        if (!targetId || isNaN(Number(targetId))) {
+          return await ctx.reply('⚠️ **Formati:** `/unban [Telegram_ID]`', { parse_mode: 'Markdown' });
+        }
+        db.setBanned(Number(targetId), false);
+        await ctx.reply(`🟢 **Foydalanuvchi [${targetId}] blokdan chiqarildi!**`, { parse_mode: 'Markdown' });
+      });
+
+      // Admin Broadcast Command (/broadcast, /broadcast_pin)
+      botInstance.command(['broadcast', 'broadcast_pin'], async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return;
+        const isPin = ctx.message.text.startsWith('/broadcast_pin');
+        const broadcastText = ctx.match ? ctx.match.trim() : '';
+
         if (!broadcastText) {
           return await ctx.reply(
-            `📢 **Xabar tarqatish formati:**\n\n` +
-            `\`/broadcast Sizning xabaringiz\` deb yozing.`,
+            `📢 **PROFESSIONAL E'LON TARQATUVCHI**\n\n` +
+            `• Oddiy e'lon: \`/broadcast [Xabaringiz]\`\n` +
+            `• Sanchilgan (Pin) e'lon: \`/broadcast_pin [Xabaringiz]\``,
             { parse_mode: 'Markdown' }
           );
         }
 
         const users = db.getUsers();
-        await ctx.reply(`📢 Xabar ${users.length} ta foydalanuvchiga yuborilmoqda...`);
+        await ctx.reply(`📢 Xabar **${users.length}** ta foydalanuvchiga yuborilmoqda...`, { parse_mode: 'Markdown' });
 
         let sent = 0, failed = 0;
-        for (const user of users) {
+        for (let i = 0; i < users.length; i++) {
+          const u = users[i];
           try {
-            await botInstance.api.sendMessage(user.id, broadcastText, { parse_mode: 'Markdown' });
+            const m = await botInstance.api.sendMessage(u.id, broadcastText, { parse_mode: 'Markdown' });
+            if (isPin) {
+              await botInstance.api.pinChatMessage(u.id, m.message_id).catch(() => {});
+            }
             sent++;
           } catch (e) {
             failed++;
@@ -315,8 +489,14 @@ function startBot(token) {
           await new Promise(r => setTimeout(r, 40));
         }
 
-        await ctx.reply(`✅ **Xabar yuborish yakunlandi!**\n\n🟢 Yuborildi: ${sent}\n🔴 Xatolik: ${failed}`);
+        await ctx.reply(
+          `✅ **E'LON TARQATISH YAKUNLANDI!**\n\n` +
+          `🟢 Muvaffaqiyatli: **${sent}** ta\n` +
+          `🔴 Yetib bormadi: **${failed}** ta`,
+          { parse_mode: 'Markdown' }
+        );
       });
+
 
 
       botInstance.on('message:text', async (ctx) => {
@@ -584,102 +764,75 @@ function startBot(token) {
         const data = ctx.callbackQuery.data;
 
         // Admin Callback Queries
-        if (data.startsWith('adm_')) {
+        if (data.startsWith('adm_') || data.startsWith('req_done:') || data.startsWith('req_del:')) {
           if (!isAdmin(ctx.from.id)) {
             return await ctx.answerCallbackQuery({ text: '⚠️ Siz admin emassiz!', show_alert: true });
           }
 
+          if (data === 'adm_home' || data === 'adm_refresh') {
+            const { text, keyboard } = buildAdminDashboardMessage();
+            try { await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: keyboard }); } catch (e) {}
+            await ctx.answerCallbackQuery({ text: 'Admin paneli yangilandi' }).catch(() => {});
+            return;
+          }
+
           if (data === 'adm_stats') {
-            const advStats = db.getAdvancedStats();
-            const searchAnalytics = db.getSearchAnalytics();
-            let text =
-              `📊 **BATAHSIL STATISTIKA**\n\n` +
-              `👥 **Foydalanuvchilar:**\n` +
-              `• Jami: **${advStats.totalUsers}**\n` +
-              `• Bugun qo'shilgan: **${advStats.growth.newUsersToday}**\n` +
-              `• Shu hafta: **${advStats.growth.newUsersWeek}**\n` +
-              `• Shu oy: **${advStats.growth.newUsersMonth}**\n\n` +
-              `🎬 **Kinolar & Ko'rishlar:**\n` +
-              `• Jami kinolar: **${advStats.totalMovies}**\n` +
-              `• Jami ko'rishlar: **${advStats.stats.totalViews || 0}**\n` +
-              `• Bugungi ko'rishlar: **${advStats.usage.today.movieViews}**\n` +
-              `• Bugungi qidiruvlar: **${advStats.usage.today.searches}**\n\n` +
-              `🔍 **Top Qidiruvlar:**\n`;
-
-            if (searchAnalytics.top && searchAnalytics.top.length > 0) {
-              searchAnalytics.top.slice(0, 5).forEach((item, idx) => {
-                text += `${idx + 1}. \`${item.query}\` — ${item.count} marta\n`;
-              });
-            } else {
-              text += `_Ma'lumot yo'q_\n`;
-            }
-
-            const kb = new InlineKeyboard()
-              .text('🔙 Orqaga', 'adm_refresh')
-              .text('🔄 Yangilash', 'adm_stats');
-
-            try {
-              await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: kb });
-            } catch (e) {}
+            const { text, keyboard } = buildAdminStatsMessage();
+            try { await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: keyboard }); } catch (e) {}
             await ctx.answerCallbackQuery({ text: 'Statistika yangilandi' }).catch(() => {});
             return;
           }
 
+          if (data === 'adm_movies') {
+            const { text, keyboard } = buildAdminMoviesMessage();
+            try { await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: keyboard }); } catch (e) {}
+            await ctx.answerCallbackQuery({ text: 'Kinolar ro\'yxati yangilandi' }).catch(() => {});
+            return;
+          }
+
           if (data === 'adm_requests') {
-            const requests = db.getRequests();
-            const pending = (requests || []).filter(r => r.status === 'pending');
-            let text = `📝 **KINO BUYURTMALARI** (Jami: ${requests ? requests.length : 0}, Kutilmoqda: ${pending.length}):\n\n`;
-
-            if (pending.length === 0) {
-              text += `_Hozircha kutilayotgan buyurtmalar yo'q._`;
-            } else {
-              pending.slice(-10).reverse().forEach((r, idx) => {
-                const userStr = r.username ? `@${r.username}` : `ID: ${r.userId}`;
-                text += `${idx + 1}. *${r.title}*\n   👤 Kimdan: ${userStr} | 📅 ${r.createdAt ? r.createdAt.split('T')[0] : ''}\n\n`;
-              });
-            }
-
-            const kb = new InlineKeyboard()
-              .text('🔙 Orqaga', 'adm_refresh')
-              .text('🔄 Yangilash', 'adm_requests');
-
-            try {
-              await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: kb });
-            } catch (e) {}
+            const { text, keyboard } = buildAdminRequestsMessage();
+            try { await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: keyboard }); } catch (e) {}
             await ctx.answerCallbackQuery({ text: 'Buyurtmalar yangilandi' }).catch(() => {});
             return;
           }
 
-          if (data === 'adm_refresh') {
-            const advStats = db.getAdvancedStats();
+          if (data === 'adm_users') {
+            const { text, keyboard } = buildAdminUsersMessage();
+            try { await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: keyboard }); } catch (e) {}
+            await ctx.answerCallbackQuery({ text: 'Userlar bo\'limi' }).catch(() => {});
+            return;
+          }
+
+          if (data.startsWith('req_done:')) {
+            const reqId = data.split(':')[1];
             const requests = db.getRequests();
-            const pendingReqs = (requests || []).filter(r => r.status === 'pending');
+            const targetReq = requests ? requests.find(r => String(r.id) === String(reqId)) : null;
 
-            const keyboard = new InlineKeyboard()
-              .text('📊 Batafsil Analitika', 'adm_stats')
-              .text(`📝 Buyurtmalar (${pendingReqs.length})`, 'adm_requests')
-              .row()
-              .text('🔄 Yangilash', 'adm_refresh');
+            db.completeRequest(reqId);
 
-            const text =
-              `⚙️ **XIT FILM — ADMIN PANELI**\n\n` +
-              `👋 Xush kelibsiz, Admin!\n\n` +
-              `📊 **Asosiy ko'rsatkichlar:**\n` +
-              `• 👥 Jami foydalanuvchilar: **${advStats.totalUsers}** ta\n` +
-              `• 🎬 Jami kinolar: **${advStats.totalMovies}** ta\n` +
-              `• 👁 Total ko'rishlar: **${advStats.stats.totalViews || 0}** marta\n` +
-              `• 📝 Kutilayotgan buyurtmalar: **${pendingReqs.length}** ta\n` +
-              `• ⚡ Bugungi yangi userlar: **${advStats.growth.newUsersToday}** ta\n\n` +
-              `👇 **Mavjud buyruqlar:**\n` +
-              `• \`/add [kod] [nomi] | [tavsif] | [janr]\` — Videoga reply qilib yangi kino qo'shish\n` +
-              `• \`/stats\` — Batafsil analitika va statistika\n` +
-              `• \`/requests\` — Foydalanuvchilar kino buyurtmalari\n` +
-              `• \`/broadcast [xabar]\` — Barcha foydalanuvchilarga xabar yuborish`;
+            if (targetReq && targetReq.userId) {
+              try {
+                await botInstance.api.sendMessage(
+                  targetReq.userId,
+                  `🎉 **Tabriklaymiz!** Siz so'ragan *"${targetReq.title}"* filmi bazamizga qo'shildi!\n\n🍿 Kodini kiriting va tomosha qiling!`,
+                  { parse_mode: 'Markdown' }
+                );
+              } catch (e) {}
+            }
 
-            try {
-              await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: keyboard });
-            } catch (e) {}
-            await ctx.answerCallbackQuery({ text: 'Admin paneli yangilandi' }).catch(() => {});
+            await ctx.answerCallbackQuery({ text: '✅ Buyurtma bajarildi va foydalanuvchiga xabar berildi!', show_alert: true }).catch(() => {});
+            const { text, keyboard } = buildAdminRequestsMessage();
+            try { await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: keyboard }); } catch (e) {}
+            return;
+          }
+
+          if (data.startsWith('req_del:')) {
+            const reqId = data.split(':')[1];
+            db.deleteRequest(reqId);
+            await ctx.answerCallbackQuery({ text: '🗑 Buyurtma o\'chirildi', show_alert: true }).catch(() => {});
+            const { text, keyboard } = buildAdminRequestsMessage();
+            try { await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: keyboard }); } catch (e) {}
             return;
           }
         }
