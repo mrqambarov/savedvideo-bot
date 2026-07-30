@@ -473,6 +473,13 @@ function startBot(token) {
           );
         }
 
+        // Handle slash commands in message:text handler
+        if (text.startsWith('/')) {
+          if (!text.startsWith('/add ') || !isAdmin(ctx.from.id)) {
+            return;
+          }
+        }
+
         // Check if admin is adding a movie
         if (text.startsWith('/add ') && isAdmin(ctx.from.id)) {
           const replyMsg = ctx.message.reply_to_message;
