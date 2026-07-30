@@ -19,6 +19,12 @@ app.use('/api', apiRouter);
 
 const tunnelManager = require('./tunnelManager');
 
+// Serve Static Admin Panel (if compiled)
+const adminDist = path.join(__dirname, '..', 'admin-panel', 'dist');
+if (fs.existsSync(adminDist)) {
+  app.use('/admin-panel', express.static(adminDist));
+}
+
 // Serve Static Frontend files of movie-client (if compiled)
 const clientDist = path.join(__dirname, '..', 'movie-client', 'dist');
 if (fs.existsSync(clientDist)) {
