@@ -242,13 +242,15 @@ function startBot(token) {
           .row()
           .text('🎬 Kinolar Top-5', 'adm_movies')
           .text('👤 Foydalanuvchilar', 'adm_users')
+          .row()
+          .text('🚀 VPS Serverni Yangilash', 'adm_update_vps')
           .row();
 
         if (webAppUrl && /^https?:\/\//.test(webAppUrl)) {
           keyboard.url('🍿 Web Admin Panel', webAppUrl).row();
         }
 
-        keyboard.text('🔄 Yangilash', 'adm_refresh');
+        keyboard.text('🔄 Refresh', 'adm_refresh');
 
         return { text, keyboard };
       }
@@ -499,6 +501,32 @@ function startBot(token) {
           `🔴 Yetib bormadi: **${failed}** ta`,
           { parse_mode: 'Markdown' }
         );
+      });
+
+      // Admin Remote VPS Auto-Update Command (/update, /deploy)
+      botInstance.command(['update', 'deploy'], async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return;
+        await ctx.reply('🚀 **VPS SERVERNI YANGILASH BAJARILMOQDA...**\n\n`git pull origin main` yuklanmoqda...', { parse_mode: 'Markdown' });
+
+        const { exec } = require('child_process');
+        const rootDir = path.join(__dirname, '..');
+
+        exec('git pull origin main', { cwd: rootDir }, async (err, stdout, stderr) => {
+          if (err) {
+            return await ctx.reply(`❌ **Yangilashda xatolik:**\n\`\`\`\n${err.message}\n\`\`\``, { parse_mode: 'Markdown' });
+          }
+
+          await ctx.reply(
+            `✅ **VPS SERVER MUVAFFAQIYATLI YANGILANDI!**\n\n` +
+            `\`\`\`\n${stdout || 'O\'zgarishlar yuklandi'}\n\`\`\`\n` +
+            `⚙️ *Bot va PM2 jarayonlari qayta yuklanmoqda...*`,
+            { parse_mode: 'Markdown' }
+          );
+
+          setTimeout(() => {
+            exec('pm2 restart all || pm2 restart movie-bot', () => {});
+          }, 1000);
+        });
       });
 
 
@@ -805,6 +833,32 @@ function startBot(token) {
             const { text, keyboard } = buildAdminUsersMessage();
             try { await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: keyboard }); } catch (e) {}
             await ctx.answerCallbackQuery({ text: 'Userlar bo\'limi' }).catch(() => {});
+            return;
+          }
+
+          if (data === 'adm_update_vps') {
+            await ctx.answerCallbackQuery({ text: '🚀 VPS Yangilanishi boshlandi...', show_alert: true }).catch(() => {});
+            await ctx.reply('🚀 **VPS SERVERNI YANGILASH BAJARILMOQDA...**\n\n`git pull origin main` yuklanmoqda...', { parse_mode: 'Markdown' });
+
+            const { exec } = require('child_process');
+            const rootDir = path.join(__dirname, '..');
+
+            exec('git pull origin main', { cwd: rootDir }, async (err, stdout, stderr) => {
+              if (err) {
+                return await ctx.reply(`❌ **Yangilashda xatolik:**\n\`\`\`\n${err.message}\n\`\`\``, { parse_mode: 'Markdown' });
+              }
+
+              await ctx.reply(
+                `✅ **VPS SERVER MUVAFFAQIYATLI YANGILANDI!**\n\n` +
+                `\`\`\`\n${stdout || 'O\'zgarishlar yuklandi'}\n\`\`\`\n` +
+                `⚙️ *Bot va PM2 jarayonlari qayta yuklanmoqda...*`,
+                { parse_mode: 'Markdown' }
+              );
+
+              setTimeout(() => {
+                exec('pm2 restart all || pm2 restart movie-bot', () => {});
+              }, 1000);
+            });
             return;
           }
 
