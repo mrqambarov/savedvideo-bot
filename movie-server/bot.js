@@ -242,9 +242,13 @@ function startBot(token) {
           .row()
           .text('🎬 Kinolar Top-5', 'adm_movies')
           .text('👤 Foydalanuvchilar', 'adm_users')
-          .row()
-          .url('🍿 Web Admin Panel', webAppUrl)
-          .text('🔄 Yangilash', 'adm_refresh');
+          .row();
+
+        if (webAppUrl && /^https?:\/\//.test(webAppUrl)) {
+          keyboard.url('🍿 Web Admin Panel', webAppUrl).row();
+        }
+
+        keyboard.text('🔄 Yangilash', 'adm_refresh');
 
         return { text, keyboard };
       }
