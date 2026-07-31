@@ -110,8 +110,13 @@ function downloadVideo(url, outputName, quality = '720') {
     args.push(url);
 
     execFile(ytDlpPath, args, { env }, (err, stdout, stderr) => {
+      const errMsg = stderr || (err ? err.message : '');
       if (err) {
-        return reject(new Error(stderr || err.message));
+        if (errMsg.includes('No video formats found') || errMsg.includes('Requested format is not available')) {
+          // Fallback to downloading image/thumbnail
+          return downloadPhoto(url, outputName).then(resolve).catch(() => reject(new Error(errMsg)));
+        }
+        return reject(new Error(errMsg));
       }
       
       // Find the file dynamically because extension is variable
@@ -121,7 +126,49 @@ function downloadVideo(url, outputName, quality = '720') {
         if (matched) {
           resolve(path.join(tempDir, matched));
         } else {
-          reject(new Error('Downloaded media file not found.'));
+          // If no video file was saved, try photo fallback
+          downloadPhoto(url, outputName).then(resolve).catch(() => reject(new Error('Downloaded media file not found.')));
+        }
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
+}
+
+/**
+ * Download photo/thumbnail when no video format is available
+ * @param {string} url 
+ * @param {string} outputName 
+ * @returns {Promise<string>}
+ */
+function downloadPhoto(url, outputName) {
+  return new Promise((resolve, reject) => {
+    const templatePath = path.join(tempDir, `${outputName}.%(ext)s`);
+    const args = [
+      '--write-thumbnail',
+      '--convert-thumbnails', 'jpg',
+      '--skip-download',
+      '--ignore-no-formats-error',
+      '--no-playlist',
+      ...NET_ARGS,
+      '-o', templatePath,
+      ...browserHeaders
+    ];
+    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+    if (fs.existsSync(cookiesPath)) {
+      args.push('--cookies', cookiesPath);
+    }
+    args.push(url);
+
+    execFile(ytDlpPath, args, { env }, (err, stdout, stderr) => {
+      try {
+        const files = fs.readdirSync(tempDir);
+        const matched = files.find(f => f.startsWith(outputName));
+        if (matched) {
+          resolve(path.join(tempDir, matched));
+        } else {
+          reject(new Error(stderr || (err ? err.message : 'Photo file not found')));
         }
       } catch (e) {
         reject(e);
