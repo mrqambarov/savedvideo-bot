@@ -87,6 +87,28 @@ router.post('/publish-social-promo', async (req, res) => {
   res.json(result);
 });
 
+router.get('/instagram-config', (req, res) => {
+  const config = db.getInstagramConfig();
+  res.json({
+    username: config.username || '',
+    hasPassword: !!config.password,
+    autoPost: !!config.autoPost,
+    updatedAt: config.updatedAt || null
+  });
+});
+
+router.post('/instagram-config', (req, res) => {
+  const { username, password, autoPost } = req.body;
+  const saved = db.saveInstagramConfig({ username, password, autoPost });
+  res.json({ success: true, username: saved.username, autoPost: saved.autoPost });
+});
+
+router.post('/publish-instagram', async (req, res) => {
+  const { instagramCaption } = req.body;
+  const result = await aiPublisher.publishToInstagram({ caption: instagramCaption });
+  res.json(result);
+});
+
 /**
  * Utility to write variables back to .env
  */

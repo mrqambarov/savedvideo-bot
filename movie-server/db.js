@@ -933,9 +933,73 @@ module.exports = {
   getRequests,
   addRequest,
   completeRequest,
+const instaConfigFile = path.join(dataDir, 'instagram_config.json');
+
+function getInstagramConfig() {
+  try {
+    if (!fs.existsSync(instaConfigFile)) return { username: '', password: '', autoPost: false };
+    return JSON.parse(fs.readFileSync(instaConfigFile, 'utf8'));
+  } catch (e) {
+    return { username: '', password: '', autoPost: false };
+  }
+}
+
+function saveInstagramConfig({ username, password, autoPost }) {
+  try {
+    const config = {
+      username: (username || '').trim(),
+      password: (password || '').trim(),
+      autoPost: !!autoPost,
+      updatedAt: new Date().toISOString()
+    };
+    fs.writeFileSync(instaConfigFile, JSON.stringify(config, null, 2));
+    return config;
+  } catch (e) {
+    console.error('Error saving Instagram config:', e.message);
+    return null;
+  }
+}
+
+module.exports = {
+  getMovies,
+  saveMovies,
+  addMovie,
+  getMovieByCode,
+  deleteMovie,
+  getTopMovies,
+  searchMovies,
+  toggleFavorite,
+  getFavorites,
+  isFavorite,
+  getGenres,
+  saveGenres,
+  trackSearchQuery,
+  getSearchAnalytics,
+  getUsers,
+  addUser,
+  getUserLang,
+  setUserLang,
+  setBanned,
+  isBanned,
+  qualifyReferral,
+  getReferralInfo,
+  getReferralLeaderboard,
+  getRewardTiers,
+  saveRewardTiers,
+  claimTierFor,
+  checkIn,
+  getStats,
+  trackMovieView,
+  trackSearch,
+  trackActiveUser,
+  getRequests,
+  addRequest,
+  completeRequest,
   deleteRequest,
   toggleLikeDislike,
   getAdvancedStats,
   getMovieReviews,
-  addMovieReview
+  addMovieReview,
+  getInstagramConfig,
+  saveInstagramConfig
 };

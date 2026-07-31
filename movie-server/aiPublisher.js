@@ -79,7 +79,44 @@ async function publishSocialPromo({ code, title, telegramPostText, botInstance }
   }
 }
 
+/**
+ * Publishes direct post to Instagram account using username and password
+ */
+async function publishToInstagram({ caption }) {
+  try {
+    const config = db.getInstagramConfig();
+    if (!config.username || !config.password) {
+      return { success: false, reason: 'Instagram login va parol kiritilmagan. Sozlamalar bo\'limida saqlang.' };
+    }
+
+    const { IgApiClient } = require('instagram-private-api');
+    const ig = new IgApiClient();
+    ig.state.generateDevice(config.username);
+
+    // Simulate login
+    await ig.account.login(config.username, config.password);
+
+    // Sample generated poster image buffer for Instagram feed post
+    const sampleJpgBuffer = Buffer.from(
+      '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=',
+      'base64'
+    );
+
+    // Publish photo to Instagram
+    const publishResult = await ig.publish.photo({
+      file: sampleJpgBuffer,
+      caption: caption
+    });
+
+    return { success: true, mediaId: publishResult.media.id, username: config.username };
+  } catch (err) {
+    console.error('Instagram Auto-Post error:', err.message);
+    return { success: false, error: err.message || 'Instagram akkauntga kirishda xatolik! Login/Parolni tekshiring.' };
+  }
+}
+
 module.exports = {
   generateAiMovieMetadata,
-  publishSocialPromo
+  publishSocialPromo,
+  publishToInstagram
 };

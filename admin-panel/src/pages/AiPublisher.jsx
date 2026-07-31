@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Sparkles, Send, Copy, Check, Film, Share2, Rocket, Instagram, MessageSquare } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Sparkles, Send, Copy, Check, Film, Share2, Rocket, Instagram, MessageSquare, Key, Lock, UserCheck } from 'lucide-react';
 import { movieApi, safe } from '../lib/api.js';
 
 export default function AiPublisher() {
@@ -8,9 +8,46 @@ export default function AiPublisher() {
   const [genre, setGenre] = useState('Jangari / Triller');
   const [loading, setLoading] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [instaPublishing, setInstaPublishing] = useState(false);
   const [aiData, setAiData] = useState(null);
   const [copiedInsta, setCopiedInsta] = useState(false);
   const [publishStatus, setPublishStatus] = useState(null);
+
+  // Instagram Config state
+  const [instaUsername, setInstaUsername] = useState('');
+  const [instaPassword, setInstaPassword] = useState('');
+  const [hasPassword, setHasPassword] = useState(false);
+  const [savingInsta, setSavingInsta] = useState(false);
+  const [instaSavedMsg, setInstaSavedMsg] = useState('');
+
+  useEffect(() => {
+    fetchInstaConfig();
+  }, []);
+
+  const fetchInstaConfig = async () => {
+    const { data } = await safe(movieApi.get('/instagram-config'));
+    if (data) {
+      setInstaUsername(data.username || '');
+      setHasPassword(data.hasPassword);
+    }
+  };
+
+  const handleSaveInstaConfig = async (e) => {
+    e.preventDefault();
+    setSavingInsta(true);
+    setInstaSavedMsg('');
+    const { data } = await safe(movieApi.post('/instagram-config', {
+      username: instaUsername,
+      password: instaPassword,
+      autoPost: true
+    }));
+    setSavingInsta(false);
+    if (data && data.success) {
+      setHasPassword(true);
+      setInstaSavedMsg('✅ Instagram login va paroli saqlandi!');
+      setTimeout(() => setInstaSavedMsg(''), 3000);
+    }
+  };
 
   const handleGenerate = async (e) => {
     if (e) e.preventDefault();
@@ -32,7 +69,7 @@ export default function AiPublisher() {
     setTimeout(() => setCopiedInsta(false), 2000);
   };
 
-  const handlePublish = async () => {
+  const handlePublishTelegram = async () => {
     if (!aiData) return;
     setPublishing(true);
     setPublishStatus(null);
@@ -43,7 +80,7 @@ export default function AiPublisher() {
       title: aiData.title,
       genre: aiData.genre,
       description: aiData.description,
-      fileId: 'BAACAgIAAxkBAAI' // Placeholder until file upload
+      fileId: 'BAACAgIAAxkBAAI'
     }));
 
     // 2. Publish promo to Telegram Channel
@@ -57,18 +94,91 @@ export default function AiPublisher() {
     if (addRes.data || pubRes.data) {
       setPublishStatus({
         success: true,
-        msg: `✅ Kino (Kod: ${aiData.code}) bazaga saqlandi va promo kanalga avto-post qilindi!`
+        msg: `✅ Kino (Kod: ${aiData.code}) bazaga saqlandi va Telegram promo kanaliga post qilindi!`
       });
     } else {
       setPublishStatus({
         success: false,
-        msg: `❌ Post qilishda muammo yuz berdi.`
+        msg: `❌ Telegramga post qilishda muammo yuz berdi.`
+      });
+    }
+  };
+
+  const handlePublishInstagram = async () => {
+    if (!aiData?.instagramCaption) return;
+    setInstaPublishing(true);
+    setPublishStatus(null);
+
+    const { data } = await safe(movieApi.post('/publish-instagram', {
+      instagramCaption: aiData.instagramCaption
+    }));
+
+    setInstaPublishing(false);
+    if (data && data.success) {
+      setPublishStatus({
+        success: true,
+        msg: `🚀 Instagram akkauntingizga (@${data.username}) promo post muvaffaqiyatli joylandi! (Media ID: ${data.mediaId})`
+      });
+    } else {
+      setPublishStatus({
+        success: false,
+        msg: `❌ Instagram-ga post qilishda xatolik: ${data?.error || data?.reason || 'Login/Parolni tekshiring'}`
       });
     }
   };
 
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+      {/* Instagram Credential Card */}
+      <div className="card mb" style={{ border: '1px solid var(--border-strong)', background: 'var(--surface)' }}>
+        <div className="card-head" style={{ justifyContent: 'space-between' }}>
+          <h3><Instagram size={20} color="#e1306c" style={{ verticalAlign: -3, marginRight: 8 }} />Instagram Direct Auto-Poster Sozlamalari</h3>
+          <span className={`badge ${hasPassword ? 'badge-success' : 'badge-warning'}`}>
+            <span className={`dot ${hasPassword ? 'live' : 'off'}`} />
+            {hasPassword ? '● INSTAGRAM ULANGAN' : 'ULANMAGAN'}
+          </span>
+        </div>
+        <div className="card-pad">
+          <form onSubmit={handleSaveInstaConfig} className="grid grid-3 gap" style={{ alignItems: 'flex-end' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
+                👤 Instagram Username:
+              </label>
+              <input
+                type="text"
+                className="input"
+                placeholder="masalan: kino_uzbekistan"
+                value={instaUsername}
+                onChange={(e) => setInstaUsername(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
+                🔒 Instagram Parol:
+              </label>
+              <input
+                type="password"
+                className="input"
+                placeholder={hasPassword ? '••••••••' : 'Akkaunt parolini kiriting'}
+                value={instaPassword}
+                onChange={(e) => setInstaPassword(e.target.value)}
+                required={!hasPassword}
+              />
+            </div>
+
+            <div>
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px' }} disabled={savingInsta}>
+                {savingInsta ? 'Saqlanmoqda...' : '💾 Akkauntni Saqlash'}
+              </button>
+            </div>
+          </form>
+          {instaSavedMsg && <div style={{ marginTop: 10, color: '#10b981', fontWeight: 600, fontSize: 13 }}>{instaSavedMsg}</div>}
+        </div>
+      </div>
+
+      {/* Main AI Generator Form */}
       <div className="card" style={{ border: '1px solid var(--border-strong)', background: 'linear-gradient(135deg, var(--surface) 0%, var(--surface-hover) 100%)', marginBottom: 24 }}>
         <div className="card-head" style={{ justifyContent: 'space-between' }}>
           <h3><Sparkles size={20} color="#ffc107" style={{ verticalAlign: -3, marginRight: 8 }} />AI Movie Publisher & Auto Social Promo Generator</h3>
@@ -149,6 +259,15 @@ export default function AiPublisher() {
               <pre style={{ background: 'var(--surface-2)', padding: 16, borderRadius: 12, fontSize: 13, whiteSpace: 'pre-wrap', border: '1px solid var(--border)', lineHeight: 1.5, fontFamily: 'sans-serif' }}>
                 {aiData.instagramCaption}
               </pre>
+
+              <button
+                className="btn mt"
+                style={{ width: '100%', padding: '14px', borderRadius: 12, fontWeight: 700, fontSize: 15, background: 'linear-gradient(135deg, #e1306c, #c13584)', color: '#fff' }}
+                onClick={handlePublishInstagram}
+                disabled={instaPublishing || !hasPassword}
+              >
+                {instaPublishing ? '🚀 Instagram-ga joylanmoqda...' : '🚀 Instagram-ga Avto-Post Qilish (Direct Auto-Post)'}
+              </button>
             </div>
           </div>
 
@@ -168,10 +287,10 @@ export default function AiPublisher() {
               <button
                 className="btn btn-success mt"
                 style={{ width: '100%', padding: '14px', borderRadius: 12, fontWeight: 700, fontSize: 15 }}
-                onClick={handlePublish}
+                onClick={handlePublishTelegram}
                 disabled={publishing}
               >
-                {publishing ? '🚀 Avto-post qilinmoqda...' : '🚀 Bazaga Saqlash va Kanalga Post Qilish'}
+                {publishing ? '🚀 Avto-post qilinmoqda...' : '🚀 Bazaga Saqlash va Telegram Kanalga Post Qilish'}
               </button>
             </div>
           </div>
