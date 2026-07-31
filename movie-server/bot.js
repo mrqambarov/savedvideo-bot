@@ -139,20 +139,23 @@ function startBot(token) {
 
       const webAppUrl = process.env.MOVIE_MINI_APP_URL || 'https://movie-client.vercel.app';
 
-      // Keyboard
-      const mainKeyboard = new Keyboard()
-        .text('🔍 Kino Qidirish').text('🗂 Janrlar')
-        .row()
-        .text('🔥 TOP kinolar').text('🎲 Tasodifiy')
-        .row()
-        .text('⭐ Sevimlilarim').text('📅 Kunlik bonus')
-        .row()
-        .webApp('🍿 Mini App (Kino Veb-Ilova)', webAppUrl)
-        .row()
-        .text('🤖 AI Kino Tavsiya').text('🎁 Do\'stlarni taklif qilish')
-        .row()
-        .text('🙋‍♂️ Buyurtma berish').text('ℹ️ Yordam')
-        .resized();
+      // Dynamic Multi-Language Keyboard
+      function getMainKeyboard(lang) {
+        const l = lang || 'uz';
+        return new Keyboard()
+          .text(i18n.t(l, 'search_btn')).text(i18n.t(l, 'genre_btn'))
+          .row()
+          .text('🔥 TOP kinolar').text('🎲 Tasodifiy')
+          .row()
+          .text('⭐ Sevimlilarim').text('📅 Kunlik bonus')
+          .row()
+          .webApp('🍿 Mini App (Kino Veb-Ilova)', webAppUrl)
+          .row()
+          .text('🤖 AI Kino Tavsiya').text('🎁 Do\'stlarni taklif qilish')
+          .row()
+          .text(i18n.t(l, 'req_btn')).text(i18n.t(l, 'help_btn'))
+          .resized();
+      }
 
       // Start Command
       botInstance.command('start', async (ctx) => {
@@ -165,12 +168,22 @@ function startBot(token) {
           }
         }
 
+        const userLang = db.getUserLang(ctx.from.id);
+        if (userLang) {
+          const name = ctx.from.first_name || 'foydalanuvchi';
+          let welcomeMsg = i18n.t(userLang, 'welcome', { name });
+          if (isAdmin(ctx.from.id)) {
+            welcomeMsg += i18n.t(userLang, 'admin_help');
+          }
+          return await ctx.reply(welcomeMsg, { parse_mode: 'Markdown', reply_markup: getMainKeyboard(userLang) });
+        }
+
         const keyboard = new InlineKeyboard()
           .text('🇺🇿 O\'zbekcha', 'set_lang:uz')
           .text('🇷🇺 Русский', 'set_lang:ru')
           .text('🇬🇧 English', 'set_lang:en');
 
-        await ctx.reply('🌐 **Iltimos, tilni tanlang / Пожалуйста, выберите язык / Please select language:**', {
+        await ctx.reply(i18n.t('uz', 'select_lang'), {
           parse_mode: 'Markdown',
           reply_markup: keyboard
         });
@@ -183,7 +196,7 @@ function startBot(token) {
           .text('🇷🇺 Русский', 'set_lang:ru')
           .text('🇬🇧 English', 'set_lang:en');
 
-        await ctx.reply('🌐 **Tilni tanlang / Select Language / Выберите язык:**', {
+        await ctx.reply(i18n.t('uz', 'select_lang'), {
           parse_mode: 'Markdown',
           reply_markup: keyboard
         });
@@ -529,7 +542,237 @@ function startBot(token) {
         });
       });
 
+      /**
+       * Cleans ad text, Telegram usernames (@channel), external links, and promo filler
+       */
+      function cleanAdText(text) {
+        if (!text) return '';
+        let str = String(text);
 
+        const lines = str.split('\n');
+        const cleanLines = [];
+
+        for (let line of lines) {
+          let l = line.trim();
+          if (!l) continue;
+
+          // Strip lines containing channel handles, links, or promotional filler
+          if (l.includes('@') || l.includes('http://') || l.includes('https://') || l.includes('t.me/')) continue;
+          if (/orqali ko['`’]?proq/i.test(l)) continue;
+          if (/kodlarni/i.test(l)) continue;
+          if (/yuklab olingan/i.test(l)) continue;
+          if (/obuna bo['`’]?ling/i.test(l)) continue;
+          if (/kanali(?:miz)?ga/i.test(l)) continue;
+
+          // Strip labels if line starts with them
+          l = l.replace(/^📦?\s*(?:nomi|title|kino nomi|kino)[\s:-]*/gi, '');
+          l = l.replace(/^🔑?\s*(?:kodi|kod|code|kino kodi)[\s:-]*/gi, '');
+          l = l.replace(/^🗂?\s*(?:janri|janr|genre)[\s:-]*/gi, '');
+          l = l.replace(/^[\s🎬🍿🔥⚡️📌👉📦-]+/, '').trim();
+
+          if (l.length > 0 && !/^-?\s*orqali/i.test(l)) {
+            cleanLines.push(l);
+          }
+        }
+
+        return cleanLines.join('\n').trim();
+      }
+
+      /**
+       * Helper to auto-generate sequential numeric code (1001, 1002, 1003...)
+       */
+      function getNextAutoCode() {
+        const movies = db.getMovies();
+        let maxCode = 1000;
+        movies.forEach(m => {
+          const num = parseInt(m.code, 10);
+          if (!isNaN(num) && num >= maxCode) {
+            maxCode = num;
+          }
+        });
+        return (maxCode + 1).toString();
+      }
+
+      /**
+       * Smart genre detection from text dictionary & hashtags
+       */
+      function detectGenre(caption) {
+        if (!caption) return 'Tarjima kino';
+        const lower = caption.toLowerCase();
+
+        const genreMatch = caption.match(/(?:janr[i]?|genre|janri)[\s:-]*([^\n]+)/i);
+        if (genreMatch && genreMatch[1]) {
+          const cleanG = cleanAdText(genreMatch[1]);
+          if (cleanG && cleanG.length > 2) return cleanG;
+        }
+
+        if (/jangari|boevik|боевик|action|spetsnaz|kriminal/i.test(lower)) return 'Jangari';
+        if (/komediya|комедия|comedy|yumor|kulgili/i.test(lower)) return 'Komediya';
+        if (/triller|триллер|thriller|detektiv|детектив/i.test(lower)) return 'Triller';
+        if (/melodrama|мелодрама|drama|драма/i.test(lower)) return 'Drama';
+        if (/fantastika|фантастика|sci-fi|fentezi|фэнтези|marvel|dc|kosmos/i.test(lower)) return 'Fantastika';
+        if (/sarguzasht|приключения|adventure/i.test(lower)) return 'Sarguzasht';
+        if (/qo['`’]?rqinchli|ужасы|horror|vampir|zombi/i.test(lower)) return 'Qo\'rqinchli';
+        if (/multfilm|мультфильм|multik|мультик|animatsiya|анимация|anime|аниме/i.test(lower)) return 'Multfilm';
+        if (/tarixiy|исторический|history/i.test(lower)) return 'Tarixiy';
+        if (/hind|индийский|bollywood/i.test(lower)) return 'Hind kino';
+        if (/serial|сериал|series/i.test(lower)) return 'Serial';
+
+        return 'Tarjima kino';
+      }
+
+      /**
+       * Sends or edits paginated movie list for a selected genre (with ◀️ / ▶️ navigation buttons)
+       */
+      async function sendGenreMovieList(ctx, selectedGenre, page = 1, isEdit = false) {
+        const userLang = db.getUserLang(ctx.from.id) || 'uz';
+        const allMovies = db.getMovies().filter(m => String(m.genre).trim().toLowerCase() === selectedGenre.trim().toLowerCase());
+
+        if (allMovies.length === 0) {
+          const textMsg = i18n.t(userLang, 'genre_empty', { genre: selectedGenre });
+          if (isEdit) {
+            try { return await ctx.editMessageText(textMsg, { parse_mode: 'Markdown' }); } catch (e) {}
+          }
+          return await ctx.reply(textMsg, { parse_mode: 'Markdown' });
+        }
+
+        const pageSize = 6;
+        const totalPages = Math.ceil(allMovies.length / pageSize);
+        const currentPage = Math.max(1, Math.min(page, totalPages));
+
+        const startIndex = (currentPage - 1) * pageSize;
+        const pageMovies = allMovies.slice(startIndex, startIndex + pageSize);
+
+        let replyText = i18n.t(userLang, 'genre_title', { genre: selectedGenre, page: currentPage, totalPages }) + '\n\n';
+        const keyboard = new InlineKeyboard();
+
+        pageMovies.forEach((m, idx) => {
+          const itemNum = startIndex + idx + 1;
+          replyText += `${itemNum}. *${m.title}* - Kod: \`${m.code}\`\n`;
+          keyboard.text(`${itemNum} 🎬`, `mv:${m.code}`);
+          if (idx % 3 === 2) keyboard.row();
+        });
+
+        if (pageMovies.length % 3 !== 0) keyboard.row();
+
+        if (totalPages > 1) {
+          if (currentPage > 1) {
+            keyboard.text(i18n.t(userLang, 'prev_btn'), `gpage:${selectedGenre}:${currentPage - 1}`);
+          }
+          keyboard.text(`📄 ${currentPage}/${totalPages}`, `noop`);
+          if (currentPage < totalPages) {
+            keyboard.text(i18n.t(userLang, 'next_btn'), `gpage:${selectedGenre}:${currentPage + 1}`);
+          }
+          keyboard.row();
+        }
+
+        keyboard.text(i18n.t(userLang, 'back_genres'), 'go_genres');
+
+        if (isEdit) {
+          try {
+            return await ctx.editMessageText(replyText, {
+              parse_mode: 'Markdown',
+              reply_markup: keyboard
+            });
+          } catch (e) {}
+        }
+
+        return await ctx.reply(replyText, {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+      }
+
+      /**
+       * Extracts movie details (code, title, genre, description, fileId) from a Telegram message/post
+       */
+      function parseMovieFromPost(msg) {
+        const video = msg.video || (msg.document && msg.document.mime_type && msg.document.mime_type.startsWith('video/') ? msg.document : null);
+        if (!video) return null;
+
+        const fileId = video.file_id;
+        const rawCaption = (msg.caption || msg.text || '').trim();
+
+        // 1. Always auto-generate clean numeric code (1001, 1002...)
+        const code = getNextAutoCode();
+
+        // 2. Extract and clean Title
+        let rawTitle = '';
+        const titleMatch = rawCaption.match(/(?:nomi|title|kino nomi|kino)[\s:-]*([^\n]+)/i);
+        if (titleMatch && titleMatch[1]) {
+          rawTitle = titleMatch[1].trim();
+        } else {
+          const lines = rawCaption.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+          if (lines.length > 0) {
+            rawTitle = lines[0].replace(/(?:kino|film|kodi|kod|nomi)[\s:-]*/gi, '').trim();
+          }
+        }
+
+        let title = cleanAdText(rawTitle);
+        if (!title || title.length < 2) {
+          title = `Kino #${code}`;
+        }
+
+        // 3. Extract and detect Genre
+        let genre = detectGenre(rawCaption);
+
+        // 4. Clean Description
+        let description = cleanAdText(rawCaption);
+        if (!description || description.length < 5 || description === title) {
+          description = `${title} - uzbek tilida tarjima kino.`;
+        }
+
+        return {
+          code,
+          title,
+          genre,
+          description,
+          fileId
+        };
+      }
+
+      // Auto-Parse Movies from Channel Posts when bot is Admin in target channel
+      botInstance.on('channel_post', async (ctx) => {
+        try {
+          const msg = ctx.channelPost;
+          if (!msg) return;
+
+          const movieData = parseMovieFromPost(msg);
+          if (movieData && movieData.fileId) {
+            const result = db.addMovie(movieData);
+            if (result) {
+              console.log(`[Auto-Channel-Parser] Added movie: "${result.title}" (Code: ${result.code}) from channel post.`);
+            }
+          }
+        } catch (err) {
+          console.error('Error in channel_post auto-parser:', err.message);
+        }
+      });
+
+      // Auto-Parse Movies forwarded or sent directly to bot by Admin
+      botInstance.on(['message:video', 'message:document'], async (ctx) => {
+        try {
+          if (!ctx.from || !isAdmin(ctx.from.id)) return;
+
+          const movieData = parseMovieFromPost(ctx.message);
+          if (movieData && movieData.fileId) {
+            const result = db.addMovie(movieData);
+            if (result) {
+              await ctx.reply(
+                `⚡️ **AVTO-PARSER: Kino bazaga muvaffaqiyatli qo'shildi!**\n\n` +
+                `🔑 **Kino kodi:** \`${result.code}\`\n` +
+                `🎬 **Nomi:** *${result.title}*\n` +
+                `🗂 **Janri:** _${result.genre}_\n` +
+                `📁 **File ID:** \`${result.fileId.substring(0, 20)}...\`\n\n` +
+                `💡 *Foydalanuvchilar botda \`${result.code}\` kodini kiritib tomosha qilishlari mumkin!*`,
+                { parse_mode: 'Markdown' }
+              );
+            }
+          }
+        } catch (err) {
+          console.error('Error in admin video auto-parser:', err.message);
+        }
+      });
 
       botInstance.on('message:text', async (ctx) => {
         const text = ctx.message.text.trim();
@@ -586,20 +829,31 @@ function startBot(token) {
           );
         }
 
-        if (text === '🔍 Kino Qidirish') {
-          return await ctx.reply('🔍 Kino nomini kiriting:');
+        const userLang = db.getUserLang(userId) || 'uz';
+
+        if (text === i18n.t('uz', 'search_btn') || text === i18n.t('ru', 'search_btn') || text === i18n.t('en', 'search_btn')) {
+          return await ctx.reply(i18n.t(userLang, 'searching'));
         }
 
-        if (text === '🗂 Janrlar') {
+        if (text === i18n.t('uz', 'genre_btn') || text === i18n.t('ru', 'genre_btn') || text === i18n.t('en', 'genre_btn')) {
           const keyboard = new InlineKeyboard();
           db.getGenres().forEach((genre, idx) => {
             keyboard.text(genre, `genre:${genre}`);
             if (idx % 2 === 1) keyboard.row();
           });
-          return await ctx.reply('🗂 **Janrlardan birini tanlang:**', {
+          return await ctx.reply(i18n.t(userLang, 'genre_select'), {
             parse_mode: 'Markdown',
             reply_markup: keyboard
           });
+        }
+
+        if (text === i18n.t('uz', 'req_btn') || text === i18n.t('ru', 'req_btn') || text === i18n.t('en', 'req_btn')) {
+          userSession.set(userId, 'waiting_for_request_title');
+          return await ctx.reply(i18n.t(userLang, 'req_prompt'));
+        }
+
+        if (text === i18n.t('uz', 'help_btn') || text === i18n.t('ru', 'help_btn') || text === i18n.t('en', 'help_btn')) {
+          return await ctx.reply(i18n.t(userLang, 'help_text'), { reply_markup: getMainKeyboard(userLang) });
         }
 
         if (text === '🎁 Do\'stlarni taklif qilish') {
@@ -687,8 +941,54 @@ function startBot(token) {
 
         // Handle slash commands in message:text handler
         if (text.startsWith('/')) {
-          if (!text.startsWith('/add ') || !isAdmin(ctx.from.id)) {
+          if ((!text.startsWith('/add ') && !text.startsWith('/add_episode ')) || !isAdmin(ctx.from.id)) {
             return;
+          }
+        }
+
+        // Check if admin is adding a serial episode
+        if (text.startsWith('/add_episode ') && isAdmin(ctx.from.id)) {
+          const replyMsg = ctx.message.reply_to_message;
+          let video = null;
+
+          if (replyMsg) {
+            video = replyMsg.video || replyMsg.document;
+          } else if (ctx.message.video || ctx.message.document) {
+            video = ctx.message.video || ctx.message.document;
+          }
+
+          if (!video) {
+            return await ctx.reply('⚠️ Xatolik: Ushbu buyruqni videoli xabarga javob (reply) qilib yozishingiz kerak yoki video bilan birga yuborishingiz kerak.');
+          }
+
+          const fileId = video.file_id;
+          const params = text.substring(13).trim(); // Remove "/add_episode "
+          const parts = params.split(/\s+/);
+          
+          if (parts.length < 2) {
+            return await ctx.reply('⚠️ Format noto\'g\'ri. To\'g\'ri format: `/add_episode [kod] [qism] [ixtiyoriy qism nomi]`', { parse_mode: 'Markdown' });
+          }
+
+          const code = parts[0].trim();
+          const episodeNumber = parseInt(parts[1].trim(), 10);
+          if (isNaN(episodeNumber)) {
+            return await ctx.reply('⚠️ Xatolik: Qism raqami faqat son bo\'lishi kerak.');
+          }
+
+          const epTitle = parts.slice(2).join(' ').trim() || `${episodeNumber}-qism`;
+
+          const result = db.addEpisode(code, episodeNumber, fileId, epTitle);
+          if (result) {
+            return await ctx.reply(
+              `✅ **Serial qismi muvaffaqiyatli saqlandi!**\n\n` +
+              `🔑 Serial kodi: \`${result.movie.code}\`\n` +
+              `🎬 Serial nomi: *${result.movie.title}*\n` +
+              `🍿 Qism: *${result.episode.episode}-qism (${result.episode.title})*\n` +
+              `🗂 Janr: _${result.movie.genre}_`,
+              { parse_mode: 'Markdown' }
+            );
+          } else {
+            return await ctx.reply('❌ Epizodni saqlashda xatolik yuz berdi.');
           }
         }
 
@@ -753,12 +1053,13 @@ function startBot(token) {
         const results = db.searchMovies(text);
         db.trackSearchQuery(text, results ? results.length : 0);
         if (results && results.length > 0) {
-          let replyText = `🔍 **"${text}" bo'yicha topilgan kinolar:**\n\n`;
+          let replyText = i18n.t(userLang, 'search_title', { query: text }) + '\n\n';
           const keyboard = new InlineKeyboard();
 
           results.slice(0, 10).forEach((m, idx) => {
             replyText += `${idx + 1}. *${m.title}* - Kod: \`${m.code}\`\n`;
             keyboard.text(`${idx + 1} 🎬`, `mv:${m.code}`);
+            if (idx % 3 === 2) keyboard.row();
           });
 
           return await ctx.reply(replyText, {
@@ -769,11 +1070,11 @@ function startBot(token) {
 
         // If no movie found with that code or name
         if (isCode) {
-          const keyboard = new InlineKeyboard().text('🙋‍♂️ Ushbu kinoni buyurtma qilish', 'req_movie');
-          return await ctx.reply(`🔍 **Kino topilmadi.**\n\nKod: \`${text}\` ga mos film topilmadi. Nomi bo'yicha qidirib ko'ring.`, { parse_mode: 'Markdown', reply_markup: keyboard });
+          const keyboard = new InlineKeyboard().text(i18n.t(userLang, 'order_this_movie'), 'req_movie');
+          return await ctx.reply(i18n.t(userLang, 'code_not_found', { code: text }), { parse_mode: 'Markdown', reply_markup: keyboard });
         } else {
-          const keyboard = new InlineKeyboard().text('🙋‍♂️ Ushbu kinoni buyurtma qilish', `req_title:${text}`);
-          return await ctx.reply(`❌ Kechirasiz, **"${text}"** nomli film topilmadi. Boshqa nom yozib ko'ring.`, { parse_mode: 'Markdown', reply_markup: keyboard });
+          const keyboard = new InlineKeyboard().text(i18n.t(userLang, 'order_this_movie'), `req_title:${text}`);
+          return await ctx.reply(i18n.t(userLang, 'not_found', { query: text }), { parse_mode: 'Markdown', reply_markup: keyboard });
         }
       });
 
@@ -782,10 +1083,12 @@ function startBot(token) {
         if (isAdmin(ctx.from.id)) {
           await ctx.reply(
             `📥 **Video fayl qabul qilindi.**\n\n` +
-            `Ushbu faylni kino sifatida saqlash uchun, unga **javob (reply)** tariqasida quyidagi formatda yozing:\n\n` +
-            `/add \`[kod]\` \`[nomi]\` | \`[tavsifi]\` | \`[janri]\` \n\n` +
-            `Masalan:\n` +
-            `/add \`101\` \`Forsaj 9\` | \`Dominik Toretto sarguzashtlari\` | \`Jangari\` `,
+            `Ushbu faylni **kino** sifatida saqlash uchun reply qilib yozing:\n` +
+            `/add \`[kod]\` \`[nomi]\` | \`[tavsifi]\` | \`[janri]\` \n` +
+            `*Masalan:* \`/add 101 Forsaj 9 | Dominik Toretto sarguzashtlari | Jangari\`\n\n` +
+            `Ushbu faylni **serial qismi** sifatida saqlash uchun reply qilib yozing:\n` +
+            `/add_episode \`[serial_kodi]\` \`[qism_raqami]\` \`[ixtiyoriy_nom]\` \n` +
+            `*Masalan:* \`/add_episode 200 1 1-qism\``,
             { parse_mode: 'Markdown', reply_to_message_id: ctx.message.message_id }
           );
         }
@@ -1013,22 +1316,45 @@ function startBot(token) {
         // Genre Click Callback
         if (data.startsWith('genre:')) {
           const selectedGenre = data.split(':')[1];
-          const movies = db.getMovies().filter(m => String(m.genre).trim() === selectedGenre.trim());
-          
-          if (movies.length === 0) {
-            await ctx.reply(`🔍 **"${selectedGenre}"** janrida hozircha kinolar yo'q.`, { parse_mode: 'Markdown' });
-          } else {
-            let replyText = `🔍 **"${selectedGenre}" janridagi kinolar:**\n\n`;
-            const keyboard = new InlineKeyboard();
-            movies.slice(0, 10).forEach((m, idx) => {
-              replyText += `${idx + 1}. *${m.title}* - Kod: \`${m.code}\`\n`;
-              keyboard.text(`${idx + 1} 🎬`, `mv:${m.code}`);
+          await sendGenreMovieList(ctx, selectedGenre, 1, false);
+          await ctx.answerCallbackQuery().catch(() => {});
+          return;
+        }
+
+        // Genre Page Navigation Callback (◀️ Oldingi / Keyingi ▶️)
+        if (data.startsWith('gpage:')) {
+          const parts = data.split(':');
+          const selectedGenre = parts[1];
+          const pageNum = parseInt(parts[2], 10) || 1;
+          await sendGenreMovieList(ctx, selectedGenre, pageNum, true);
+          await ctx.answerCallbackQuery().catch(() => {});
+          return;
+        }
+
+        // Go Back to Genre Menu Callback
+        if (data === 'go_genres') {
+          const userLang = db.getUserLang(ctx.from.id) || 'uz';
+          const keyboard = new InlineKeyboard();
+          db.getGenres().forEach((genre, idx) => {
+            keyboard.text(genre, `genre:${genre}`);
+            if (idx % 2 === 1) keyboard.row();
+          });
+          try {
+            await ctx.editMessageText(i18n.t(userLang, 'genre_select'), {
+              parse_mode: 'Markdown',
+              reply_markup: keyboard
             });
-            await ctx.reply(replyText, {
+          } catch (e) {
+            await ctx.reply(i18n.t(userLang, 'genre_select'), {
               parse_mode: 'Markdown',
               reply_markup: keyboard
             });
           }
+          await ctx.answerCallbackQuery().catch(() => {});
+          return;
+        }
+
+        if (data === 'noop') {
           await ctx.answerCallbackQuery().catch(() => {});
           return;
         }
@@ -1056,6 +1382,54 @@ function startBot(token) {
           }
           await ctx.answerCallbackQuery().catch(() => {});
           return;
+        }
+
+        // Serial Episode Click Callback
+        if (data.startsWith('ep:')) {
+          const parts = data.split(':');
+          const code = parts[1];
+          const epNum = parseInt(parts[2], 10);
+
+          const movie = db.getMovieByCode(code);
+          if (!movie) {
+            return await ctx.answerCallbackQuery({ text: '⚠️ Serial topilmadi!', show_alert: true });
+          }
+
+          const episode = movie.episodes ? movie.episodes.find(e => Number(e.episode) === epNum) : null;
+          if (!episode) {
+            return await ctx.answerCallbackQuery({ text: '⚠️ Ushbu qism hali yuklanmagan!', show_alert: true });
+          }
+
+          await ctx.answerCallbackQuery({ text: `${epNum}-qism yuklanmoqda...` }).catch(() => {});
+
+          const cleanTitle = movie.title.replace(/[_*`\[\]()]/g, ' ');
+          const epTitle = episode.title.replace(/[_*`\[\]()]/g, ' ');
+          const captionText = `🎬 **${cleanTitle}**\n` +
+            `🍿 **${epTitle}**\n\n` +
+            `🔑 Kod: \`${movie.code}\` (Qism: ${epNum})\n\n` +
+            `📹 Boshqa qismlarni ko'rish yoki yuklash uchun botga \`${movie.code}\` kodini yuboring.`;
+
+          const keyboard = new InlineKeyboard()
+            .text(`◀️ Serial qismlariga qaytish`, `mv:${movie.code}`);
+
+          try {
+            return await ctx.replyWithVideo(episode.fileId, {
+              caption: captionText,
+              parse_mode: 'Markdown',
+              reply_markup: keyboard
+            });
+          } catch (err) {
+            try {
+              return await ctx.replyWithDocument(episode.fileId, {
+                caption: captionText,
+                parse_mode: 'Markdown',
+                reply_markup: keyboard
+              });
+            } catch (e) {
+              console.error('Failed to send episode:', e.message);
+              return await ctx.reply(`❌ Qismni yuborishda xatolik yuz berdi. Iltimos, boshqa qismni ko'ring yoki administratorga xabar bering.`);
+            }
+          }
         }
 
         if (data.startsWith('mv:')) {
@@ -1115,16 +1489,76 @@ async function sendMovie(ctx, movie) {
       }
     }
   }
+  function cleanMarkdown(str) {
+    if (!str) return '';
+    return String(str).replace(/[_*`\[\]()]/g, ' ');
+  }
+
   const likesCount = movie.likes ? movie.likes.length : 0;
   const dislikesCount = movie.dislikes ? movie.dislikes.length : 0;
   const downloaderBotUsername = process.env.DOWNLOADER_BOT_USERNAME || 'savemedia_music_bot';
-  const captionText = `🎬 **${movie.title}**\n\n` +
-    `🗂 Janr: #${movie.genre ? movie.genre.replace(/\s+/g, '_') : 'Tarjima_kino'}\n` +
-    `🔑 Kod: \`${movie.code}\`\n\n` +
-    `📝 _${movie.description || 'Tavsif berilmagan'}_\n\n` +
-    `📹 YouTube, Instagram, TikTokdan yuklab olish: @${downloaderBotUsername}`;
 
+  const cleanTitle = cleanMarkdown(movie.title);
+  const cleanDesc = cleanMarkdown(movie.description || 'Tavsif berilmagan');
+  const cleanGenre = cleanMarkdown(movie.genre ? movie.genre.replace(/\s+/g, '_') : 'Tarjima_kino');
+
+  const viewsCount = movie.views || 0;
   const fav = ctx.from ? db.isFavorite(ctx.from.id, movie.code) : false;
+
+  if (movie.isSerial) {
+    const captionText = `🎬 **${cleanTitle}** (Serial)\n\n` +
+      `🗂 Janr: #${cleanGenre}\n` +
+      `🔑 Kod: \`${movie.code}\`\n` +
+      `👁 Ko'rishlar: **${viewsCount}** marta\n\n` +
+      `📝 _${cleanDesc}_\n\n` +
+      `🍿 *Qismlar ro'yxati (Tomosha qilish uchun kerakli qismni tanlang):*`;
+
+    const keyboard = new InlineKeyboard();
+    if (movie.episodes && movie.episodes.length > 0) {
+      movie.episodes.forEach((ep, idx) => {
+        keyboard.text(`${ep.episode}-qism`, `ep:${movie.code}:${ep.episode}`);
+        if (idx % 4 === 3) {
+          keyboard.row();
+        }
+      });
+      
+      keyboard.row()
+        .text(`👍 🔥 ${likesCount}`, `like:${movie.code}`)
+        .text(`👎 ❄️ ${dislikesCount}`, `dislike:${movie.code}`)
+        .row()
+        .text(fav ? '⭐ ⚡️ Sevimlilarda saqlangan' : '☆ ✨ Sevimlilarga qo\'shish', `fav:${movie.code}`);
+    } else {
+      keyboard.text(`Hozircha qismlar yo'q`, `noop`);
+      keyboard.row()
+        .text(`👍 🔥 ${likesCount}`, `like:${movie.code}`)
+        .text(`👎 ❄️ ${dislikesCount}`, `dislike:${movie.code}`)
+        .row()
+        .text(fav ? '⭐ ⚡️ Sevimlilarda saqlangan' : '☆ ✨ Sevimlilarga qo\'shish', `fav:${movie.code}`);
+    }
+
+    try {
+      if (movie.poster) {
+        return await ctx.replyWithPhoto(movie.poster, {
+          caption: captionText,
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+      }
+    } catch (e) {}
+
+    return await ctx.reply(captionText, {
+      parse_mode: 'Markdown',
+      reply_markup: keyboard
+    });
+  }
+
+  const captionText = `🎬 **${cleanTitle}**\n\n` +
+    `🗂 Janr: #${cleanGenre}\n` +
+    `🔑 Kod: \`${movie.code}\`\n` +
+    `👁 Ko'rishlar: **${viewsCount}** marta\n\n` +
+    `📝 _${cleanDesc}_\n\n` +
+    `📹 Video va MP3 yuklab olish: @${downloaderBotUsername}`;
+
   const keyboard = new InlineKeyboard()
     .text(`👍 🔥 ${likesCount}`, `like:${movie.code}`)
     .text(`👎 ❄️ ${dislikesCount}`, `dislike:${movie.code}`)

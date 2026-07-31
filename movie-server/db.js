@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
 
 const dataDir = path.join(__dirname, 'data');
@@ -917,6 +917,63 @@ function saveInstagramConfig(config) {
   }
 }
 
+function addEpisode(code, episodeNumber, fileId, title) {
+  try {
+    const movies = getMovies();
+    const index = movies.findIndex(m => String(m.code).trim() === String(code).trim());
+    
+    let movieData;
+    if (index !== -1) {
+      movieData = movies[index];
+      movieData.isSerial = true;
+      movieData.genre = 'Serial'; // automatically enforce 'Serial' genre
+      if (!movieData.episodes) {
+        movieData.episodes = [];
+      }
+    } else {
+      movieData = {
+        code: String(code).trim(),
+        title: title ? `Serial ${title}` : `Serial ${code}`,
+        description: `Ushbu serial qismlari yuklanmoqda.`,
+        fileId: '', // placeholder, since episodes are stored inside episodes list
+        genre: 'Serial',
+        poster: '',
+        likes: [],
+        dislikes: [],
+        views: 0,
+        isSerial: true,
+        episodes: [],
+        dateAdded: new Date().toISOString()
+      };
+      movies.push(movieData);
+    }
+
+    // Check if episode already exists in array
+    const epIndex = movieData.episodes.findIndex(e => Number(e.episode) === Number(episodeNumber));
+    const episodeData = {
+      episode: Number(episodeNumber),
+      fileId: fileId,
+      title: title || `${episodeNumber}-qism`,
+      dateAdded: new Date().toISOString()
+    };
+
+    if (epIndex !== -1) {
+      movieData.episodes[epIndex] = episodeData;
+    } else {
+      movieData.episodes.push(episodeData);
+    }
+
+    // Sort episodes ascending by episode number
+    movieData.episodes.sort((a, b) => a.episode - b.episode);
+
+    saveMovies(movies);
+    return { movie: movieData, episode: episodeData };
+  } catch (e) {
+    console.error('Error adding episode:', e.message);
+    return null;
+  }
+}
+
 module.exports = {
   getMovies,
   saveMovies,
@@ -959,5 +1016,6 @@ module.exports = {
   getMovieReviews,
   addMovieReview,
   getInstagramConfig,
-  saveInstagramConfig
+  saveInstagramConfig,
+  addEpisode
 };
