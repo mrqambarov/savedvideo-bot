@@ -601,22 +601,26 @@ function getPlatformAnalytics() {
       }
     });
 
-    const total = (instagram + tiktok + youtube + other) || 3000;
+    const total = instagram + tiktok + youtube + other;
     const platforms = [
-      { name: 'Instagram', value: instagram || 1420, percent: Math.round(((instagram || 1420) / total) * 100), color: '#e1306c' },
-      { name: 'TikTok', value: tiktok || 1100, percent: Math.round(((tiktok || 1100) / total) * 100), color: '#00f2fe' },
-      { name: 'YouTube', value: youtube || 480, percent: Math.round(((youtube || 480) / total) * 100), color: '#ff0000' },
-      { name: 'Boshqalar', value: other || 150, percent: Math.round(((other || 150) / total) * 100), color: '#8b5cf6' }
+      { name: 'Instagram', value: instagram, percent: total > 0 ? Math.round((instagram / total) * 100) : 0, color: '#e1306c' },
+      { name: 'TikTok', value: tiktok, percent: total > 0 ? Math.round((tiktok / total) * 100) : 0, color: '#00f2fe' },
+      { name: 'YouTube', value: youtube, percent: total > 0 ? Math.round((youtube / total) * 100) : 0, color: '#ff0000' },
+      { name: 'Boshqalar', value: other, percent: total > 0 ? Math.round((other / total) * 100) : 0, color: '#8b5cf6' }
     ];
 
-    const topUsers = [...users]
-      .map(u => ({
-        id: u.id,
-        name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Foydalanuvchi',
-        username: u.username ? '@' + u.username : 'Mavjud emas',
-        downloads: u.history ? u.history.length : (u.downloadsCount || Math.floor(Math.random() * 40 + 10)),
-        lastActive: u.lastActive ? u.lastActive.substring(0, 10) : 'Bugun'
-      }))
+    const topUsers = users
+      .filter(u => u.history && u.history.length > 0)
+      .map(u => {
+        const fullName = `${u.first_name || u.firstName || ''} ${u.last_name || u.lastName || ''}`.trim();
+        return {
+          id: u.id,
+          name: fullName || (u.username ? '@' + u.username.replace(/^@/, '') : 'Foydalanuvchi'),
+          username: u.username ? '@' + u.username.replace(/^@/, '') : 'Mavjud emas',
+          downloads: u.history ? u.history.length : 0,
+          lastActive: u.lastSeen ? u.lastSeen.substring(0, 10) : (u.dateJoined ? u.dateJoined.substring(0, 10) : 'Bugun')
+        };
+      })
       .sort((a, b) => b.downloads - a.downloads)
       .slice(0, 10);
 

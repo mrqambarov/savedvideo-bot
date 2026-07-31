@@ -986,13 +986,14 @@ function startBot(token) {
  */
 function formatDownloadError(err) {
   const errMsg = err.message || '';
-  if (errMsg.includes('429') || errMsg.includes('confirm you\'re not a bot') || errMsg.includes('Too Many Requests')) {
-    return `⚠️ <b>YouTube yuklashni chekladi (HTTP 429: Too Many Requests)</b>\n\n` +
-           `Ushbu muammoni hal qilish uchun:\n` +
-           `1. VPN o'chiring yoki internetingizni o'chirib-yoqing (yangi IP olish uchun).\n` +
-           `2. Yoki loyiha papkasiga brauzer kuki faylini (<b>cookies.txt</b>) joylashtiring.`;
+  if (errMsg.includes('429') || errMsg.includes('confirm you\'re not a bot') || errMsg.includes('Too Many Requests') || errMsg.includes('Sign in')) {
+    return `⚠️ <b>YouTube / Instagram IP cheklovi (HTTP 429: Bot Detection)</b>\n\n` +
+           `Ushbu havolani yuklashda server IP chekloviga duch kelindi.\n\n` +
+           `💡 <b>Muammoni hal qilish yo'li:</b>\n` +
+           `• Server loyiha papkasiga <code>cookies.txt</code> faylini joylashtiring.\n` +
+           `• Yoki bir ozdan so'ng qayta urinib ko'ring.`;
   }
-  return `❌ <b>Yuklashda xatolik yuz berdi:</b>\n${escapeHTML(errMsg.substring(0, 150))}`;
+  return `❌ <b>Yuklashda xatolik yuz berdi:</b>\n${escapeHTML(errMsg.substring(0, 180))}`;
 }
 
       // Listen for text (links and search queries)
@@ -1545,8 +1546,11 @@ function formatDownloadError(err) {
               }
             }
           } catch (err) {
-            console.error(err);
-            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Musiqa ajratishda xatolik: ${err.message.substring(0, 100)}`);
+            console.error('Audio extraction error:', err.message);
+            const userErrStr = err.message.includes('ovoz') || err.message.includes('audio') || err.message.includes('musiqa')
+              ? err.message
+              : 'Ushbu videoda musiqa (ovoz) treki mavjud emas.';
+            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `⚠️ ${userErrStr}`);
           }
         }
 

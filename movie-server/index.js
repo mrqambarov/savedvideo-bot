@@ -49,14 +49,18 @@ app.listen(PORT, async () => {
     console.warn('Tunnel init warning:', tunnelErr.message);
   }
 
-  // Automatically start Telegram Bot on boot if token is present
-  const botToken = process.env.MOVIE_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
-  if (botToken) {
+  // Automatically start Telegram Bot on boot if distinct token is present
+  const movieToken = process.env.MOVIE_BOT_TOKEN;
+  const mainToken = process.env.TELEGRAM_BOT_TOKEN;
+
+  if (movieToken && movieToken !== mainToken) {
     console.log('MOVIE_BOT_TOKEN found. Booting Movie Telegram bot...');
-    bot.startBot(botToken)
+    bot.startBot(movieToken)
       .then(() => console.log('Movie Telegram Bot initialization check completed.'))
       .catch((err) => console.error('Movie Telegram Bot auto-start failed:', err.message));
+  } else if (movieToken && movieToken === mainToken) {
+    console.warn('WARNING: MOVIE_BOT_TOKEN is identical to TELEGRAM_BOT_TOKEN! Movie Bot startup skipped to prevent 409 Conflict with main Download Bot.');
   } else {
-    console.log('No MOVIE_BOT_TOKEN configured. Movie Bot is inactive. Set the token in config to start it.');
+    console.log('No MOVIE_BOT_TOKEN configured. Movie Bot is inactive. Set a unique MOVIE_BOT_TOKEN in .env to activate it.');
   }
 });

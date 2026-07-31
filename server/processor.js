@@ -1,9 +1,55 @@
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
-const ffprobePath = require('@ffprobe-installer/ffprobe').path;
+function resolveFFmpegPath() {
+  // 1. Try system ffmpeg (e.g. /usr/bin/ffmpeg)
+  try {
+    execSync('ffmpeg -version', { stdio: 'ignore' });
+    return 'ffmpeg';
+  } catch (e) {}
+
+  // 2. Try local bin folder
+  const isWin = process.platform === 'win32';
+  const binName = isWin ? 'ffmpeg.exe' : 'ffmpeg';
+  const localBinPath = path.join(__dirname, 'bin', binName);
+  if (fs.existsSync(localBinPath)) {
+    return localBinPath;
+  }
+
+  // 3. Try npm installer package
+  try {
+    return require('@ffmpeg-installer/ffmpeg').path;
+  } catch (e) {
+    return 'ffmpeg';
+  }
+}
+
+function resolveFFprobePath() {
+  // 1. Try system ffprobe (e.g. /usr/bin/ffprobe)
+  try {
+    execSync('ffprobe -version', { stdio: 'ignore' });
+    return 'ffprobe';
+  } catch (e) {}
+
+  // 2. Try local bin folder
+  const isWin = process.platform === 'win32';
+  const binName = isWin ? 'ffprobe.exe' : 'ffprobe';
+  const localBinPath = path.join(__dirname, 'bin', binName);
+  if (fs.existsSync(localBinPath)) {
+    return localBinPath;
+  }
+
+  // 3. Try npm installer package
+  try {
+    return require('@ffprobe-installer/ffprobe').path;
+  } catch (e) {
+    return 'ffprobe';
+  }
+}
+
+const ffmpegPath = resolveFFmpegPath();
+const ffprobePath = resolveFFprobePath();
 const tempDir = path.join(__dirname, 'temp');
 
 if (!fs.existsSync(tempDir)) {
@@ -35,12 +81,32 @@ function runFFmpeg(args) {
 }
 
 /**
+ * Checks if media file contains at least one audio stream using ffprobe
+ */
+function hasAudioStream(filePath) {
+  try {
+    const out = execSync(`"${ffprobePath}" -v error -show_entries stream=codec_type -of default=noprint_wrappers=1:nokey=1 "${filePath}"`, { encoding: 'utf8' });
+    return out.includes('audio');
+  } catch (e) {
+    return true;
+  }
+}
+
+/**
  * Extracts audio from a video file and encodes it as high-quality MP3
  * @param {string} inputPath 
  * @param {string} outputName 
  * @returns {Promise<string>} Path to output MP3
  */
-function extractAudio(inputPath, outputName) {
+async function extractAudio(inputPath, outputName) {
+  if (!fs.existsSync(inputPath)) {
+    throw new Error('Fayl topilmadi.');
+  }
+
+  if (!hasAudioStream(inputPath)) {
+    throw new Error('Ushbu videoda ovoz / musiqa treki mavjud emas.');
+  }
+
   const outputPath = path.join(tempDir, `${outputName}.mp3`);
   const args = [
     '-y',
@@ -48,10 +114,25 @@ function extractAudio(inputPath, outputName) {
     '-i', inputPath,
     '-vn',
     '-acodec', 'libmp3lame',
-    '-q:a', '4', // 4 is standard high quality (~160kbps), much faster to encode than 0
+    '-q:a', '4',
     outputPath
   ];
-  return runFFmpeg(args).then(() => outputPath);
+
+  try {
+    await runFFmpeg(args);
+    return outputPath;
+  } catch (err) {
+    // Fallback attempt with generic mp3 codec
+    const fallbackArgs = [
+      '-y',
+      '-i', inputPath,
+      '-vn',
+      '-c:a', 'mp3',
+      outputPath
+    ];
+    await runFFmpeg(fallbackArgs);
+    return outputPath;
+  }
 }
 
 /**

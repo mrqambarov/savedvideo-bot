@@ -1,5 +1,15 @@
 {
   "totalViews": 0,
-  "totalSearchQueries": 0,
-  "dailyUsage": {}
+  "totalSearchQueries": 4,
+  "dailyUsage": {
+    "2026-07-30": {
+      "movieViews": 0,
+      "searchQueries": 4,
+      "activeUsers": [
+        821276009,
+        6263659922,
+        5215184836
+      ]
+    }
+  }
 }

@@ -60,35 +60,45 @@ async function ensureBinaries() {
       }
     }
 
-    // Copy ffmpeg and ffprobe from npm packages to bin/ for auto-discovery
-    console.log('Locating and copying FFmpeg/FFprobe binaries...');
+    // Copy ffmpeg and ffprobe from npm packages to bin/ for auto-discovery if system FFmpeg is missing
+    let hasSystemFFmpeg = false;
     try {
-      const ffmpegSource = require('@ffmpeg-installer/ffmpeg').path;
-      const ffprobeSource = require('@ffprobe-installer/ffprobe').path;
+      const { execSync } = require('child_process');
+      execSync('ffmpeg -version', { stdio: 'ignore' });
+      hasSystemFFmpeg = true;
+      console.log('System FFmpeg detected. Skipping copy.');
+    } catch (e) {}
 
-      const ffmpegDestName = isWindows ? 'ffmpeg.exe' : 'ffmpeg';
-      const ffprobeDestName = isWindows ? 'ffprobe.exe' : 'ffprobe';
+    if (!hasSystemFFmpeg) {
+      console.log('Locating and copying FFmpeg/FFprobe binaries...');
+      try {
+        const ffmpegSource = require('@ffmpeg-installer/ffmpeg').path;
+        const ffprobeSource = require('@ffprobe-installer/ffprobe').path;
 
-      const ffmpegDestPath = path.join(binDir, ffmpegDestName);
-      const ffprobeDestPath = path.join(binDir, ffprobeDestName);
+        const ffmpegDestName = isWindows ? 'ffmpeg.exe' : 'ffmpeg';
+        const ffprobeDestName = isWindows ? 'ffprobe.exe' : 'ffprobe';
 
-      if (!fs.existsSync(ffmpegDestPath)) {
-        fs.copyFileSync(ffmpegSource, ffmpegDestPath);
-        if (!isWindows) {
-          fs.chmodSync(ffmpegDestPath, 0o755);
+        const ffmpegDestPath = path.join(binDir, ffmpegDestName);
+        const ffprobeDestPath = path.join(binDir, ffprobeDestName);
+
+        if (!fs.existsSync(ffmpegDestPath)) {
+          fs.copyFileSync(ffmpegSource, ffmpegDestPath);
+          if (!isWindows) {
+            fs.chmodSync(ffmpegDestPath, 0o755);
+          }
+          console.log(`FFmpeg copied successfully to ${ffmpegDestName}`);
         }
-        console.log(`FFmpeg copied successfully to ${ffmpegDestName}`);
-      }
 
-      if (!fs.existsSync(ffprobeDestPath)) {
-        fs.copyFileSync(ffprobeSource, ffprobeDestPath);
-        if (!isWindows) {
-          fs.chmodSync(ffprobeDestPath, 0o755);
+        if (!fs.existsSync(ffprobeDestPath)) {
+          fs.copyFileSync(ffprobeSource, ffprobeDestPath);
+          if (!isWindows) {
+            fs.chmodSync(ffprobeDestPath, 0o755);
+          }
+          console.log(`FFprobe copied successfully to ${ffprobeDestName}`);
         }
-        console.log(`FFprobe copied successfully to ${ffprobeDestName}`);
+      } catch (copyErr) {
+        console.warn('Could not copy FFmpeg/FFprobe binaries from node_modules:', copyErr.message);
       }
-    } catch (copyErr) {
-      console.warn('Could not copy FFmpeg/FFprobe binaries from node_modules:', copyErr.message);
     }
   } catch (err) {
     console.error('Setup error:', err.message);

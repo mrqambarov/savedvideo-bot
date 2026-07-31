@@ -1,1 +1,32 @@
-[]
+[
+  {
+    "id": 821276009,
+    "username": "Anv_444",
+    "first_name": "Anvarov",
+    "dateJoined": "2026-07-30T04:01:02.356Z",
+    "referredBy": null,
+    "refCount": 0,
+    "refPending": 0,
+    "refQualified": false
+  },
+  {
+    "id": 6263659922,
+    "username": "mrqambarov",
+    "first_name": "Anvar",
+    "dateJoined": "2026-07-30T04:01:02.790Z",
+    "referredBy": null,
+    "refCount": 0,
+    "refPending": 0,
+    "refQualified": false
+  },
+  {
+    "id": 5215184836,
+    "username": "RGZ_03",
+    "first_name": "Gulnoza",
+    "dateJoined": "2026-07-30T05:23:04.801Z",
+    "referredBy": null,
+    "refCount": 0,
+    "refPending": 0,
+    "refQualified": false
+  }
+]

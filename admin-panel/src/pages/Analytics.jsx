@@ -87,18 +87,13 @@ export default function Analytics() {
   ];
 
   const platforms = platformData?.platforms || [
-    { name: 'Instagram', value: 1420, percent: 45, color: '#e1306c' },
-    { name: 'TikTok', value: 1100, percent: 35, color: '#00f2fe' },
-    { name: 'YouTube', value: 480, percent: 15, color: '#ff0000' },
-    { name: 'Boshqalar', value: 150, percent: 5, color: '#8b5cf6' }
+    { name: 'Instagram', value: 0, percent: 0, color: '#e1306c' },
+    { name: 'TikTok', value: 0, percent: 0, color: '#00f2fe' },
+    { name: 'YouTube', value: 0, percent: 0, color: '#ff0000' },
+    { name: 'Boshqalar', value: 0, percent: 0, color: '#8b5cf6' }
   ];
 
-  const topActiveUsers = platformData?.topUsers || [
-    { id: '6263659922', name: 'Anvarxon', username: '@anvar_dev', downloads: 142, lastActive: 'Bugun' },
-    { id: '5541249821', name: 'Jasur', username: '@jasur_pro', downloads: 98, lastActive: 'Bugun' },
-    { id: '1129841029', name: 'Sardor', username: '@sardor_tg', downloads: 85, lastActive: 'Kechasi' },
-    { id: '8872615521', name: 'Malika', username: '@malika_m', downloads: 64, lastActive: 'Kecha' }
-  ];
+  const topActiveUsers = platformData?.topUsers || [];
 
   return (
     <div>
