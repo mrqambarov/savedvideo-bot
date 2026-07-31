@@ -571,6 +571,19 @@ function revokeOtherSessions(currentId) {
   saveSessions(sessions);
 }
 
+function getUsersSegment(segment = 'all') {
+  const users = getUsers();
+  const now = Date.now();
+  const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+
+  if (segment === 'active') {
+    return users.filter(u => u.lastActive && (now - new Date(u.lastActive).getTime() <= THREE_DAYS_MS));
+  } else if (segment === 'inactive') {
+    return users.filter(u => !u.lastActive || (now - new Date(u.lastActive).getTime() > THREE_DAYS_MS));
+  }
+  return users;
+}
+
 module.exports = {
   getUsers,
   addUser,
@@ -595,5 +608,6 @@ module.exports = {
   getSessions,
   addSession,
   revokeSession,
-  revokeOtherSessions
+  revokeOtherSessions,
+  getUsersSegment
 };

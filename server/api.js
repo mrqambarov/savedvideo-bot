@@ -590,13 +590,14 @@ let currentBroadcast = {
 
 // Get broadcast progress
 router.get('/broadcast', (req, res) => {
-  res.json(currentBroadcast);
+    res.json(currentBroadcast);
 });
 
 // Start broadcast
 router.post('/broadcast', async (req, res) => {
-  const { message, buttonText, buttonUrl, mediaType, mediaUrl, buttons } = req.body;
-  if (!message) {
+  const { message, mediaType, mediaUrl, buttonText, buttonUrl, buttons, targetSegment } = req.body;
+
+  if (!message || message.trim() === '') {
     return res.status(400).json({ error: 'Xabar matni kiritilishi shart.' });
   }
 
@@ -604,9 +605,9 @@ router.post('/broadcast', async (req, res) => {
     return res.status(400).json({ error: 'Hozirda boshqa reklama tarqatilmoqda.' });
   }
 
-  const users = db.getUsers();
+  const users = db.getUsersSegment(targetSegment || 'all');
   if (users.length === 0) {
-    return res.status(400).json({ error: 'Botda ro\'yxatdan o\'tgan foydalanuvchilar topilmadi.' });
+    return res.status(400).json({ error: 'Tanlangan auditoriya segmentida foydalanuvchilar topilmadi.' });
   }
 
   currentBroadcast = {

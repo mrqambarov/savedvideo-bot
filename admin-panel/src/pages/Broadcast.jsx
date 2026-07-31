@@ -59,6 +59,8 @@ export default function Broadcast() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bot]);
 
+  const [targetSegment, setTargetSegment] = useState('all'); // 'all', 'active', 'inactive'
+
   const start = async () => {
     if (!msg.trim()) return toast('Xabar matnini kiriting', 'error');
     const validButtons = buttons.filter(b => b.label.trim() && b.url.trim());
@@ -67,7 +69,8 @@ export default function Broadcast() {
       message: msg,
       mediaType,
       mediaUrl: mediaUrl.trim() || undefined,
-      buttons: validButtons
+      buttons: validButtons,
+      targetSegment
     }));
     if (error) { setSending(false); return toast(error, 'error'); }
     toast('Media reklama tarqatilishi boshlandi');
@@ -87,6 +90,19 @@ export default function Broadcast() {
           <Segmented options={[{ value: 'dl', label: 'Downloader Bot' }, { value: 'movie', label: 'Kino Bot' }]} value={bot} onChange={setBot} />
         </div>
         <div className="card-pad">
+          <div className="field">
+            <label>Maqsadli Auditoriya (Segment)</label>
+            <Segmented
+              options={[
+                { value: 'all', label: '🌐 Barcha foydalanuvchilar' },
+                { value: 'active', label: '⚡ Faollar (3 kun)' },
+                { value: 'inactive', label: '😴 Inaktivlar (>3 kun)' }
+              ]}
+              value={targetSegment}
+              onChange={setTargetSegment}
+            />
+          </div>
+
           <div className="field">
             <label>Xabar turi</label>
             <Segmented
