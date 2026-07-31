@@ -488,6 +488,89 @@ function setMediaCache(url, mediaData) {
   }
 }
 
+const sessionsFile = path.join(dataDir, 'admin_sessions.json');
+if (!fs.existsSync(sessionsFile)) {
+  fs.writeFileSync(sessionsFile, JSON.stringify([], null, 2));
+}
+
+function parseUserAgent(ua = '') {
+  let os = 'Noma\'lum Qurilma';
+  let browser = 'Brauzer';
+
+  if (/windows/i.test(ua)) os = 'Windows PC';
+  else if (/macintosh|mac os x/i.test(ua)) os = 'MacBook / macOS';
+  else if (/iphone|ipad|ipod/i.test(ua)) os = 'iPhone / iOS';
+  else if (/android/i.test(ua)) os = 'Android Qurilma';
+  else if (/linux/i.test(ua)) os = 'Linux';
+
+  if (/chrome|crios/i.test(ua)) browser = 'Chrome';
+  else if (/firefox|fxios/i.test(ua)) browser = 'Firefox';
+  else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browser = 'Safari';
+  else if (/edg/i.test(ua)) browser = 'Edge';
+  else if (/opera|opr/i.test(ua)) browser = 'Opera';
+
+  return `${os} (${browser})`;
+}
+
+function getSessions() {
+  try {
+    if (!fs.existsSync(sessionsFile)) return [];
+    return JSON.parse(fs.readFileSync(sessionsFile, 'utf8'));
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveSessions(sessions) {
+  try {
+    fs.writeFileSync(sessionsFile, JSON.stringify(sessions, null, 2));
+  } catch (e) {
+    console.error('Error saving sessions:', e.message);
+  }
+}
+
+function addSession(ip, userAgent, token) {
+  const sessions = getSessions();
+  const sessionId = Math.random().toString(36).substring(2, 10);
+  const nowIso = new Date().toISOString();
+  const deviceName = parseUserAgent(userAgent);
+
+  const existingIdx = sessions.findIndex(s => s.ip === ip && s.deviceName === deviceName);
+  if (existingIdx !== -1) {
+    sessions[existingIdx].lastActive = nowIso;
+    sessions[existingIdx].token = token;
+    saveSessions(sessions);
+    return sessions[existingIdx].id;
+  }
+
+  const newSession = {
+    id: sessionId,
+    ip: ip || '127.0.0.1',
+    deviceName,
+    userAgent: userAgent || '',
+    token,
+    created: nowIso,
+    lastActive: nowIso
+  };
+
+  sessions.unshift(newSession);
+  if (sessions.length > 20) sessions.pop();
+  saveSessions(sessions);
+  return sessionId;
+}
+
+function revokeSession(id) {
+  let sessions = getSessions();
+  sessions = sessions.filter(s => s.id !== id);
+  saveSessions(sessions);
+}
+
+function revokeOtherSessions(currentId) {
+  let sessions = getSessions();
+  sessions = sessions.filter(s => s.id === currentId);
+  saveSessions(sessions);
+}
+
 module.exports = {
   getUsers,
   addUser,
@@ -508,5 +591,9 @@ module.exports = {
   getUserLang,
   setUserLang,
   getMediaCache,
-  setMediaCache
+  setMediaCache,
+  getSessions,
+  addSession,
+  revokeSession,
+  revokeOtherSessions
 };

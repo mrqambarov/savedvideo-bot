@@ -44,7 +44,10 @@ router.post('/login', (req, res) => {
   }
   const adminPassword = process.env.ADMIN_PASSWORD || 'Anvar06';
   if (password === adminPassword) {
-    res.json({ success: true, token: ADMIN_TOKEN });
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+    const userAgent = req.headers['user-agent'] || '';
+    const sessionId = db.addSession(ip, userAgent, ADMIN_TOKEN);
+    res.json({ success: true, token: ADMIN_TOKEN, sessionId });
   } else {
     res.status(401).json({ error: 'Parol noto\'g\'ri!' });
   }
@@ -733,6 +736,33 @@ router.get('/backup-data', authMiddleware, (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// Admin Active Sessions Endpoints
+router.get('/sessions', authMiddleware, (req, res) => {
+  const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+  const ip = String(rawIp).split(',')[0].trim();
+  const userAgent = req.headers['user-agent'] || '';
+  const sessions = db.getSessions();
+  const currentDev = sessions.find(s => s.ip === ip || s.userAgent === userAgent);
+
+  const formatted = sessions.map(s => ({
+    ...s,
+    current: currentDev ? s.id === currentDev.id : (s.ip === ip)
+  }));
+  res.json(formatted);
+});
+
+router.post('/revoke-session', authMiddleware, (req, res) => {
+  const { sessionId } = req.body;
+  if (sessionId) db.revokeSession(sessionId);
+  res.json({ success: true, message: 'Seans yakunlandi!' });
+});
+
+router.post('/revoke-other-sessions', authMiddleware, (req, res) => {
+  const { currentId } = req.body;
+  db.revokeOtherSessions(currentId);
+  res.json({ success: true, message: 'Barcha boshqa seanslar yakunlandi!' });
 });
 
 module.exports = router;

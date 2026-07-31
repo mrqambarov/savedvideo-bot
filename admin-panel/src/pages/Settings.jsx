@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Moon, Sun, LogOut, Palette, Info, ShieldCheck, RefreshCw, Trash2, Download, Key, Server, Bot, Film } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Moon, Sun, LogOut, Palette, Info, ShieldCheck, RefreshCw, Trash2, Download, Key, Server, Bot, Film, Laptop, Smartphone, Globe, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
 import { dlApi, safe } from '../lib/api.js';
 
@@ -8,7 +8,22 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [passLoading, setPassLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState('');
+  const [sessions, setSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
   const [msg, setMsg] = useState(null);
+
+  const fetchSessions = async () => {
+    setSessionsLoading(true);
+    const { data } = await safe(dlApi.get('/sessions'));
+    setSessionsLoading(false);
+    if (Array.isArray(data)) {
+      setSessions(data);
+    }
+  };
+
+  useEffect(() => {
+    fetchSessions();
+  }, []);
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
@@ -48,6 +63,29 @@ export default function SettingsPage() {
       setMsg({ type: 'error', text: error });
     } else {
       setMsg({ type: 'success', text: data.message || 'Vaqtinchalik xotira tozalandi!' });
+    }
+  };
+
+  const handleRevokeSession = async (sessionId) => {
+    setMsg(null);
+    const { data, error } = await safe(dlApi.post('/revoke-session', { sessionId }));
+    if (error) {
+      setMsg({ type: 'error', text: error });
+    } else {
+      setMsg({ type: 'success', text: data.message || 'Seans yakunlandi!' });
+      fetchSessions();
+    }
+  };
+
+  const handleRevokeOtherSessions = async () => {
+    const current = sessions.find(s => s.current);
+    setMsg(null);
+    const { data, error } = await safe(dlApi.post('/revoke-other-sessions', { currentId: current ? current.id : null }));
+    if (error) {
+      setMsg({ type: 'error', text: error });
+    } else {
+      setMsg({ type: 'success', text: data.message || 'Barcha boshqa seanslar yakunlandi!' });
+      fetchSessions();
     }
   };
 
@@ -126,6 +164,59 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Active Devices & Sessions Section */}
+      <div className="card" style={{ gridColumn: '1 / -1' }}>
+        <div className="card-head" style={{ justifyContent: 'space-between' }}>
+          <h3><Laptop size={17} style={{ verticalAlign: -3, marginRight: 8, color: 'var(--accent)' }} />Kirilgan Qurilmalar va Faol Seanslar</h3>
+          {sessions.length > 1 && (
+            <button className="btn btn-danger btn-sm" onClick={handleRevokeOtherSessions}>
+              <AlertTriangle size={14} /> Barcha Boshqa Seanslarni Yakunlash
+            </button>
+          )}
+        </div>
+        <div className="card-pad">
+          {sessionsLoading ? (
+            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-3)' }}>Seanslar yuklanmoqda...</div>
+          ) : sessions.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-3)' }}>Hozircha faol seanslar ma'lumotlari mavjud emas.</div>
+          ) : (
+            <div style={{ display: 'grid', gap: 12 }}>
+              {sessions.map((s) => (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: 10, background: s.current ? 'rgba(99,102,241,0.08)' : 'var(--surface-hover)', border: `1px solid ${s.current ? 'var(--accent)' : 'var(--border)'}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ width: 42, height: 42, borderRadius: 10, background: s.current ? 'var(--accent-grad)' : 'var(--border)', display: 'grid', placeItems: 'center', color: '#fff', flexShrink: 0 }}>
+                      {s.deviceName.includes('iPhone') || s.deviceName.includes('Android') ? <Smartphone size={20} /> : <Laptop size={20} />}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {s.deviceName}
+                        {s.current ? (
+                          <span style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 10, background: 'rgba(16,185,129,0.2)', color: '#10b981', fontWeight: 700 }}>
+                            <CheckCircle2 size={11} style={{ verticalAlign: -1, marginRight: 3 }} /> JORIY QURILMA
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 10, background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', fontWeight: 600 }}>
+                            FAOL SEANS
+                          </span>
+                        )}
+                      </div>
+                      <div className="cell-sub" style={{ fontSize: 12, marginTop: 3 }}>
+                        <Globe size={12} style={{ verticalAlign: -2, marginRight: 4 }} /> IP: <b className="mono">{s.ip}</b> · Kirilgan vaqt: <b>{s.created ? s.created.replace('T', ' ').substring(0, 16) : 'Noma\'lum'}</b>
+                      </div>
+                    </div>
+                  </div>
+                  {!s.current && (
+                    <button className="btn btn-danger btn-sm" onClick={() => handleRevokeSession(s.id)}>
+                      Seansni Yakunlash
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Bot Controls & Server Tools Tiles Grid */}
       <div className="card" style={{ gridColumn: '1 / -1' }}>
         <div className="card-head"><h3><Server size={17} style={{ verticalAlign: -3, marginRight: 8, color: 'var(--accent)' }} />Botlarni va Serverni Boshqarish</h3></div>
@@ -179,7 +270,7 @@ export default function SettingsPage() {
         <div className="card-head"><h3><Info size={17} style={{ verticalAlign: -3, marginRight: 8, color: 'var(--accent)' }} />Panel Haqida</h3></div>
         <div className="card-pad">
           <div className="grid grid-stats" style={{ gap: 16 }}>
-            <div><div className="cell-sub">Versiya</div><div style={{ fontWeight: 700, fontSize: 15 }}>1.2.0 (Pro Studio)</div></div>
+            <div><div className="cell-sub">Versiya</div><div style={{ fontWeight: 700, fontSize: 15 }}>1.3.0 (Pro Studio)</div></div>
             <div><div className="cell-sub">Boshqariladigan botlar</div><div style={{ fontWeight: 700, fontSize: 15 }}>VibeConvert · Kino Bot</div></div>
             <div><div className="cell-sub">Server IP</div><div style={{ fontWeight: 700, fontSize: 15 }} className="mono">94.237.103.133</div></div>
             <div><div className="cell-sub">Avto-Backup</div><div style={{ fontWeight: 700, fontSize: 15, color: '#10b981' }}>● Yoqilgan (Har 24 soat)</div></div>
