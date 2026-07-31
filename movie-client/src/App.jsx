@@ -99,11 +99,9 @@ export default function App() {
   const [favorites, setFavorites] = useState([]);
   const [heroIndex, setHeroIndex] = useState(0);
 
-  // Comments state inside modal
-  const [comments, setComments] = useState([
-    { name: 'Anvar', text: 'Juda zo\'r kino ekan, sifatiga gap yo\'q! 🍿', date: 'Bugun' },
-    { name: 'Jasur', text: 'Ovoz tarjimasi va 4K tasvir judayam tiniq.', date: 'Kechasi' }
-  ]);
+  // Comments & Rating state inside modal
+  const [userRating, setUserRating] = useState(5);
+  const [reviewsData, setReviewsData] = useState({ reviews: [], avgRating: 4.9 });
   const [newCommentText, setNewCommentText] = useState('');
 
   // Admin Modal
@@ -124,6 +122,21 @@ export default function App() {
     fetchMovies();
     fetchConfig();
   }, []);
+
+  useEffect(() => {
+    if (selectedMovie && selectedMovie.code) {
+      fetchReviews(selectedMovie.code);
+    }
+  }, [selectedMovie]);
+
+  const fetchReviews = async (code) => {
+    try {
+      const res = await axios.get(`${API_BASE}/public-reviews/${code}`);
+      if (res.data && Array.isArray(res.data.reviews)) {
+        setReviewsData(res.data);
+      }
+    } catch (e) {}
+  };
 
   // Auto carousel slide timer
   useEffect(() => {
@@ -163,10 +176,25 @@ export default function App() {
     }
   };
 
-  const handleAddComment = (e) => {
+  const handleAddComment = async (e) => {
     e.preventDefault();
-    if (!newCommentText.trim()) return;
-    setComments([{ name: 'Foydalanuvchi', text: newCommentText.trim(), date: 'Hozir' }, ...comments]);
+    if (!newCommentText.trim() || !selectedMovie) return;
+    try {
+      const res = await axios.post(`${API_BASE}/public-reviews/${selectedMovie.code}`, {
+        name: 'Foydalanuvchi',
+        rating: userRating,
+        comment: newCommentText.trim()
+      });
+      if (res.data && Array.isArray(res.data.reviews)) {
+        setReviewsData(res.data);
+      }
+    } catch (e) {
+      // Local fallback
+      setReviewsData(prev => ({
+        ...prev,
+        reviews: [{ name: 'Foydalanuvchi', rating: userRating, comment: newCommentText.trim(), date: 'Hozir' }, ...prev.reviews]
+      }));
+    }
     setNewCommentText('');
   };
 
@@ -395,9 +423,39 @@ export default function App() {
                 {selectedMovie.description || 'Juda ta\'sirli va hayajonli tarjima kino. Yuqori sifat va professional tarjimada taqdim etiladi.'}
               </p>
 
-              {/* Comments Section */}
+              {/* Comments & Rating Section */}
               <div className="comments-section">
-                <h4 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', marginBottom: '12px' }}>💬 Tomoshabinlar Sharhlari ({comments.length})</h4>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                  <h4 style={{ fontFamily: 'var(--font-title)', fontSize: '1.1rem', margin: 0 }}>
+                    💬 Tomoshabinlar Sharhlari ({reviewsData.reviews?.length || 0})
+                  </h4>
+                  <div style={{ background: 'rgba(255,193,7,0.15)', color: '#ffc107', padding: '4px 12px', borderRadius: '12px', fontWeight: 700, fontSize: '0.9rem' }}>
+                    ⭐️ {reviewsData.avgRating || '5.0'} / 5.0
+                  </div>
+                </div>
+
+                {/* 1-5 Star Rating Picker */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Baho bering:</span>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setUserRating(star)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '1.4rem',
+                        cursor: 'pointer',
+                        color: star <= userRating ? '#ffc107' : 'rgba(255,255,255,0.2)',
+                        transition: 'transform 0.1s'
+                      }}
+                    >
+                      ★
+                    </button>
+                  ))}
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ffc107', marginLeft: '6px' }}>{userRating} / 5</span>
+                </div>
 
                 <form onSubmit={handleAddComment} className="comment-input-row">
                   <input
@@ -413,15 +471,21 @@ export default function App() {
                 </form>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
-                  {comments.map((c, i) => (
-                    <div key={i} style={{ background: 'rgba(255,255,255,0.03)', padding: '12px 16px', borderRadius: '10px', border: '1px solid var(--border-glass)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: '4px' }}>
-                        <span>👤 {c.name}</span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{c.date}</span>
+                  {reviewsData.reviews && reviewsData.reviews.length > 0 ? (
+                    reviewsData.reviews.map((c, i) => (
+                      <div key={i} style={{ background: 'rgba(255,255,255,0.03)', padding: '12px 16px', borderRadius: '10px', border: '1px solid var(--border-glass)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: '4px' }}>
+                          <span>👤 {c.name || 'Foydalanuvchi'} <span style={{ color: '#ffc107', fontSize: '0.8rem', marginLeft: '6px' }}>{'★'.repeat(c.rating || 5)}</span></span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{c.date || 'Hozir'}</span>
+                        </div>
+                        <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{c.comment || c.text}</div>
                       </div>
-                      <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{c.text}</div>
+                    ))
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      Hozircha sharhlar mavjud emas. Birinchi bo'lib fikringizni yozib qoldiring!
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             </div>

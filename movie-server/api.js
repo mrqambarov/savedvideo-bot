@@ -50,6 +50,21 @@ router.get('/public-config', (req, res) => {
   });
 });
 
+router.get('/public-reviews/:code', (req, res) => {
+  const { code } = req.params;
+  res.json(db.getMovieReviews(code));
+});
+
+router.post('/public-reviews/:code', (req, res) => {
+  const { code } = req.params;
+  const { name, rating, comment } = req.body;
+  if (!comment || comment.trim() === '') {
+    return res.status(400).json({ error: 'Sharh matni kiritilishi kerak!' });
+  }
+  const result = db.addMovieReview(code, { name, rating, comment });
+  res.json(result);
+});
+
 router.use(authMiddleware);
 
 /**

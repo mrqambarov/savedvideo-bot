@@ -837,6 +837,62 @@ module.exports = {
   isFavorite,
   getFavorites,
   recommendMoviesByMood,
+const reviewsFile = path.join(dataDir, 'movie_reviews.json');
+if (!fs.existsSync(reviewsFile)) {
+  fs.writeFileSync(reviewsFile, JSON.stringify({}, null, 2));
+}
+
+function getMovieReviews(code) {
+  try {
+    if (!fs.existsSync(reviewsFile)) return { reviews: [], avgRating: 5.0 };
+    const raw = fs.readFileSync(reviewsFile, 'utf8');
+    const data = JSON.parse(raw);
+    const list = data[String(code)] || [];
+    const totalRating = list.reduce((acc, r) => acc + (Number(r.rating) || 5), 0);
+    const avgRating = list.length > 0 ? (totalRating / list.length).toFixed(1) : 5.0;
+    return { reviews: list, avgRating: Number(avgRating) };
+  } catch (e) {
+    return { reviews: [], avgRating: 5.0 };
+  }
+}
+
+function addMovieReview(code, { name, rating, comment }) {
+  try {
+    let data = {};
+    if (fs.existsSync(reviewsFile)) {
+      try { data = JSON.parse(fs.readFileSync(reviewsFile, 'utf8')); } catch (e) {}
+    }
+    const movieCode = String(code);
+    if (!data[movieCode]) data[movieCode] = [];
+
+    const newReview = {
+      id: Math.random().toString(36).substring(2, 9),
+      name: name || 'Foydalanuvchi',
+      rating: Number(rating) || 5,
+      comment: String(comment || '').trim(),
+      date: new Date().toLocaleDateString()
+    };
+
+    data[movieCode].unshift(newReview);
+    fs.writeFileSync(reviewsFile, JSON.stringify(data, null, 2));
+    return getMovieReviews(movieCode);
+  } catch (e) {
+    console.error('Error adding movie review:', e.message);
+    return null;
+  }
+}
+
+module.exports = {
+  getMovies,
+  saveMovies,
+  addMovie,
+  getMovieByCode,
+  deleteMovie,
+  getTopMovies,
+  searchMovies,
+  toggleFavorite,
+  getFavorites,
+  isFavorite,
   getGenres,
   saveGenres,
   trackSearchQuery,
@@ -863,5 +919,7 @@ module.exports = {
   completeRequest,
   deleteRequest,
   toggleLikeDislike,
-  getAdvancedStats
+  getAdvancedStats,
+  getMovieReviews,
+  addMovieReview
 };
