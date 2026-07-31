@@ -473,9 +473,9 @@ function startBot(token) {
           `💡 *Ushbu havolani do'stlaringizga yoki guruhlarga ulashing. Har bir faol taklif uchun reytingingiz oshadi!*`;
 
         const keyboard = new InlineKeyboard()
-          .url('↪️ Do\'stlarga ulashish', shareUrl)
+          .url('↪️ 🚀 Do\'stlarga ulashish', shareUrl)
           .row()
-          .text('🔄 Reytingni yangilash', 'ref_refresh');
+          .text('🔄 ⚡️ Reytingni yangilash', 'ref_refresh');
 
         if (ctx.callbackQuery) {
           try { await ctx.answerCallbackQuery({ text: 'Reyting yangilandi!' }); } catch (e) {}
@@ -999,19 +999,19 @@ function formatDownloadError(err) {
       botInstance.on('message:text', async (ctx) => {
         const text = ctx.message.text.trim();
 
-        if (text === '🎁 Do\'stlarni taklif qilish') {
+        if (text.includes('Do\'stlarni taklif qilish') || text.includes('Referal')) {
           return await sendReferralInfo(ctx);
         }
 
-        if (text === '📜 Yuklashlar Tarixi') {
+        if (text.includes('Yuklashlar Tarixi') || text.includes('Tarixi')) {
           return await showHistory(ctx);
         }
 
-        if (text === '📢 Botni Ulashish') {
+        if (text.includes('Botni Ulashish') || text.includes('Ulashish')) {
           const botUsername = ctx.me.username;
           const shareText = encodeURIComponent(`Eng tezkor video va musiqa yuklovchi bot! 🚀`);
           const shareUrl = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${shareText}`;
-          const keyboard = new InlineKeyboard().url('↪️ Do\'stlarga ulashish', shareUrl);
+          const keyboard = new InlineKeyboard().url('↪️ 🚀 Do\'stlarga ulashish', shareUrl);
           
           return await ctx.reply('🤖 **Botni do\'stlaringizga tavsiya qiling va ulashing!**', {
             parse_mode: 'Markdown',
@@ -1019,13 +1019,13 @@ function formatDownloadError(err) {
           });
         }
 
-        if (text === '❓ Yordam') {
+        if (text.includes('Yordam')) {
           return await ctx.reply(
             `❓ **Yordam bo'limi:**\n\n` +
             `• Havola yuboring (YouTube, TikTok, Instagram) -> Men sizga yuklab olish tugmalarini taqdim etaman.\n` +
             `• Video yuboring -> Dumaloq video qilish yoki MP3 ajratish variantlarini olasiz.\n` +
             `• Musiqa (Audio/Voice) yuboring -> Effekt berish va musiqani aniqlash variantlarini olasiz.`,
-            { parse_mode: 'Markdown', reply_markup: mainKeyboard }
+            { parse_mode: 'Markdown' }
           );
         }
         
@@ -1044,15 +1044,15 @@ function formatDownloadError(err) {
           const shareUrl = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${shareText}`;
           
           const keyboard = new InlineKeyboard()
-            .text('🎵 MP3 Audio', `dl_aud:${shortId}`)
-            .text('⏺ Dumaloq Video', `video_note:${shortId}`)
+            .text('🎧 ⚡️ MP3 Musiqa', `dl_aud:${shortId}`)
+            .text('🌀 🎥 Dumaloq Video', `video_note:${shortId}`)
             .row()
-            .text('🗜 Hajmini siqish', `compress_vid:${shortId}`)
-            .text('🎞 GIF qilish', `convert_gif:${shortId}`)
+            .text('🗜 ⚡️ Hajmini siqish (50-70%)', `compress_vid:${shortId}`)
+            .text('🎞 ✨ GIF Animatsiya', `convert_gif:${shortId}`)
             .row()
-            .url('↪️ Do\'stlarga ulashish', shareUrl)
+            .url('↪️ 🚀 Do\'stlarga ulashish', shareUrl)
             .row()
-            .url('👉 Guruhga qo\'shish ⤴️', `https://t.me/${botUsername}?startgroup=true`);
+            .url('👉 👥 Guruhga qo\'shish ⤴️', `https://t.me/${botUsername}?startgroup=true`);
 
           const isGroup = ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup');
           const replyOptions = isGroup ? { reply_to_message_id: ctx.message.message_id } : {};

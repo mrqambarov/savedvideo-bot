@@ -1126,10 +1126,10 @@ async function sendMovie(ctx, movie) {
 
   const fav = ctx.from ? db.isFavorite(ctx.from.id, movie.code) : false;
   const keyboard = new InlineKeyboard()
-    .text(`👍 ${likesCount}`, `like:${movie.code}`)
-    .text(`👎 ${dislikesCount}`, `dislike:${movie.code}`)
+    .text(`👍 🔥 ${likesCount}`, `like:${movie.code}`)
+    .text(`👎 ❄️ ${dislikesCount}`, `dislike:${movie.code}`)
     .row()
-    .text(fav ? '⭐ Sevimlilarda' : '☆ Sevimlilarga', `fav:${movie.code}`);
+    .text(fav ? '⭐ ⚡️ Sevimlilarda saqlangan' : '☆ ✨ Sevimlilarga qo\'shish', `fav:${movie.code}`);
 
   try {
     return await ctx.replyWithVideo(movie.fileId, {
