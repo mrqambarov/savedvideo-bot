@@ -789,6 +789,8 @@ function startBot(token) {
               await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, formatDownloadError(err), { parse_mode: 'HTML' });
             } catch (e) {}
           }
+          return;
+        }
         if (data.startsWith('video_note:')) {
           const shortId = data.split(':')[1];
           let mediaPath = localVideoCache.get(shortId);
