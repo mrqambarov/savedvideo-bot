@@ -110,6 +110,9 @@ export default function AiPublisher() {
     setPublishStatus(null);
 
     const { data } = await safe(movieApi.post('/publish-instagram', {
+      title: aiData.title,
+      code: aiData.code,
+      genre: aiData.genre,
       instagramCaption: aiData.instagramCaption
     }));
 

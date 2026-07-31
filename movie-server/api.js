@@ -104,8 +104,8 @@ router.post('/instagram-config', (req, res) => {
 });
 
 router.post('/publish-instagram', async (req, res) => {
-  const { instagramCaption } = req.body;
-  const result = await aiPublisher.publishToInstagram({ caption: instagramCaption });
+  const { title, code, genre, instagramCaption } = req.body;
+  const result = await aiPublisher.publishToInstagram({ title, code, genre, caption: instagramCaption });
   res.json(result);
 });
 
