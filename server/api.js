@@ -765,4 +765,103 @@ router.post('/revoke-other-sessions', authMiddleware, (req, res) => {
   res.json({ success: true, message: 'Barcha boshqa seanslar yakunlandi!' });
 });
 
+// Get Bot Info for Token Switcher
+router.get('/bot-info', authMiddleware, async (req, res) => {
+  try {
+    const downloaderToken = process.env.TELEGRAM_BOT_TOKEN || '';
+    const movieToken = process.env.MOVIE_BOT_TOKEN || downloaderToken;
+    const downloaderUser = process.env.DOWNLOADER_BOT_USERNAME || 'savemedia_music_bot';
+    const movieUser = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
+
+    const maskToken = (t) => t ? `${t.substring(0, 7)}...${t.slice(-5)}` : 'O\'rnatilmagan';
+
+    res.json({
+      downloader: {
+        username: downloaderUser,
+        tokenMasked: maskToken(downloaderToken),
+        status: downloaderToken ? 'online' : 'offline'
+      },
+      movie: {
+        username: movieUser,
+        tokenMasked: maskToken(movieToken),
+        status: movieToken ? 'online' : 'offline'
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Switch Bot Token & Auto Hot-Reload
+router.post('/switch-bot-token', authMiddleware, async (req, res) => {
+  const { target, newToken } = req.body;
+  if (!newToken || newToken.trim().length < 20) {
+    return res.status(400).json({ error: 'Yangi Telegram Bot Token kiritilmadi yoki yaroqsiz formatda!' });
+  }
+
+  const cleanToken = newToken.trim();
+
+  try {
+    const tgRes = await axios.get(`https://api.telegram.org/bot${cleanToken}/getMe`, { timeout: 8000 });
+    if (!tgRes.data || !tgRes.data.ok || !tgRes.data.result) {
+      return res.status(400).json({ error: 'Telegram API xatosi: Token noto\'g\'ri yoki bot topilmadi!' });
+    }
+
+    const botInfo = tgRes.data.result;
+    const botUsername = botInfo.username || '';
+    const botName = botInfo.first_name || '';
+
+    if (fs.existsSync(envPath)) {
+      let content = fs.readFileSync(envPath, 'utf8');
+      if (target === 'downloader') {
+        process.env.TELEGRAM_BOT_TOKEN = cleanToken;
+        process.env.DOWNLOADER_BOT_USERNAME = botUsername;
+        if (content.includes('TELEGRAM_BOT_TOKEN=')) {
+          content = content.replace(/TELEGRAM_BOT_TOKEN=.*/g, `TELEGRAM_BOT_TOKEN=${cleanToken}`);
+        } else {
+          content += `\nTELEGRAM_BOT_TOKEN=${cleanToken}\n`;
+        }
+        if (content.includes('DOWNLOADER_BOT_USERNAME=')) {
+          content = content.replace(/DOWNLOADER_BOT_USERNAME=.*/g, `DOWNLOADER_BOT_USERNAME=${botUsername}`);
+        } else {
+          content += `\nDOWNLOADER_BOT_USERNAME=${botUsername}\n`;
+        }
+      } else {
+        process.env.MOVIE_BOT_TOKEN = cleanToken;
+        process.env.MOVIE_BOT_USERNAME = botUsername;
+        if (content.includes('MOVIE_BOT_TOKEN=')) {
+          content = content.replace(/MOVIE_BOT_TOKEN=.*/g, `MOVIE_BOT_TOKEN=${cleanToken}`);
+        } else {
+          content += `\nMOVIE_BOT_TOKEN=${cleanToken}\n`;
+        }
+        if (content.includes('MOVIE_BOT_USERNAME=')) {
+          content = content.replace(/MOVIE_BOT_USERNAME=.*/g, `MOVIE_BOT_USERNAME=${botUsername}`);
+        } else {
+          content += `\nMOVIE_BOT_USERNAME=${botUsername}\n`;
+        }
+      }
+      fs.writeFileSync(envPath, content, 'utf8');
+    }
+
+    const targetApp = target === 'movie' ? 'movie-bot' : 'vibeconvert-bot';
+    const { exec } = require('child_process');
+    exec(`pm2 restart ${targetApp}`, (err) => {
+      if (err) console.error(`Error restarting ${targetApp}:`, err.message);
+    });
+
+    res.json({
+      success: true,
+      bot: {
+        id: botInfo.id,
+        name: botName,
+        username: botUsername
+      },
+      message: `Yangi bot @${botUsername} (${botName}) muvaffaqiyatli bog'landi va 1 soniyada ishga tushirildi!`
+    });
+  } catch (err) {
+    const errMsg = err.response?.data?.description || err.message || 'Telegram Bot API bilan bog\'lanishda xatolik!';
+    res.status(400).json({ error: `Token validation xatosi: ${errMsg}` });
+  }
+});
+
 module.exports = router;

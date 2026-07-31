@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Moon, Sun, LogOut, Palette, Info, ShieldCheck, RefreshCw, Trash2, Download, Key, Server, Bot, Film, Laptop, Smartphone, Globe, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
 import { dlApi, safe } from '../lib/api.js';
+import BotManagerCard from './BotManager.jsx';
 
 export default function SettingsPage() {
   const { theme, toggleTheme, logout } = useApp();
@@ -123,6 +124,9 @@ export default function SettingsPage() {
           </button>
         </div>
       </div>
+
+      {/* Instant Bot Token Switcher & Hot Reload Manager */}
+      <BotManagerCard />
 
       {/* Direct Password Change */}
       <div className="card">
@@ -270,7 +274,7 @@ export default function SettingsPage() {
         <div className="card-head"><h3><Info size={17} style={{ verticalAlign: -3, marginRight: 8, color: 'var(--accent)' }} />Panel Haqida</h3></div>
         <div className="card-pad">
           <div className="grid grid-stats" style={{ gap: 16 }}>
-            <div><div className="cell-sub">Versiya</div><div style={{ fontWeight: 700, fontSize: 15 }}>1.3.0 (Pro Studio)</div></div>
+            <div><div className="cell-sub">Versiya</div><div style={{ fontWeight: 700, fontSize: 15 }}>1.4.0 (Pro Studio)</div></div>
             <div><div className="cell-sub">Boshqariladigan botlar</div><div style={{ fontWeight: 700, fontSize: 15 }}>VibeConvert · Kino Bot</div></div>
             <div><div className="cell-sub">Server IP</div><div style={{ fontWeight: 700, fontSize: 15 }} className="mono">94.237.103.133</div></div>
             <div><div className="cell-sub">Avto-Backup</div><div style={{ fontWeight: 700, fontSize: 15, color: '#10b981' }}>● Yoqilgan (Har 24 soat)</div></div>
