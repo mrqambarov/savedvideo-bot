@@ -144,13 +144,12 @@ function downloadVideo(url, outputName, quality = '720') {
  */
 function downloadPhoto(url, outputName) {
   return new Promise((resolve, reject) => {
-    const templatePath = path.join(tempDir, `${outputName}.%(ext)s`);
+    const templatePath = path.join(tempDir, `${outputName}_%(autonumber)s.%(ext)s`);
     const args = [
       '--write-thumbnail',
       '--convert-thumbnails', 'jpg',
       '--skip-download',
       '--ignore-no-formats-error',
-      '--no-playlist',
       ...NET_ARGS,
       '-o', templatePath,
       ...browserHeaders
@@ -164,9 +163,11 @@ function downloadPhoto(url, outputName) {
     execFile(ytDlpPath, args, { env }, (err, stdout, stderr) => {
       try {
         const files = fs.readdirSync(tempDir);
-        const matched = files.find(f => f.startsWith(outputName));
-        if (matched) {
-          resolve(path.join(tempDir, matched));
+        const matched = files.filter(f => f.startsWith(outputName)).sort().map(f => path.join(tempDir, f));
+        if (matched.length === 1) {
+          resolve(matched[0]);
+        } else if (matched.length > 1) {
+          resolve(matched);
         } else {
           reject(new Error(stderr || (err ? err.message : 'Photo file not found')));
         }

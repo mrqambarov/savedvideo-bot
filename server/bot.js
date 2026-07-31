@@ -883,8 +883,8 @@ function formatDownloadError(err) {
             const shortId = Math.random().toString(36).substring(2, 8);
             urlCache.set(shortId, url);
 
-            // Download the file instantly
-            const mediaPath = await downloader.downloadVideo(url, `dl_inst_${shortId}`);
+            const mediaResult = await downloader.downloadVideo(url, `dl_inst_${shortId}`);
+            const mediaPaths = Array.isArray(mediaResult) ? mediaResult : [mediaResult];
 
             const botUsername = ctx.me.username;
             const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
@@ -902,46 +902,73 @@ function formatDownloadError(err) {
 
             await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
 
-            const ext = path.extname(mediaPath).toLowerCase();
-            const isVideo = ['.mp4', '.webm', '.mkv', '.mov', '.avi'].includes(ext);
-            const isPhoto = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext);
+            if (mediaPaths.length === 1) {
+              const mediaPath = mediaPaths[0];
+              const ext = path.extname(mediaPath).toLowerCase();
+              const isVideo = ['.mp4', '.webm', '.mkv', '.mov', '.avi'].includes(ext);
+              const isPhoto = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext);
 
-            if (isVideo) {
-              await ctx.replyWithVideo(new InputFile(mediaPath), {
-                caption: captionText,
+              if (isVideo) {
+                await ctx.replyWithVideo(new InputFile(mediaPath), {
+                  caption: captionText,
+                  reply_markup: keyboard
+                });
+                db.trackDownload('video');
+                db.trackUserDownload(ctx.from.id, `Video (havola)`, 'video', url);
+
+                // Cache the downloaded video for 5 minutes for instant audio extraction
+                localVideoCache.set(shortId, mediaPath);
+                setTimeout(() => {
+                  try {
+                    if (fs.existsSync(mediaPath)) {
+                      fs.unlinkSync(mediaPath);
+                    }
+                    localVideoCache.delete(shortId);
+                  } catch (e) {}
+                }, 5 * 60 * 1000);
+
+              } else if (isPhoto) {
+                await ctx.replyWithPhoto(new InputFile(mediaPath), {
+                  caption: captionText,
+                  reply_markup: keyboard
+                });
+                db.trackDownload('video');
+                db.trackUserDownload(ctx.from.id, `Rasm (havola)`, 'photo', url);
+                try { fs.unlinkSync(mediaPath); } catch (e) {}
+              } else {
+                // Document fallback
+                await ctx.replyWithDocument(new InputFile(mediaPath), {
+                  caption: captionText,
+                  reply_markup: keyboard
+                });
+                db.trackDownload('video');
+                db.trackUserDownload(ctx.from.id, `Hujjat (havola)`, 'document', url);
+                try { fs.unlinkSync(mediaPath); } catch (e) {}
+              }
+            } else if (mediaPaths.length > 1) {
+              // Instagram photo carousel (Multiple photos)
+              const chunkSize = 10;
+              for (let i = 0; i < mediaPaths.length; i += chunkSize) {
+                const chunk = mediaPaths.slice(i, i + chunkSize);
+                const mediaGroup = chunk.map((p, idx) => ({
+                  type: 'photo',
+                  media: new InputFile(p),
+                  caption: (i === 0 && idx === 0) ? captionText : undefined
+                }));
+                await ctx.replyWithMediaGroup(mediaGroup);
+              }
+
+              // Send action keyboard at the end
+              await ctx.reply('✨ Barcha rasmlar yuklab olindi!', {
                 reply_markup: keyboard
               });
-              db.trackDownload('video');
-              db.trackUserDownload(ctx.from.id, `Video (havola)`, 'video', url);
 
-              // Cache the downloaded video for 5 minutes for instant audio extraction
-              localVideoCache.set(shortId, mediaPath);
-              setTimeout(() => {
-                try {
-                  if (fs.existsSync(mediaPath)) {
-                    fs.unlinkSync(mediaPath);
-                  }
-                  localVideoCache.delete(shortId);
-                } catch (e) {}
-              }, 5 * 60 * 1000);
+              db.trackDownload('video');
+              db.trackUserDownload(ctx.from.id, `Rasm Karusel (${mediaPaths.length} ta)`, 'photo', url);
 
-            } else if (isPhoto) {
-              await ctx.replyWithPhoto(new InputFile(mediaPath), {
-                caption: captionText,
-                reply_markup: keyboard
-              });
-              db.trackDownload('video');
-              db.trackUserDownload(ctx.from.id, `Rasm (havola)`, 'photo', url);
-              fs.unlinkSync(mediaPath);
-            } else {
-              // Document fallback
-              await ctx.replyWithDocument(new InputFile(mediaPath), {
-                caption: captionText,
-                reply_markup: keyboard
-              });
-              db.trackDownload('video');
-              db.trackUserDownload(ctx.from.id, `Hujjat (havola)`, 'document', url);
-              fs.unlinkSync(mediaPath);
+              for (const p of mediaPaths) {
+                try { fs.unlinkSync(p); } catch (e) {}
+              }
             }
           } catch (err) {
             console.error(err);
