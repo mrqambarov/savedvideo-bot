@@ -832,11 +832,27 @@ module.exports = {
   getMovieByCode,
   searchMovies,
   getTopMovies,
-  getRandomMovie,
-  toggleFavorite,
-  isFavorite,
-  getFavorites,
-  recommendMoviesByMood,
+function recommendMoviesByMood(moodKey) {
+  const movies = getMovies();
+  if (!movies || movies.length === 0) return [];
+  
+  const map = {
+    funny: ['Komediya', 'Multfilm'],
+    action: ['Jangari', 'Sarguzasht'],
+    romantic: ['Melodrama'],
+    family: ['Multfilm', 'Sarguzasht', 'Tarjima kino'],
+    historical: ['Tarixiy', 'Triller']
+  };
+
+  const targetGenres = map[moodKey] || [];
+  if (targetGenres.length === 0) return movies.slice(0, 10);
+
+  const matched = movies.filter(m => 
+    targetGenres.some(g => (m.genre || '').toLowerCase().includes(g.toLowerCase()))
+  );
+
+  return matched.length > 0 ? matched : movies.slice(0, 10);
+}
 const reviewsFile = path.join(dataDir, 'movie_reviews.json');
 if (!fs.existsSync(reviewsFile)) {
   fs.writeFileSync(reviewsFile, JSON.stringify({}, null, 2));

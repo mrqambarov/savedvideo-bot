@@ -94,6 +94,7 @@ const RICH_PORTAL_MOVIES = [
 export default function App() {
   const [moviesList, setMoviesList] = useState([]);
   const [selectedGenre, setSelectedGenre] = useState('Barchasi');
+  const [selectedMood, setSelectedMood] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [favorites, setFavorites] = useState([]);
@@ -315,8 +316,47 @@ export default function App() {
         </div>
       )}
 
+      {/* Mood Selector Bar (Kayfiyatga qarab kino saralash) */}
+      <div style={{ padding: '0 5%', marginTop: '24px' }}>
+        <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span>🎭 BUGUN QANDAY KAYFIYATDASIZ?</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(1-click tavsiya)</span>
+        </div>
+        <div className="genre-chips-scroll" style={{ paddingBottom: '6px' }}>
+          {[
+            { key: 'all', label: '✨ Barcha kinolar' },
+            { key: 'funny', label: '😃 Kulgili & Quvnoq' },
+            { key: 'action', label: '🚀 Sarguzasht & Adrenalin' },
+            { key: 'romantic', label: '❤️ Romantic & Sevgi' },
+            { key: 'family', label: '👨‍👩‍👧‍👦 Oila bilan' },
+            { key: 'historical', label: '🧠 Tarixiy & Triller' }
+          ].map((m) => (
+            <div
+              key={m.key}
+              className={`genre-chip ${selectedMood === m.key ? 'active' : ''}`}
+              style={{
+                background: selectedMood === m.key ? 'linear-gradient(135deg, #ffc107, #ff9800)' : 'rgba(255,255,255,0.06)',
+                color: selectedMood === m.key ? '#000' : '#fff',
+                fontWeight: 700
+              }}
+              onClick={() => {
+                setSelectedMood(m.key);
+                if (m.key === 'funny') setSelectedGenre('Komediya');
+                else if (m.key === 'action') setSelectedGenre('Jangari');
+                else if (m.key === 'romantic') setSelectedGenre('Melodrama');
+                else if (m.key === 'family') setSelectedGenre('Multfilm');
+                else if (m.key === 'historical') setSelectedGenre('Tarixiy');
+                else setSelectedGenre('Barchasi');
+              }}
+            >
+              {m.label}
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Genre Filter Chips */}
-      <div className="genre-chips-container">
+      <div className="genre-chips-scroll">
         {genresList.map((g, idx) => (
           <div
             key={idx}

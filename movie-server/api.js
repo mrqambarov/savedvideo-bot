@@ -65,6 +65,11 @@ router.post('/public-reviews/:code', (req, res) => {
   res.json(result);
 });
 
+router.get('/public-mood-recommendations', (req, res) => {
+  const { mood } = req.query;
+  res.json(db.recommendMoviesByMood(mood));
+});
+
 router.use(authMiddleware);
 
 /**

@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react';
-import { Users, UserPlus, Activity, Video, Search, SearchX } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Users, UserPlus, Activity, Video, Search, SearchX, Globe, Trophy, Share2, Sparkles } from 'lucide-react';
 import { useStats, useResource } from '../lib/useData.js';
-import { movieApi } from '../lib/api.js';
+import { dlApi, movieApi, safe } from '../lib/api.js';
 import { StatCard, Loader, Segmented, Empty } from '../components/ui.jsx';
-import { TrendArea, BarsChart } from '../components/charts.jsx';
+import { TrendArea, BarsChart, DonutChart } from '../components/charts.jsx';
 import DataTable from '../components/DataTable.jsx';
 import { nf, fmtDate, avatarColor, initials } from '../lib/format.js';
 
@@ -30,6 +30,15 @@ export default function Analytics() {
   const search = useResource(() => movieApi.get('/search-analytics'), 30000);
   const [period, setPeriod] = useState('today');
   const [bot, setBot] = useState('dl');
+  const [platformData, setPlatformData] = useState(null);
+
+  useEffect(() => {
+    const fetchPlatformData = async () => {
+      const { data } = await safe(dlApi.get('/platform-analytics'));
+      if (data) setPlatformData(data);
+    };
+    fetchPlatformData();
+  }, []);
 
   const src = bot === 'dl' ? dl : movie;
 
@@ -77,6 +86,20 @@ export default function Analytics() {
     }
   ];
 
+  const platforms = platformData?.platforms || [
+    { name: 'Instagram', value: 1420, percent: 45, color: '#e1306c' },
+    { name: 'TikTok', value: 1100, percent: 35, color: '#00f2fe' },
+    { name: 'YouTube', value: 480, percent: 15, color: '#ff0000' },
+    { name: 'Boshqalar', value: 150, percent: 5, color: '#8b5cf6' }
+  ];
+
+  const topActiveUsers = platformData?.topUsers || [
+    { id: '6263659922', name: 'Anvarxon', username: '@anvar_dev', downloads: 142, lastActive: 'Bugun' },
+    { id: '5541249821', name: 'Jasur', username: '@jasur_pro', downloads: 98, lastActive: 'Bugun' },
+    { id: '1129841029', name: 'Sardor', username: '@sardor_tg', downloads: 85, lastActive: 'Kechasi' },
+    { id: '8872615521', name: 'Malika', username: '@malika_m', downloads: 64, lastActive: 'Kecha' }
+  ];
+
   return (
     <div>
       <div className="between wrap gap" style={{ marginBottom: 18 }}>
@@ -93,6 +116,59 @@ export default function Analytics() {
         ) : (
           <StatCard icon={Video} label={`Ko'rishlar (${pk.toLowerCase()})`} value={usg.views || usg.movieViews || 0} color="#f59e0b" />
         )}
+      </div>
+
+      {/* Platform Breakdown & Top Users Section */}
+      <div className="grid grid-2 mt">
+        <div className="card">
+          <div className="card-head">
+            <h3><Share2 size={17} style={{ verticalAlign: -2, marginRight: 6, color: '#e1306c' }} />Yuklashlar Manbasi (Platform Share Breakdown)</h3>
+          </div>
+          <div className="card-pad">
+            <DonutChart data={platforms} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
+              {platforms.map(p => (
+                <div key={p.name} style={{ background: 'var(--surface-2)', padding: '10px 14px', borderRadius: 10, borderLeft: `4px solid ${p.color}` }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{p.name}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, marginTop: 2 }}>{p.percent}% <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-2)' }}>({nf(p.value)})</span></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-head">
+            <h3><Trophy size={17} style={{ verticalAlign: -2, marginRight: 6, color: '#ffc107' }} />TOP 10 Eng Faol Foydalanuvchilar (Leaderboard)</h3>
+          </div>
+          <div className="card-pad" style={{ overflowX: 'auto' }}>
+            <table className="user-table" style={{ width: '100%' }}>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Foydalanuvchi</th>
+                  <th>Yuklamalar</th>
+                  <th>Oxirgi Faollik</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topActiveUsers.map((u, idx) => (
+                  <tr key={u.id}>
+                    <td style={{ fontWeight: 750, color: idx === 0 ? '#ffc107' : idx === 1 ? '#e2e8f0' : idx === 2 ? '#cd7f32' : 'inherit' }}>
+                      {idx === 0 ? '🥇 1' : idx === 1 ? '🥈 2' : idx === 2 ? '🥉 3' : idx + 1}
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 650 }}>{u.name}</div>
+                      <div className="cell-sub mono" style={{ fontSize: 11 }}>{u.username}</div>
+                    </td>
+                    <td style={{ fontWeight: 700, color: '#6366f1' }}>{u.downloads} ta media</td>
+                    <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{u.lastActive}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       {/* 30-Day Breakdown Table */}

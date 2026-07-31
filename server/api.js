@@ -905,6 +905,10 @@ router.get('/system-health', authMiddleware, (req, res) => {
       uptime: uptimeStr,
       status: 'healthy'
     });
+// Platform Smart Analytics Endpoint
+router.get('/platform-analytics', authMiddleware, (req, res) => {
+  try {
+    res.json(db.getPlatformAnalytics());
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
