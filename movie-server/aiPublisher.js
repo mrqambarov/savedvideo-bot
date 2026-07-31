@@ -171,9 +171,63 @@ async function publishToInstagram({ title, code, genre, caption }) {
   }
 }
 
+/**
+ * Verifies Instagram credentials live against Instagram API server and saves verified account
+ */
+async function verifyAndSaveInstagramAccount({ username, password }) {
+  try {
+    const cleanUsername = (username || '').trim().replace(/^@/, '');
+    const cleanPassword = (password || '').trim();
+
+    if (!cleanUsername || !cleanPassword) {
+      return { success: false, error: 'Instagram username va parolini kiritishingiz shart!' };
+    }
+
+    const { IgApiClient } = require('instagram-private-api');
+    const ig = new IgApiClient();
+    ig.state.generateDevice(cleanUsername);
+
+    // Live login verification attempt against Instagram API
+    const user = await ig.account.login(cleanUsername, cleanPassword);
+
+    // Save to database
+    db.saveInstagramConfig({
+      username: cleanUsername,
+      password: cleanPassword,
+      autoPost: true,
+      verified: true,
+      fullName: user.full_name || cleanUsername,
+      profilePic: user.profile_pic_url || '',
+      pk: user.pk
+    });
+
+    return {
+      success: true,
+      message: `✅ Instagram akkauntingiz (@${cleanUsername}) bilan muvaffaqiyatli bog'landi!`,
+      account: {
+        username: cleanUsername,
+        fullName: user.full_name || cleanUsername,
+        profilePic: user.profile_pic_url || ''
+      }
+    };
+  } catch (err) {
+    console.error('Instagram Live Verification Error:', err.message);
+    let friendlyError = err.message || 'Instagram tizimiga ulanib bo\'lmadi.';
+    
+    if (err.message && (err.message.includes('checkpoint') || err.message.includes('challenge'))) {
+      friendlyError = '⚠️ Instagram SMS/Email 2-faktorli (2FA) tasdiqlash talab qilmoqda. Iltimos, brauzer orqali bir marta kirib tasdiqlang.';
+    } else if (err.message && (err.message.includes('password') || err.message.includes('bad_password'))) {
+      friendlyError = '❌ Instagram login yoki paroli noto\'g\'ri! Qayta tekshirib yozing.';
+    }
+
+    return { success: false, error: friendlyError };
+  }
+}
+
 module.exports = {
   generateAiMovieMetadata,
   publishSocialPromo,
   publishToInstagram,
-  createRealPosterImage
+  createRealPosterImage,
+  verifyAndSaveInstagramAccount
 };

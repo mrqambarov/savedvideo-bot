@@ -35,17 +35,17 @@ export default function AiPublisher() {
   const handleSaveInstaConfig = async (e) => {
     e.preventDefault();
     setSavingInsta(true);
-    setInstaSavedMsg('');
-    const { data } = await safe(movieApi.post('/instagram-config', {
+    setInstaSavedMsg(null);
+    const { data, error } = await safe(movieApi.post('/verify-instagram-account', {
       username: instaUsername,
-      password: instaPassword,
-      autoPost: true
+      password: instaPassword
     }));
     setSavingInsta(false);
     if (data && data.success) {
       setHasPassword(true);
-      setInstaSavedMsg('✅ Instagram login va paroli saqlandi!');
-      setTimeout(() => setInstaSavedMsg(''), 3000);
+      setInstaSavedMsg({ success: true, text: data.message || `✅ Instagram (@${data.account?.username}) bilan muvaffaqiyatli bog'landi!` });
+    } else {
+      setInstaSavedMsg({ success: false, text: error || data?.error || '❌ Instagram login yoki paroli noto\'g\'ri! Qayta tekshirib yozing.' });
     }
   };
 
@@ -172,12 +172,25 @@ export default function AiPublisher() {
             </div>
 
             <div>
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px' }} disabled={savingInsta}>
-                {savingInsta ? 'Saqlanmoqda...' : '💾 Akkauntni Saqlash'}
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px', background: 'linear-gradient(135deg, #e1306c, #833ab4)' }} disabled={savingInsta}>
+                {savingInsta ? '⚡️ Tekshirilmoqda...' : '🔗 Instagram Akkauntni Tekshirish va Ulash'}
               </button>
             </div>
           </form>
-          {instaSavedMsg && <div style={{ marginTop: 10, color: '#10b981', fontWeight: 600, fontSize: 13 }}>{instaSavedMsg}</div>}
+          {instaSavedMsg && (
+            <div style={{
+              marginTop: 12,
+              padding: 12,
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 650,
+              background: instaSavedMsg.success ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+              border: `1px solid ${instaSavedMsg.success ? '#10b981' : '#ef4444'}`,
+              color: instaSavedMsg.success ? '#10b981' : '#ef4444'
+            }}>
+              {instaSavedMsg.text}
+            </div>
+          )}
         </div>
       </div>
 

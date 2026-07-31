@@ -97,10 +97,24 @@ router.get('/instagram-config', (req, res) => {
   });
 });
 
-router.post('/instagram-config', (req, res) => {
-  const { username, password, autoPost } = req.body;
-  const saved = db.saveInstagramConfig({ username, password, autoPost });
-  res.json({ success: true, username: saved.username, autoPost: saved.autoPost });
+router.post('/instagram-config', async (req, res) => {
+  const { username, password } = req.body;
+  const result = await aiPublisher.verifyAndSaveInstagramAccount({ username, password });
+  if (result.success) {
+    res.json(result);
+  } else {
+    res.status(400).json(result);
+  }
+});
+
+router.post('/verify-instagram-account', async (req, res) => {
+  const { username, password } = req.body;
+  const result = await aiPublisher.verifyAndSaveInstagramAccount({ username, password });
+  if (result.success) {
+    res.json(result);
+  } else {
+    res.status(400).json(result);
+  }
 });
 
 router.post('/publish-instagram', async (req, res) => {
