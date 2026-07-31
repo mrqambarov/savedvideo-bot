@@ -1,4 +1,4 @@
-const fs = require('fs');
+﻿const fs = require('fs');
 const path = require('path');
 
 const dataDir = path.join(__dirname, 'data');
@@ -825,17 +825,14 @@ function getAdvancedStats() {
   };
 }
 
-module.exports = {
-  getMovies,
-  addMovie,
-  deleteMovie,
-  getMovieByCode,
-  searchMovies,
-  getTopMovies,
+const reviewsFile = path.join(dataDir, 'movie_reviews.json');
+if (!fs.existsSync(reviewsFile)) {
+  fs.writeFileSync(reviewsFile, JSON.stringify({}, null, 2));
+}
+
 function recommendMoviesByMood(moodKey) {
   const movies = getMovies();
   if (!movies || movies.length === 0) return [];
-  
   const map = {
     funny: ['Komediya', 'Multfilm'],
     action: ['Jangari', 'Sarguzasht'],
@@ -843,19 +840,10 @@ function recommendMoviesByMood(moodKey) {
     family: ['Multfilm', 'Sarguzasht', 'Tarjima kino'],
     historical: ['Tarixiy', 'Triller']
   };
-
   const targetGenres = map[moodKey] || [];
   if (targetGenres.length === 0) return movies.slice(0, 10);
-
-  const matched = movies.filter(m => 
-    targetGenres.some(g => (m.genre || '').toLowerCase().includes(g.toLowerCase()))
-  );
-
+  const matched = movies.filter(m => targetGenres.some(g => (m.genre || '').toLowerCase().includes(g.toLowerCase())));
   return matched.length > 0 ? matched : movies.slice(0, 10);
-}
-const reviewsFile = path.join(dataDir, 'movie_reviews.json');
-if (!fs.existsSync(reviewsFile)) {
-  fs.writeFileSync(reviewsFile, JSON.stringify({}, null, 2));
 }
 
 function getMovieReviews(code) {
@@ -880,7 +868,6 @@ function addMovieReview(code, { name, rating, comment }) {
     }
     const movieCode = String(code);
     if (!data[movieCode]) data[movieCode] = [];
-
     const newReview = {
       id: Math.random().toString(36).substring(2, 9),
       name: name || 'Foydalanuvchi',
@@ -888,7 +875,6 @@ function addMovieReview(code, { name, rating, comment }) {
       comment: String(comment || '').trim(),
       date: new Date().toLocaleDateString()
     };
-
     data[movieCode].unshift(newReview);
     fs.writeFileSync(reviewsFile, JSON.stringify(data, null, 2));
     return getMovieReviews(movieCode);
@@ -898,41 +884,6 @@ function addMovieReview(code, { name, rating, comment }) {
   }
 }
 
-module.exports = {
-  getMovies,
-  saveMovies,
-  addMovie,
-  getMovieByCode,
-  deleteMovie,
-  getTopMovies,
-  searchMovies,
-  toggleFavorite,
-  getFavorites,
-  isFavorite,
-  getGenres,
-  saveGenres,
-  trackSearchQuery,
-  getSearchAnalytics,
-  getUsers,
-  addUser,
-  getUserLang,
-  setUserLang,
-  setBanned,
-  isBanned,
-  qualifyReferral,
-  getReferralInfo,
-  getReferralLeaderboard,
-  getRewardTiers,
-  saveRewardTiers,
-  claimTierFor,
-  checkIn,
-  getStats,
-  trackMovieView,
-  trackSearch,
-  trackActiveUser,
-  getRequests,
-  addRequest,
-  completeRequest,
 const instaConfigFile = path.join(dataDir, 'instagram_config.json');
 
 function getInstagramConfig() {
@@ -944,16 +895,22 @@ function getInstagramConfig() {
   }
 }
 
-function saveInstagramConfig({ username, password, autoPost }) {
+function saveInstagramConfig(config) {
   try {
-    const config = {
-      username: (username || '').trim(),
-      password: (password || '').trim(),
-      autoPost: !!autoPost,
-      updatedAt: new Date().toISOString()
+    const existing = getInstagramConfig();
+    const merged = {
+      ...existing,
+      username: (config.username !== undefined ? config.username : existing.username || '').trim(),
+      password: (config.password !== undefined ? config.password : existing.password || '').trim(),
+      autoPost: config.autoPost !== undefined ? !!config.autoPost : !!existing.autoPost,
+      updatedAt: new Date().toISOString(),
+      verified: config.verified !== undefined ? config.verified : existing.verified,
+      fullName: config.fullName || existing.fullName || '',
+      profilePic: config.profilePic || existing.profilePic || '',
+      pk: config.pk || existing.pk || null
     };
-    fs.writeFileSync(instaConfigFile, JSON.stringify(config, null, 2));
-    return config;
+    fs.writeFileSync(instaConfigFile, JSON.stringify(merged, null, 2));
+    return merged;
   } catch (e) {
     console.error('Error saving Instagram config:', e.message);
     return null;
@@ -998,6 +955,7 @@ module.exports = {
   deleteRequest,
   toggleLikeDislike,
   getAdvancedStats,
+  recommendMoviesByMood,
   getMovieReviews,
   addMovieReview,
   getInstagramConfig,
