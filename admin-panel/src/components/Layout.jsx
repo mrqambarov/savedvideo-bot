@@ -86,6 +86,21 @@ export default function Layout({ children }) {
             )
           )}
         </nav>
+        <div className="sidebar-footer">
+          <div className="sidebar-avatar">
+            SA
+            <span className="status-dot" title="Faol Admin"></span>
+          </div>
+          <div className="sidebar-user-info">
+            <div className="sidebar-user-name">Super Admin</div>
+            <div className="sidebar-user-role">
+              <span>ID: 6263659922</span>
+            </div>
+          </div>
+          <button className="sidebar-logout-btn" onClick={logout} title="Tizimdan chiqish">
+            <LogOut size={16} />
+          </button>
+        </div>
       </aside>
 
       <div className={`backdrop ${open ? 'show' : ''}`} onClick={() => setOpen(false)} />

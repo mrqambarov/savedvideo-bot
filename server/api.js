@@ -673,4 +673,66 @@ router.post('/broadcast', async (req, res) => {
   }, 40); // 40ms interval (~25 requests/sec, safe rate-limiting)
 });
 
+// Admin Password Change Endpoint
+router.post('/change-password', authMiddleware, (req, res) => {
+  const { newPassword } = req.body;
+  if (!newPassword || newPassword.trim().length < 4) {
+    return res.status(400).json({ error: 'Yangi parol kamida 4 ta belgidan iborat bo\'lishi kerak.' });
+  }
+  const cleanPass = newPassword.trim();
+  process.env.ADMIN_PASSWORD = cleanPass;
+
+  if (fs.existsSync(envPath)) {
+    try {
+      let content = fs.readFileSync(envPath, 'utf8');
+      if (content.includes('ADMIN_PASSWORD=')) {
+        content = content.replace(/ADMIN_PASSWORD=.*/g, `ADMIN_PASSWORD=${cleanPass}`);
+      } else {
+        content += `\nADMIN_PASSWORD=${cleanPass}\n`;
+      }
+      fs.writeFileSync(envPath, content, 'utf8');
+    } catch (e) {
+      console.error('Error updating .env:', e.message);
+    }
+  }
+  res.json({ success: true, message: 'Parol muvaffaqiyatli yangilandi!' });
+});
+
+// Admin Restart Bot Endpoint
+router.post('/restart-bot', authMiddleware, (req, res) => {
+  const { target } = req.body; // 'downloader' or 'movie'
+  const targetApp = target === 'movie' ? 'movie-bot' : 'vibeconvert-bot';
+  const { exec } = require('child_process');
+  exec(`pm2 restart ${targetApp}`, (err, stdout, stderr) => {
+    if (err) {
+      return res.status(500).json({ error: 'Qayta ishga tushirishda xatolik: ' + err.message });
+    }
+    res.json({ success: true, message: `${targetApp} muvaffaqiyatli qayta ishga tushirildi!` });
+  });
+});
+
+// Admin Clean Temp Directory Endpoint
+router.post('/clean-temp', authMiddleware, (req, res) => {
+  try {
+    processor.cleanTempDirectory(0);
+    res.json({ success: true, message: 'Vaqtinchalik fayllar va kesh xotira tozalandi!' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Admin Download DB Backup Endpoint
+router.get('/backup-data', authMiddleware, (req, res) => {
+  try {
+    const users = db.getUsers();
+    const stats = db.getStats();
+    const dateStr = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename=backup_savedvideo_${dateStr}.json`);
+    res.send(JSON.stringify({ users, stats, date: dateStr }, null, 2));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
