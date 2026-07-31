@@ -72,6 +72,21 @@ router.get('/public-mood-recommendations', (req, res) => {
 
 router.use(authMiddleware);
 
+const aiPublisher = require('./aiPublisher');
+
+router.post('/ai-generate-movie-promo', (req, res) => {
+  const { title, customCode, genre } = req.body;
+  const data = aiPublisher.generateAiMovieMetadata({ title, customCode, genre });
+  res.json(data);
+});
+
+router.post('/publish-social-promo', async (req, res) => {
+  const { code, title, telegramPostText } = req.body;
+  const botInstance = bot.getBotInstance();
+  const result = await aiPublisher.publishSocialPromo({ code, title, telegramPostText, botInstance });
+  res.json(result);
+});
+
 /**
  * Utility to write variables back to .env
  */
