@@ -445,6 +445,49 @@ function getAdvancedStats() {
   };
 }
 
+const mediaCacheFile = path.join(dataDir, 'media_cache.json');
+if (!fs.existsSync(mediaCacheFile)) {
+  fs.writeFileSync(mediaCacheFile, JSON.stringify({}, null, 2));
+}
+
+function normalizeUrl(url) {
+  try {
+    const u = new URL(url);
+    return (u.hostname + u.pathname).replace(/\/$/, '').toLowerCase();
+  } catch (e) {
+    return String(url).trim().toLowerCase();
+  }
+}
+
+function getMediaCache(url) {
+  try {
+    const norm = normalizeUrl(url);
+    if (!fs.existsSync(mediaCacheFile)) return null;
+    const raw = fs.readFileSync(mediaCacheFile, 'utf8');
+    const cache = JSON.parse(raw);
+    return cache[norm] || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function setMediaCache(url, mediaData) {
+  try {
+    const norm = normalizeUrl(url);
+    let cache = {};
+    if (fs.existsSync(mediaCacheFile)) {
+      try { cache = JSON.parse(fs.readFileSync(mediaCacheFile, 'utf8')); } catch (e) {}
+    }
+    cache[norm] = {
+      ...mediaData,
+      cachedAt: new Date().toISOString()
+    };
+    fs.writeFileSync(mediaCacheFile, JSON.stringify(cache, null, 2));
+  } catch (e) {
+    console.error('Error saving media cache:', e.message);
+  }
+}
+
 module.exports = {
   getUsers,
   addUser,
@@ -463,5 +506,7 @@ module.exports = {
   getUserDownloads,
   getAdvancedStats,
   getUserLang,
-  setUserLang
+  setUserLang,
+  getMediaCache,
+  setMediaCache
 };

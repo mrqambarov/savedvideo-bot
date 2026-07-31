@@ -733,6 +733,100 @@ function startBot(token) {
               await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, formatDownloadError(err), { parse_mode: 'HTML' });
             } catch (e) {}
           }
+        if (data.startsWith('video_note:')) {
+          const shortId = data.split(':')[1];
+          let mediaPath = localVideoCache.get(shortId);
+          const url = urlCache.get(shortId);
+
+          await ctx.answerCallbackQuery({ text: '⏺ Dumaloq videoga aylantirilmoqda...' });
+          const statusMsg = await ctx.reply('⏺ **Video 1:1 Dumaloq xabarga aylantirilmoqda...**', { parse_mode: 'Markdown' });
+
+          let tempDlPath = null;
+          try {
+            if (!mediaPath || !fs.existsSync(mediaPath)) {
+              if (!url) throw new Error('Video fayl muddati o\'tgan.');
+              mediaPath = await downloader.downloadVideo(url, `temp_round_${shortId}`);
+              tempDlPath = mediaPath;
+            }
+
+            const roundPath = await processor.convertToRoundVideo(mediaPath, `round_${shortId}`, 'circular');
+            await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
+            await ctx.replyWithVideoNote(new InputFile(roundPath));
+
+            try {
+              if (fs.existsSync(roundPath)) fs.unlinkSync(roundPath);
+              if (tempDlPath && fs.existsSync(tempDlPath)) fs.unlinkSync(tempDlPath);
+            } catch (e) {}
+          } catch (err) {
+            console.error(err);
+            try { await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `❌ Dumaloq video xatolik: ${escapeHTML(err.message)}`); } catch (e) {}
+          }
+          return;
+        }
+
+        if (data.startsWith('compress_vid:')) {
+          const shortId = data.split(':')[1];
+          let mediaPath = localVideoCache.get(shortId);
+          const url = urlCache.get(shortId);
+
+          await ctx.answerCallbackQuery({ text: '🗜 Video siqilmoqda...' });
+          const statusMsg = await ctx.reply('🗜 **Video hajmi 50-70% ga siqilmoqda...**', { parse_mode: 'Markdown' });
+
+          let tempDlPath = null;
+          try {
+            if (!mediaPath || !fs.existsSync(mediaPath)) {
+              if (!url) throw new Error('Video fayl muddati o\'tgan.');
+              mediaPath = await downloader.downloadVideo(url, `temp_comp_${shortId}`);
+              tempDlPath = mediaPath;
+            }
+
+            const compPath = await processor.compressVideo(mediaPath, `comp_${shortId}`);
+            await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
+            await ctx.replyWithVideo(new InputFile(compPath), {
+              caption: `🗜 **Video hajmi siqildi!**\n❤️ @${ctx.me.username} orqali siqildi 🚀`
+            });
+
+            try {
+              if (fs.existsSync(compPath)) fs.unlinkSync(compPath);
+              if (tempDlPath && fs.existsSync(tempDlPath)) fs.unlinkSync(tempDlPath);
+            } catch (e) {}
+          } catch (err) {
+            console.error(err);
+            try { await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `❌ Siqishda xatolik: ${escapeHTML(err.message)}`); } catch (e) {}
+          }
+          return;
+        }
+
+        if (data.startsWith('convert_gif:')) {
+          const shortId = data.split(':')[1];
+          let mediaPath = localVideoCache.get(shortId);
+          const url = urlCache.get(shortId);
+
+          await ctx.answerCallbackQuery({ text: '🎞 GIF yaratilmoqda...' });
+          const statusMsg = await ctx.reply('🎞 **Videodan GIF animatsiya yaratilmoqda...**', { parse_mode: 'Markdown' });
+
+          let tempDlPath = null;
+          try {
+            if (!mediaPath || !fs.existsSync(mediaPath)) {
+              if (!url) throw new Error('Video fayl muddati o\'tgan.');
+              mediaPath = await downloader.downloadVideo(url, `temp_gif_${shortId}`);
+              tempDlPath = mediaPath;
+            }
+
+            const gifPath = await processor.convertToGif(mediaPath, `gif_${shortId}`);
+            await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
+            await ctx.replyWithAnimation(new InputFile(gifPath), {
+              caption: `🎞 **Animatsiyali GIF**\n❤️ @${ctx.me.username} orqali yaratildi 🚀`
+            });
+
+            try {
+              if (fs.existsSync(gifPath)) fs.unlinkSync(gifPath);
+              if (tempDlPath && fs.existsSync(tempDlPath)) fs.unlinkSync(tempDlPath);
+            } catch (e) {}
+          } catch (err) {
+            console.error(err);
+            try { await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `❌ GIF xatolik: ${escapeHTML(err.message)}`); } catch (e) {}
+          }
           return;
         }
 
@@ -877,28 +971,76 @@ function formatDownloadError(err) {
         if (urlRegex.test(text)) {
           // Direct URL Download
           const url = text.match(urlRegex)[0];
-          const statusMsg = await ctx.reply('📥 Havola tahlil qilinib, yuklab olinmoqda...');
+          const shortId = Math.random().toString(36).substring(2, 8);
+          urlCache.set(shortId, url);
+
+          const botUsername = ctx.me.username;
+          const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
+          const captionText = `❤️ @${botUsername} orqali yuklab olindi 🚀\n\n🍿 Yangi kinolar bepul: @${movieBotUsername}`;
+          
+          const shareText = encodeURIComponent(`Eng tezkor video va musiqa yuklovchi bot! 🚀`);
+          const shareUrl = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${shareText}`;
+          
+          const keyboard = new InlineKeyboard()
+            .text('🎵 MP3 Audio', `dl_aud:${shortId}`)
+            .text('⏺ Dumaloq Video', `video_note:${shortId}`)
+            .row()
+            .text('🗜 Hajmini siqish', `compress_vid:${shortId}`)
+            .text('🎞 GIF qilish', `convert_gif:${shortId}`)
+            .row()
+            .url('↪️ Do\'stlarga ulashish', shareUrl)
+            .row()
+            .url('👉 Guruhga qo\'shish ⤴️', `https://t.me/${botUsername}?startgroup=true`);
+
+          const isGroup = ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup');
+          const replyOptions = isGroup ? { reply_to_message_id: ctx.message.message_id } : {};
+
+          // 1. Check Instant Cache (0.1s speed)
+          const cached = db.getMediaCache(url);
+          if (cached) {
+            const instantCaption = `❤️ @${botUsername} orqali (Instant ⚡) yuklab olindi 🚀\n\n🍿 Yangi kinolar bepul: @${movieBotUsername}`;
+            try {
+              if (cached.type === 'video') {
+                await ctx.replyWithVideo(cached.fileId, {
+                  caption: instantCaption,
+                  reply_markup: keyboard,
+                  ...replyOptions
+                });
+                db.trackDownload('video');
+                db.trackUserDownload(ctx.from.id, `Video (Instant ⚡)`, 'video', url);
+                return;
+              } else if (cached.type === 'photo') {
+                await ctx.replyWithPhoto(cached.fileId, {
+                  caption: instantCaption,
+                  reply_markup: keyboard,
+                  ...replyOptions
+                });
+                db.trackDownload('video');
+                db.trackUserDownload(ctx.from.id, `Rasm (Instant ⚡)`, 'photo', url);
+                return;
+              } else if (cached.type === 'carousel') {
+                const mediaGroup = cached.fileIds.map((id, idx) => ({
+                  type: 'photo',
+                  media: id,
+                  caption: idx === 0 ? instantCaption : undefined
+                }));
+                await ctx.replyWithMediaGroup(mediaGroup, replyOptions);
+                await ctx.reply('✨ Barcha rasmlar yuklab olindi!', { reply_markup: keyboard });
+                db.trackDownload('video');
+                db.trackUserDownload(ctx.from.id, `Rasm Karusel (Instant ⚡)`, 'photo', url);
+                return;
+              }
+            } catch (cacheErr) {
+              // Fallback to normal download if Telegram cached fileId expired
+            }
+          }
+
+          // 2. Normal Download
+          const statusMsg = await ctx.reply('📥 Havola tahlil qilinib, yuklab olinmoqda...', replyOptions);
 
           try {
-            const shortId = Math.random().toString(36).substring(2, 8);
-            urlCache.set(shortId, url);
-
             const mediaResult = await downloader.downloadVideo(url, `dl_inst_${shortId}`);
             const mediaPaths = Array.isArray(mediaResult) ? mediaResult : [mediaResult];
-
-            const botUsername = ctx.me.username;
-            const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
-            const captionText = `❤️ @${botUsername} orqali yuklab olindi 🚀\n\n🍿 Yangi kinolar bepul: @${movieBotUsername}`;
-            
-            const shareText = encodeURIComponent(`Eng tezkor video va musiqa yuklovchi bot! 🚀`);
-            const shareUrl = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${shareText}`;
-            
-            const keyboard = new InlineKeyboard()
-              .text('🎵 Qo\'shiqni yuklab olish (MP3)', `dl_aud:${shortId}`)
-              .row()
-              .url('↪️ Do\'stlarga ulashish', shareUrl)
-              .row()
-              .url('👉 Guruhga qo\'shish ⤴️', `https://t.me/${botUsername}?startgroup=true`);
 
             await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
 
@@ -909,14 +1051,18 @@ function formatDownloadError(err) {
               const isPhoto = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext);
 
               if (isVideo) {
-                await ctx.replyWithVideo(new InputFile(mediaPath), {
+                const sentMsg = await ctx.replyWithVideo(new InputFile(mediaPath), {
                   caption: captionText,
-                  reply_markup: keyboard
+                  reply_markup: keyboard,
+                  ...replyOptions
                 });
+                if (sentMsg && sentMsg.video) {
+                  db.setMediaCache(url, { type: 'video', fileId: sentMsg.video.file_id });
+                }
                 db.trackDownload('video');
                 db.trackUserDownload(ctx.from.id, `Video (havola)`, 'video', url);
 
-                // Cache the downloaded video for 5 minutes for instant audio extraction
+                // Cache the downloaded video for 5 minutes for instant audio/round video extraction
                 localVideoCache.set(shortId, mediaPath);
                 setTimeout(() => {
                   try {
@@ -928,10 +1074,14 @@ function formatDownloadError(err) {
                 }, 5 * 60 * 1000);
 
               } else if (isPhoto) {
-                await ctx.replyWithPhoto(new InputFile(mediaPath), {
+                const sentMsg = await ctx.replyWithPhoto(new InputFile(mediaPath), {
                   caption: captionText,
-                  reply_markup: keyboard
+                  reply_markup: keyboard,
+                  ...replyOptions
                 });
+                if (sentMsg && sentMsg.photo && sentMsg.photo.length > 0) {
+                  db.setMediaCache(url, { type: 'photo', fileId: sentMsg.photo[sentMsg.photo.length - 1].file_id });
+                }
                 db.trackDownload('video');
                 db.trackUserDownload(ctx.from.id, `Rasm (havola)`, 'photo', url);
                 try { fs.unlinkSync(mediaPath); } catch (e) {}
@@ -939,7 +1089,8 @@ function formatDownloadError(err) {
                 // Document fallback
                 await ctx.replyWithDocument(new InputFile(mediaPath), {
                   caption: captionText,
-                  reply_markup: keyboard
+                  reply_markup: keyboard,
+                  ...replyOptions
                 });
                 db.trackDownload('video');
                 db.trackUserDownload(ctx.from.id, `Hujjat (havola)`, 'document', url);
@@ -948,6 +1099,7 @@ function formatDownloadError(err) {
             } else if (mediaPaths.length > 1) {
               // Instagram photo carousel (Multiple photos)
               const chunkSize = 10;
+              let savedFileIds = [];
               for (let i = 0; i < mediaPaths.length; i += chunkSize) {
                 const chunk = mediaPaths.slice(i, i + chunkSize);
                 const mediaGroup = chunk.map((p, idx) => ({
@@ -955,12 +1107,23 @@ function formatDownloadError(err) {
                   media: new InputFile(p),
                   caption: (i === 0 && idx === 0) ? captionText : undefined
                 }));
-                await ctx.replyWithMediaGroup(mediaGroup);
+                const sentGroup = await ctx.replyWithMediaGroup(mediaGroup, replyOptions);
+                if (Array.isArray(sentGroup)) {
+                  sentGroup.forEach(m => {
+                    if (m.photo && m.photo.length > 0) {
+                      savedFileIds.push(m.photo[m.photo.length - 1].file_id);
+                    }
+                  });
+                }
+              }
+              if (savedFileIds.length > 0) {
+                db.setMediaCache(url, { type: 'carousel', fileIds: savedFileIds });
               }
 
               // Send action keyboard at the end
               await ctx.reply('✨ Barcha rasmlar yuklab olindi!', {
-                reply_markup: keyboard
+                reply_markup: keyboard,
+                ...replyOptions
               });
 
               db.trackDownload('video');
