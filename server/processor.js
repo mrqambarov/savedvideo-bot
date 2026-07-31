@@ -67,10 +67,10 @@ function convertToRoundVideo(inputPath, outputName, style = 'circular') {
 
   if (style === 'circular') {
     // 1:1 crop + circular mask blended onto black background using yuv420p format conversion
-    filter = "crop=w='min(iw,ih)':h='min(iw,ih)',format=yuva420p,geq=lum='p(X,Y)':a='st(1,pow(min(W/2,H/2),2))+st(3,pow(X-(W/2),2)+pow(Y-(H/2),2));if(lte(ld(3),ld(1)),255,0)',format=yuv420p";
+    filter = "crop=w='min(iw,ih)':h='min(iw,ih)',scale=480:480,format=yuva420p,geq=lum='p(X,Y)':a='st(1,pow(min(W/2,H/2),2))+st(3,pow(X-(W/2),2)+pow(Y-(H/2),2));if(lte(ld(3),ld(1)),255,0)',format=yuv420p";
   } else {
     // Simple square 1:1 crop (ideal for Telegram sendVideoNote API)
-    filter = "crop=w='min(iw,ih)':h='min(iw,ih)'";
+    filter = "crop=w='min(iw,ih)':h='min(iw,ih)',scale=480:480";
   }
 
   const args = [
@@ -305,7 +305,7 @@ function convertToGif(inputPath, outputName) {
     '-y',
     '-threads', '0',
     '-i', inputPath,
-    '-vf', 'fps=15,scale=480:-1:flags=lanczos',
+    '-vf', 'fps=15,scale=480:-2:flags=lanczos',
     '-an',
     '-c:v', 'libx264',
     '-preset', 'superfast',
