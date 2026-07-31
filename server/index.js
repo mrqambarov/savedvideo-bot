@@ -32,6 +32,49 @@ if (fs.existsSync(clientDist)) {
   });
 }
 
+const { execFile } = require('child_process');
+
+// Auto-Update yt-dlp binary
+function autoUpdateYtDlp() {
+  const isWindows = process.platform === 'win32';
+  const binDir = path.join(__dirname, 'bin');
+  const localYtDlp = path.join(binDir, isWindows ? 'yt-dlp.exe' : 'yt-dlp');
+  const binToRun = fs.existsSync(localYtDlp) ? localYtDlp : 'yt-dlp';
+
+  console.log('[Auto-Update] Checking yt-dlp latest updates...');
+  execFile(binToRun, ['-U'], (err, stdout, stderr) => {
+    if (stdout) console.log('[Auto-Update] yt-dlp:', stdout.trim());
+    if (err) console.error('[Auto-Update] yt-dlp check warning:', err.message);
+  });
+}
+
+// Auto-Backup Database to Admin Telegram Chat
+async function sendDailyBackup() {
+  try {
+    const adminId = process.env.ADMIN_ID;
+    const botInst = bot.getBotInstance();
+    if (!adminId || !botInst) return;
+
+    const dataDir = path.join(__dirname, 'data');
+    const usersFile = path.join(dataDir, 'users.json');
+    const statsFile = path.join(dataDir, 'stats.json');
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    const caption = `💾 **Kunlik Avto-Backup:** (${dateStr})\n📊 Baza ma'lumotlari zaxira nusxasi`;
+
+    const { InputFile } = require('grammy');
+    if (fs.existsSync(usersFile)) {
+      await botInst.api.sendDocument(adminId, new InputFile(usersFile, `users_${dateStr}.json`), { caption });
+    }
+    if (fs.existsSync(statsFile)) {
+      await botInst.api.sendDocument(adminId, new InputFile(statsFile, `stats_${dateStr}.json`));
+    }
+    console.log('[Auto-Backup] Daily backup sent to admin Telegram successfully.');
+  } catch (err) {
+    console.error('[Auto-Backup] Error sending daily backup:', err.message);
+  }
+}
+
 // Start Server
 app.listen(PORT, async () => {
   console.log(`Express API Server running on port ${PORT}`);
@@ -51,15 +94,26 @@ app.listen(PORT, async () => {
     console.error('CRITICAL: Server binaries setup failed:', err.message);
   }
 
+  // Run initial auto-update yt-dlp and schedule every 24 hours
+  autoUpdateYtDlp();
+  setInterval(() => {
+    autoUpdateYtDlp();
+    sendDailyBackup();
+  }, 24 * 60 * 60 * 1000);
+
   // Automatically start Telegram Bot on boot if token is present
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   if (botToken) {
     console.log('TELEGRAM_BOT_TOKEN found. Booting Telegram bot...');
     bot.startBot(botToken)
-      .then(() => console.log('Telegram Bot initialization check completed.'))
+      .then(() => {
+        console.log('Telegram Bot initialization check completed.');
+        // Initial auto-backup send 10 seconds after bot boot
+        setTimeout(sendDailyBackup, 10000);
+      })
       .catch((err) => console.error('Telegram Bot auto-start failed:', err.message));
   } else {
-    console.log('No TELEGRAM_BOT_TOKEN configured. Bot is inactive. Set the token in .env or the web UI to start it.');
+    console.log('No TELEGRAM_BOT_TOKEN configured. Bot is inactive.');
   }
 });
 

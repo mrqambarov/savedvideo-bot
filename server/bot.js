@@ -440,8 +440,64 @@ function startBot(token) {
         .text('❓ Yordam')
         .resized();
 
+      // Send Referral Info & Leaderboard
+      async function sendReferralInfo(ctx) {
+        const userId = ctx.from.id;
+        const info = db.getReferralInfo(userId);
+        const botUsername = ctx.me ? ctx.me.username : (process.env.DOWNLOADER_BOT_USERNAME || 'savemedia_music_bot');
+        const refLink = `https://t.me/${botUsername}?start=ref_${userId}`;
+        const shareText = encodeURIComponent(`🔥 Eng tezkor Instagram, YouTube, TikTok va Pinterest media yuklovchi bot! Test qilib ko'ring:`);
+        const shareUrl = `https://t.me/share/url?url=${refLink}&text=${shareText}`;
+
+        const leaderboard = db.getReferralLeaderboard(10);
+        let leaderText = `🏆 **TOP-10 REFERALLAR (REYTING):**\n\n`;
+        if (leaderboard.length === 0) {
+          leaderText += `*Hali hech kim do'stlarini taklif qilmadi. Birinchi bo'ling!*\n\n`;
+        } else {
+          leaderboard.forEach((u, idx) => {
+            const medal = ['🥇', '🥈', '🥉'][idx] || `${idx + 1}.`;
+            const name = escapeHTML(u.first_name || u.username || 'Foydalanuvchi');
+            leaderText += `${medal} **${name}** — **${u.refCount} ta** taklif\n`;
+          });
+          leaderText += `\n`;
+        }
+
+        const userRankText = info.rank > 0 ? `🏅 Sizning o'rningiz: **${info.rank}-o'rin**` : `🏅 Siz hali reytingda emassiz`;
+
+        const msgText =
+          `${leaderText}` +
+          `🎁 **SIZNING REFERAL MA'LUMOTLARINGIZ:**\n\n` +
+          `👥 Taklif qilgan do'stlaringiz: **${info.refCount} ta**\n` +
+          `${userRankText}\n\n` +
+          `🔗 **Sizning shaxsiy referal havolangiz:**\n\`${refLink}\`\n\n` +
+          `💡 *Ushbu havolani do'stlaringizga yoki guruhlarga ulashing. Har bir faol taklif uchun reytingingiz oshadi!*`;
+
+        const keyboard = new InlineKeyboard()
+          .url('↪️ Do\'stlarga ulashish', shareUrl)
+          .row()
+          .text('🔄 Reytingni yangilash', 'ref_refresh');
+
+        if (ctx.callbackQuery) {
+          try { await ctx.answerCallbackQuery({ text: 'Reyting yangilandi!' }); } catch (e) {}
+          try { return await ctx.editMessageText(msgText, { parse_mode: 'Markdown', reply_markup: keyboard }); } catch (e) {}
+        }
+
+        await ctx.reply(msgText, {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+      }
+
       // Start Command
       botInstance.command('start', (ctx) => {
+        const text = ctx.message.text.trim();
+        let referrerId = null;
+        if (text.includes('ref_')) {
+          const parts = text.split('ref_');
+          if (parts[1]) referrerId = parseInt(parts[1], 10);
+        }
+        db.upsertUser(ctx.from, referrerId);
+
         const keyboard = new InlineKeyboard()
           .text('🇺🇿 O\'zbekcha', 'set_lang:uz')
           .text('🇷🇺 Русский', 'set_lang:ru')
@@ -838,6 +894,10 @@ function startBot(token) {
           return await sendStatsReport(ctx);
         }
 
+        if (data === 'ref_refresh') {
+          return await sendReferralInfo(ctx);
+        }
+
         if (data.startsWith('adm_ban:')) {
           if (!isAdmin(ctx.from.id)) return await ctx.answerCallbackQuery({ text: 'Siz admin emassiz!', show_alert: true });
           const targetId = data.split(':')[1];
@@ -858,7 +918,7 @@ function startBot(token) {
       });
 
       // Referral / contest command
-      botInstance.command('referal', async (ctx) => {
+      botInstance.command(['referal', 'leaderboard', 'topref'], async (ctx) => {
         await sendReferralInfo(ctx);
       });
 
