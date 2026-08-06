@@ -368,30 +368,33 @@ body {
 }
 
 /* Genre Filter Chips Bar */
-.genre-chips-container {
+.genre-chips-container, .genre-chips-scroll {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
   padding: 0 50px;
-  margin-bottom: 35px;
+  margin-bottom: 24px;
   overflow-x: auto;
   scrollbar-width: none;
 }
 
 @media (max-width: 768px) {
-  .genre-chips-container {
+  .genre-chips-container, .genre-chips-scroll {
     padding: 0 20px;
   }
 }
 
 .genre-chip {
-  padding: 10px 22px;
-  background: rgba(255, 255, 255, 0.04);
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 18px;
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-glass);
-  border-radius: 30px;
+  border-radius: 99px;
   color: var(--text-secondary);
   font-family: var(--font-title);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;

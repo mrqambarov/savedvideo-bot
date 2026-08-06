@@ -5,8 +5,8 @@ export function nf(n) {
 
 export function shortNum(n) {
   const v = Number(n) || 0;
-  if (v >= 1_000_000) return (v / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
-  if (v >= 1_000) return (v / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+  if (v >= 1000000) return (v / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (v >= 1000) return (v / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
   return String(v);
 }
 
@@ -38,8 +38,8 @@ export function timeAgo(iso) {
 
 // Deterministic avatar color from a string.
 const AV_COLORS = [
-  ['#6366f1', '#8b5cf6'], ['#0ea5e9', '#22d3ee'], ['#10b981', '#34d399'],
-  ['#f59e0b', '#fbbf24'], ['#ef4444', '#f87171'], ['#ec4899', '#f472b6'],
+  ['#8b5cf6', '#a855f7'], ['#0ea5e9', '#22d3ee'], ['#10b981', '#34d399'],
+  ['#f97316', '#fbbf24'], ['#ef4444', '#f87171'], ['#ec4899', '#f472b6'],
   ['#8b5cf6', '#c084fc'], ['#14b8a6', '#2dd4bf'],
 ];
 export function avatarColor(seed) {

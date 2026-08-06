@@ -204,9 +204,13 @@ export default function App() {
     try {
       const res = await axios.post(`${API_BASE}/login`, { password: passwordInput });
       if (res.data.token) {
+        localStorage.setItem('dlToken', res.data.token);
+        localStorage.setItem('movieToken', res.data.token);
         localStorage.setItem('movieAdminToken', res.data.token);
         setIsAuthenticated(true);
         setLoginError('');
+        setShowAdminModal(false);
+        window.location.href = '/';
       }
     } catch (err) {
       setLoginError('Parol noto\'g\'ri');
@@ -264,8 +268,8 @@ export default function App() {
             🤖 TELEGRAM BOT
           </a>
 
-          <button className="btn-outline-site" onClick={() => setShowAdminModal(true)}>
-            ⚙️ {isAuthenticated ? 'Admin' : 'Kirish'}
+          <button className="btn-outline-site" onClick={() => { if (isAuthenticated) { window.location.href = '/'; } else { setShowAdminModal(true); } }}>
+            ⚙️ {isAuthenticated ? 'Admin Panel' : 'Kirish'}
           </button>
         </div>
       </header>

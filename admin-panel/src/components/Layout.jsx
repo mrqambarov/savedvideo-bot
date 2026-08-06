@@ -1,44 +1,46 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, BarChart3, Film, Inbox, Megaphone, Radio,
-  Download, Bot, Settings, Menu, Moon, Sun, LogOut, Sparkles, Gift, Users as UsersIcon,
+  LayoutDashboard, Film, Inbox, Megaphone, Radio,
+  Download, Bot, Settings, Menu, Moon, Sun, LogOut, Sparkles, Gift, Users as UsersIcon, Clapperboard, X, Tv
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
 import { movieApi, safe } from '../lib/api.js';
 
 const NAV = [
-  { section: 'Umumiy' },
+  { section: 'MEDIA STUDIO' },
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/analytics', label: 'Analitika', icon: BarChart3 },
-  { to: '/users', label: 'Foydalanuvchilar', icon: UsersIcon },
-  { section: 'Kino bot' },
-  { to: '/movies', label: 'Kinolar', icon: Film },
+  { to: '/movies', label: '🎬 Kino Katalogi', icon: Film },
+  { to: '/serials', label: '📺 Seriallar & Epizodlar', icon: Tv },
   { to: '/ai-publisher', label: '✨ AI Publisher', icon: Sparkles },
-  { to: '/requests', label: "So'rovlar", icon: Inbox, badge: 'requests' },
-  { section: 'Boshqaruv' },
-  { to: '/broadcast', label: 'Broadcast', icon: Megaphone },
-  { to: '/referrals', label: 'Konkurs / Referal', icon: Gift },
-  { to: '/channels', label: 'Homiy kanallar', icon: Radio },
-  { section: 'Botlar' },
-  { to: '/downloader', label: 'Downloader Bot', icon: Download },
-  { to: '/movie-bot', label: 'Kino Bot', icon: Bot },
-  { to: '/settings', label: 'Sozlamalar', icon: Settings },
+  { to: '/requests', label: "📝 Kino So'rovlari", icon: Inbox, badge: 'requests' },
+  { section: 'TAHLIL & FOYDALANUVCHILAR' },
+  { to: '/analytics', label: '📊 Analitika', icon: UsersIcon },
+  { to: '/users', label: '👥 Foydalanuvchilar', icon: UsersIcon },
+  { to: '/referrals', label: '🎁 Referal & Konkurs', icon: Gift },
+  { section: 'MARKETING & KANALLAR' },
+  { to: '/broadcast', label: '📢 Broadcast Messenger', icon: Megaphone },
+  { to: '/channels', label: '📡 Homiy Kanallar (CPA)', icon: Radio },
+  { section: 'TIZIM & BOTLAR' },
+  { to: '/downloader', label: '📥 Downloader Bot', icon: Download },
+  { to: '/movie-bot', label: '🤖 Kino Bot Studio', icon: Bot },
+  { to: '/settings', label: '⚙️ Tizim Sozlamalari', icon: Settings },
 ];
 
 const TITLES = {
-  '/': ['Dashboard', 'Ikkala botning umumiy holati'],
-  '/analytics': ['Analitika', "Foydalanuvchilar va faollik tahlili"],
-  '/users': ['Foydalanuvchilar', "Bloklash va shaxsiy xabar yuborish"],
-  '/movies': ['Kinolar', 'Kino katalogini boshqarish'],
-  '/ai-publisher': ['✨ AI Publisher', '1-Click AI Kino va Social Promo Generator'],
-  '/requests': ["So'rovlar", "Foydalanuvchi kino so'rovlari"],
-  '/broadcast': ['Broadcast', 'Ommaviy xabar yuborish'],
-  '/referrals': ['Konkurs / Referal', "Do'st taklif qilish reytingi va g'olib tanlash"],
-  '/channels': ['Homiy kanallar', 'Majburiy obuna kanallari'],
-  '/downloader': ['Downloader Bot', 'Video yuklovchi bot sozlamalari'],
-  '/movie-bot': ['Kino Bot', 'Kino bot sozlamalari'],
-  '/settings': ['Sozlamalar', 'Panel sozlamalari'],
+  '/': ['Media Studio Dashboard', 'Real-vaqt server va botlar monitoringi'],
+  '/analytics': ['Analitika & Tahlil', 'Foydalanuvchilar va yuklamalar statistikasi'],
+  '/users': ['Foydalanuvchilar Ro\'yxati', 'Foydalanuvchilar katalogi va profillari'],
+  '/movies': ['🎬 Kino Katalogi', 'Kinolar va meta-ma\'lumotlarini boshqarish'],
+  '/serials': ['📺 Seriallar & Epizodlar', 'Serial qismlari va epizodlarni boshqarish'],
+  '/ai-publisher': ['✨ AI Publisher', '1-Click AI Kino Post & Promo Generator'],
+  '/requests': ["📝 Kino So'rovlari", "Foydalanuvchilar so'ragan kinolar va holat"],
+  '/broadcast': ['📢 Broadcast Messenger', 'Tugmali reklama va xabarlar yuborish'],
+  '/referrals': ['🎁 Referal & Konkurs', "Do'st taklif qilish va g'oliblar reytingi"],
+  '/channels': ['📡 Homiy Kanallar', 'Majburiy obuna va CPA rotatsiyasi'],
+  '/downloader': ['📥 Downloader Bot Studio', 'Video, audio va dumaloq video sozlamalari'],
+  '/movie-bot': ['🤖 Kino Bot Studio', 'Kino bot va qidiruv sozlamalari'],
+  '/settings': ['⚙️ Tizim Sozlamalari', 'Parol, backup va PM2 botlarni boshqarish'],
 };
 
 export default function Layout({ children }) {
@@ -58,70 +60,86 @@ export default function Layout({ children }) {
       }
     };
     load();
-    const t = setInterval(load, 30000);
+    const t = setInterval(load, 25000);
     return () => { alive = false; clearInterval(t); };
   }, [loc.pathname]);
 
-  const [title, sub] = TITLES[loc.pathname] || ['Boshqaruv Paneli', ''];
+  const [title, sub] = TITLES[loc.pathname] || ['Cinema Media Studio', ''];
   const badges = { requests: pending };
 
   return (
     <div className="app-shell">
+      {open && <div className="modal-overlay" style={{ zIndex: 45 }} onClick={() => setOpen(false)} />}
+
       <aside className={`sidebar ${open ? 'open' : ''}`}>
-        <div className="sidebar-brand">
-          <div className="logo"><Sparkles size={20} /></div>
-          <div>
-            Admin Panel
-            <small>VibeConvert · Kino</small>
+        <div className="sidebar-header" style={{ justifyContent: 'space-between' }}>
+          <div className="flex gap" style={{ alignItems: 'center' }}>
+            <div className="brand-logo"><Clapperboard size={20} color="#ffffff" /></div>
+            <div className="brand-text">
+              <h1>Cinema Studio</h1>
+              <span>Media Admin 2026</span>
+            </div>
           </div>
+          {open && (
+            <button className="icon-btn" onClick={() => setOpen(false)} style={{ border: 'none', background: 'none' }}>
+              <X size={18} />
+            </button>
+          )}
         </div>
-        <nav className="nav-section">
+
+        <nav className="sidebar-nav">
           {NAV.map((item, i) =>
             item.section ? (
-              <div key={`s${i}`} className="nav-label">{item.section}</div>
+              <div key={`s${i}`} className="nav-group-label">{item.section}</div>
             ) : (
-              <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                <item.icon size={18} />
-                <span>{item.label}</span>
-                {item.badge && badges[item.badge] > 0 && <span className="badge-count">{badges[item.badge]}</span>}
-              </NavLink>
+              <div key={item.to} className="nav-item">
+                <NavLink to={item.to} end={item.end} className={({ isActive }) => (isActive ? 'active' : '')}>
+                  <item.icon size={18} />
+                  <span>{item.label}</span>
+                  {item.badge && badges[item.badge] > 0 && <span className="badge-count">{badges[item.badge]}</span>}
+                </NavLink>
+              </div>
             )
           )}
         </nav>
+
         <div className="sidebar-footer">
-          <div className="sidebar-avatar">
-            SA
-            <span className="status-dot" title="Faol Admin"></span>
+          <div className="user-avatar">SA</div>
+          <div className="user-info">
+            <div className="user-name">Super Admin</div>
+            <div className="user-role">ID: 6263659922</div>
           </div>
-          <div className="sidebar-user-info">
-            <div className="sidebar-user-name">Super Admin</div>
-            <div className="sidebar-user-role">
-              <span>ID: 6263659922</span>
-            </div>
-          </div>
-          <button className="sidebar-logout-btn" onClick={logout} title="Tizimdan chiqish">
+          <button className="icon-btn" onClick={logout} title="Tizimdan chiqish">
             <LogOut size={16} />
           </button>
         </div>
       </aside>
 
-      <div className={`backdrop ${open ? 'show' : ''}`} onClick={() => setOpen(false)} />
-
-      <div className="main">
-        <header className="topbar">
-          <button className="icon-btn menu-toggle" onClick={() => setOpen((o) => !o)}><Menu size={20} /></button>
-          <div>
-            <h1>{title}</h1>
-            {sub && <div className="topbar-sub">{sub}</div>}
+      <div className="main-content">
+        <header className="top-bar">
+          <div className="flex gap" style={{ alignItems: 'center' }}>
+            <button className="icon-btn mobile-menu-toggle" onClick={() => setOpen(!open)} style={{ marginRight: 10 }} title="Menyu">
+              <Menu size={20} />
+            </button>
+            <div className="top-bar-title">
+              <h2>{title}</h2>
+              {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{sub}</div>}
+            </div>
           </div>
-          <div className="topbar-actions">
+          <div className="top-bar-actions">
+            <div className="cinema-badge-pill">
+              <span>● LIVE CINEMA SERVER</span>
+            </div>
             <button className="icon-btn" onClick={toggleTheme} title="Mavzuni almashtirish">
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            <button className="icon-btn" onClick={logout} title="Chiqish"><LogOut size={18} /></button>
+            <button className="icon-btn" onClick={logout} title="Chiqish">
+              <LogOut size={18} />
+            </button>
           </div>
         </header>
-        <main className="page">{children}</main>
+
+        <main className="page-body">{children}</main>
       </div>
     </div>
   );

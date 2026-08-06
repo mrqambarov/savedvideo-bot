@@ -70,9 +70,9 @@ const BASE_NET_ARGS = [
  */
 async function fallbackCobaltDownload(url, outputName, isAudio = false, quality = '720') {
   const cobaltEndpoints = [
-    'https://api.cobalt.tools/api/json',
+    'https://api.cobalt.tools/',
     'https://co.wuk.sh/api/json',
-    'https://cobalt-api.kwippy.com/api/json'
+    'https://cobalt.kwippy.com/'
   ];
 
   for (const endpoint of cobaltEndpoints) {
@@ -90,38 +90,42 @@ async function fallbackCobaltDownload(url, outputName, isAudio = false, quality 
           'Content-Type': 'application/json',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
         },
-        timeout: 12000
+        timeout: 15000
       });
 
       const data = res.data;
-      if (data && (data.url || (data.picker && data.picker.length > 0))) {
-        let downloadUrl = data.url;
-        if (!downloadUrl && data.picker && data.picker.length > 0) {
+      let downloadUrl = null;
+      if (data) {
+        if (typeof data.url === 'string' && data.url) {
+          downloadUrl = data.url;
+        } else if (Array.isArray(data.picker) && data.picker.length > 0) {
           downloadUrl = data.picker[0].url;
+        } else if (data.status === 'redirect' || data.status === 'tunnel') {
+          downloadUrl = data.url;
         }
+      }
 
-        if (downloadUrl) {
-          const ext = isAudio ? '.mp3' : (data.filename ? path.extname(data.filename) || '.mp4' : '.mp4');
-          const destPath = path.join(tempDir, `${outputName}${ext.startsWith('.') ? ext : '.' + ext}`);
+      if (downloadUrl) {
+        const ext = isAudio ? '.mp3' : '.mp4';
+        const destPath = path.join(tempDir, `${outputName}${ext}`);
 
-          const streamRes = await axios({
-            method: 'GET',
-            url: downloadUrl,
-            responseType: 'stream',
-            timeout: 60000
-          });
+        const streamRes = await axios({
+          method: 'GET',
+          url: downloadUrl,
+          responseType: 'stream',
+          timeout: 90000
+        });
 
-          const writer = fs.createWriteStream(destPath);
-          streamRes.data.pipe(writer);
+        const writer = fs.createWriteStream(destPath);
+        streamRes.data.pipe(writer);
 
-          await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-          });
+        await new Promise((resolve, reject) => {
+          writer.on('finish', resolve);
+          writer.on('error', reject);
+        });
 
-          if (fs.existsSync(destPath) && fs.statSync(destPath).size > 0) {
-            return destPath;
-          }
+        if (fs.existsSync(destPath) && fs.statSync(destPath).size > 0) {
+          return destPath;
         }
       }
     } catch (e) {
@@ -200,15 +204,10 @@ async function getInfo(url) {
  */
 async function downloadVideo(url, outputName, quality = '720') {
   const templatePath = path.join(tempDir, `${outputName}.%(ext)s`);
-  let formatFilter = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[ext=mp4]/best';
-
-  if (quality === '1080') {
-    formatFilter = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[ext=mp4]/best';
-  } else if (quality === '480') {
-    formatFilter = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best[ext=mp4]/best';
-  } else if (quality === '360') {
-    formatFilter = 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[ext=mp4]/best';
-  }
+  const targetHeight = parseInt(quality, 10) || 720;
+  
+  // Prioritize H.264/AAC for speed and native playback, but allow any best stream if needed
+  const formatFilter = `bestvideo[height<=${targetHeight}][vcodec^=avc1]+bestaudio[acodec^=mp4a]/bestvideo[height<=${targetHeight}]+bestaudio/best[height<=${targetHeight}]/best`;
 
   const cookiesArgs = getCookiesArgs();
   const ytDlpBin = getYtDlpBin();
@@ -220,6 +219,7 @@ async function downloadVideo(url, outputName, quality = '720') {
         const args = [
           '-f', formatFilter,
           '--merge-output-format', 'mp4',
+          '--recode-video', 'mp4',
           '--no-playlist',
           ...BASE_NET_ARGS,
           ...strategyArgs,
@@ -240,9 +240,20 @@ async function downloadVideo(url, outputName, quality = '720') {
 
           try {
             const files = fs.readdirSync(tempDir);
-            const matched = files.find(f => f.startsWith(outputName));
-            if (matched) {
-              resolve(path.join(tempDir, matched));
+            const validFiles = files.filter(f => {
+              if (!f.startsWith(outputName)) return false;
+              const ext = path.extname(f).toLowerCase();
+              if (['.part', '.ytdl', '.tmp', '.temp'].includes(ext)) return false;
+              const fullPath = path.join(tempDir, f);
+              try {
+                return fs.statSync(fullPath).size > 0;
+              } catch (e) {
+                return false;
+              }
+            });
+
+            if (validFiles.length > 0) {
+              resolve(path.join(tempDir, validFiles[0]));
             } else {
               downloadPhoto(url, outputName).then(resolve).catch(() => reject(new Error('Downloaded media file not found.')));
             }

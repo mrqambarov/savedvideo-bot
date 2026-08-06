@@ -1,9 +1,5 @@
 import axios from 'axios';
 
-// In production the panel is served from the same origin as the bots (behind nginx):
-//   downloader API  ->  /api          (nginx location / -> :5000)
-//   movie API       ->  /movies/api   (nginx location /movies/ -> :5001)
-// In local dev we hit the VPS directly (CORS is enabled on both servers).
 const DEV_HOST = 'http://94.237.103.133';
 const isDev = import.meta.env.DEV;
 
@@ -24,7 +20,6 @@ function attach(instance, key) {
       if (err.response && err.response.status === 401) {
         localStorage.removeItem(TOKENS.dl);
         localStorage.removeItem(TOKENS.movie);
-        // let the app react (AuthContext listens on storage / reloads)
         window.dispatchEvent(new Event('auth-expired'));
       }
       return Promise.reject(err);
@@ -34,7 +29,6 @@ function attach(instance, key) {
 attach(dlApi, 'dl');
 attach(movieApi, 'movie');
 
-// Single login: same ADMIN_PASSWORD authenticates both bots.
 export async function login(password) {
   const [dl, movie] = await Promise.allSettled([
     dlApi.post('/login', { password }),
@@ -61,7 +55,6 @@ export function isLoggedIn() {
   return !!(localStorage.getItem(TOKENS.dl) || localStorage.getItem(TOKENS.movie));
 }
 
-// Convenience wrappers that never throw — return { data, error }.
 export async function safe(promise) {
   try {
     const res = await promise;

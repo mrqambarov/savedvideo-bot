@@ -503,6 +503,36 @@ router.post('/channels', (req, res) => {
   }
 });
 
+router.post('/test-channel', async (req, res) => {
+  try {
+    const { username } = req.body;
+    if (!username) return res.status(400).json({ error: "Username kiritilmadi" });
+    const bot = require('./bot').getBotInstance();
+    if (!bot) return res.status(500).json({ error: "Bot faol emas" });
+    
+    let clean = username.trim();
+    if (!clean.startsWith('@') && !clean.startsWith('-100')) {
+      clean = '@' + clean;
+    }
+    const member = await bot.api.getChatMember(clean, bot.botInfo.id);
+    const isAdmin = member.status === 'administrator' || member.status === 'creator';
+    res.json({
+      success: true,
+      isAdmin,
+      status: member.status,
+      message: isAdmin 
+        ? `✅ Bot "${clean}" kanalida ADMIN!` 
+        : `⚠️ Bot "${clean}" kanalida a'zo (${member.status}), lekin ADMIN emas!`
+    });
+  } catch (err) {
+    res.json({
+      success: false,
+      isAdmin: false,
+      error: `❌ Kanal tekshirishda xato: ${err.message}. Botni kanalga ADMIN qiling!`
+    });
+  }
+});
+
 // 3. Process Upload (Circular Video, Audio Extract, Effects, Identify, Trim, Speed, Audio-to-Round)
 router.post('/process-upload', upload.single('file'), async (req, res) => {
   if (!req.file) {

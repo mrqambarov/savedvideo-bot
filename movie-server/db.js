@@ -638,14 +638,36 @@ function saveRequests(requests) {
   }
 }
 
-function addRequest(userId, username, title) {
+function addRequest(userId, usernameOrUserObj, titleArg) {
   try {
+    let userIdVal = userId;
+    let usernameVal = typeof usernameOrUserObj === 'string' ? usernameOrUserObj : null;
+    let firstNameVal = null;
+    let titleVal = typeof usernameOrUserObj === 'string' ? titleArg : usernameOrUserObj;
+
+    if (typeof userId === 'object' && userId !== null) {
+      userIdVal = userId.id;
+      usernameVal = userId.username;
+      firstNameVal = userId.first_name;
+      titleVal = usernameOrUserObj;
+    }
+
+    if (!usernameVal || usernameVal === 'Noma\'lum') {
+      const users = getUsers();
+      const found = users.find(u => Number(u.id) === Number(userIdVal));
+      if (found) {
+        usernameVal = found.username ? (found.username.startsWith('@') ? found.username : '@' + found.username) : null;
+        firstNameVal = firstNameVal || found.first_name;
+      }
+    }
+
     const requests = getRequests();
     const newRequest = {
       id: Math.random().toString(36).substring(2, 9),
-      userId,
-      username: username || 'Noma\'lum',
-      title: title.trim(),
+      userId: userIdVal,
+      username: usernameVal || null,
+      firstName: firstNameVal || null,
+      title: (titleVal || '').trim(),
       status: 'pending',
       dateRequested: new Date().toISOString()
     };

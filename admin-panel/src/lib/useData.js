@@ -1,52 +1,52 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { dlApi, movieApi, safe } from './api.js';
 
-// Poll both bots' /stats endpoints. Returns combined state.
-export function useStats(intervalMs = 20000) {
+export function useResource(apiCall, interval = 0) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(async () => {
+    const { data: res, error: err } = await safe(apiCall());
+    if (err) setError(err);
+    else setData(res);
+    setLoading(false);
+  }, [apiCall]);
+
+  useEffect(() => {
+    load();
+    if (interval > 0) {
+      const timer = setInterval(load, interval);
+      return () => clearInterval(timer);
+    }
+  }, [load, interval]);
+
+  return { data, loading, error, reload: load };
+}
+
+export function useStats() {
   const [dl, setDl] = useState(null);
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updatedAt, setUpdatedAt] = useState(null);
-  const first = useRef(true);
 
   const load = useCallback(async () => {
-    const [d, m] = await Promise.all([safe(dlApi.get('/stats')), safe(movieApi.get('/stats'))]);
-    if (d.data) setDl(d.data);
-    if (m.data) setMovie(m.data);
+    setLoading(true);
+    const [dlRes, movieRes] = await Promise.allSettled([
+      safe(dlApi.get('/stats')),
+      safe(movieApi.get('/stats')),
+    ]);
+
+    if (dlRes.status === 'fulfilled' && dlRes.value.data) setDl(dlRes.value.data);
+    if (movieRes.status === 'fulfilled' && movieRes.value.data) setMovie(movieRes.value.data);
+    
     setUpdatedAt(new Date());
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    if (first.current) { first.current = false; load(); }
-    const t = setInterval(load, intervalMs);
-    return () => clearInterval(t);
-  }, [load, intervalMs]);
+    load();
+  }, [load]);
 
   return { dl, movie, loading, updatedAt, reload: load };
-}
-
-// Generic polled resource.
-export function useResource(fetcher, intervalMs = 0, deps = []) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const fRef = useRef(fetcher);
-  fRef.current = fetcher;
-
-  const load = useCallback(async () => {
-    const { data } = await safe(fRef.current());
-    setData(data);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    load();
-    if (intervalMs > 0) {
-      const t = setInterval(load, intervalMs);
-      return () => clearInterval(t);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-
-  return { data, loading, reload: load, setData };
 }

@@ -22,6 +22,11 @@ function warnSponsorCheck(channel, err) {
   console.error(`Sponsor check failed for ${channel}: ${err.message}. Botni "${channel}" kanaliga ADMIN qiling — getChatMember shuni talab qiladi.`);
 }
 
+function escapeHTML(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function getActiveSponsorChannel() {
   try {
     const active = sponsorManager.getActiveSponsorChannel();
@@ -110,6 +115,7 @@ function startBot(token) {
 
         const activeChannel = getActiveSponsorChannel();
         if (activeChannel) {
+          if (!ctx.from) return await next();
           try {
             const chatMember = await ctx.api.getChatMember(activeChannel.username, ctx.from.id);
             const isMember = ['creator', 'administrator', 'member', 'restricted'].includes(chatMember.status);
@@ -125,8 +131,8 @@ function startBot(token) {
                 .text('🔄 A\'zolikni Tekshirish', 'chk_sub');
 
               return await ctx.reply(
-                `⚠️ **Botdan foydalanish uchun kanalimizga a'zo bo'ling!**\n\n📢 ${activeChannel.username}\n\nA'zo bo'lgach, "A'zolikni Tekshirish" tugmasini bosing — bot so'rovingizni darhol bajaradi.`,
-                { parse_mode: 'Markdown', reply_markup: keyboard }
+                `⚠️ <b>Botdan foydalanish uchun kanalimizga a'zo bo'ling!</b>\n\n📢 ${escapeHTML(activeChannel.username)}\n\nA'zo bo'lgach, "A'zolikni Tekshirish" tugmasini bosing — bot so'rovingizni darhol bajaradi.`,
+                { parse_mode: 'HTML', reply_markup: keyboard }
               );
             }
           } catch (err) {
@@ -209,7 +215,7 @@ function startBot(token) {
           `• Kino kodini (masalan: 101) yuboring -> Kino yuklab beriladi.\n` +
           `• Kino nomini yozing -> Kino nomiga qarab qidiriladi.\n` +
           `• Janrlar bo'yicha qidirish uchun **🗂 Janrlar** tugmasini bosing.`,
-          { reply_markup: mainKeyboard }
+          { reply_markup: getMainKeyboard(db.getUserLang(ctx.from.id)) }
         );
       });
 
@@ -786,7 +792,7 @@ function startBot(token) {
           if (title.length < 2) {
             return await ctx.reply('⚠️ Kino nomi juda qisqa. Qaytadan urinib ko\'ring.');
           }
-          const request = db.addRequest(userId, ctx.from.username, title);
+          const request = db.addRequest(ctx.from, title);
           if (request) {
             return await ctx.reply(
               `✅ **Buyurtmangiz muvaffaqiyatli qabul qilindi!**\n\n` +
@@ -935,8 +941,23 @@ function startBot(token) {
             `❓ **Yordam bo'limi:**\n\n` +
             `• Kino kodini (masalan: 101) yuboring -> Kino yuklab beriladi.\n` +
             `• Kino nomini yozing -> Kino nomiga qarab qidiriladi.`,
-            { reply_markup: mainKeyboard }
+            { reply_markup: getMainKeyboard(db.getUserLang(ctx.from.id)) }
           );
+        }
+
+        // /serial [kod] — serial qismlarini ko'rsatish
+        if (text.startsWith('/serial')) {
+          const parts = text.trim().split(/\s+/);
+          const serialCode = parts[1];
+          if (!serialCode) {
+            return await ctx.reply('⚠️ Format: `/serial [kod]` — masalan: `/serial 200`', { parse_mode: 'Markdown' });
+          }
+          const serialMovie = db.getMovieByCode(serialCode);
+          if (!serialMovie) {
+            return await ctx.reply(`❌ \`${serialCode}\` kodli serial topilmadi. Kodni to'g'ri yozdingizmi?`, { parse_mode: 'Markdown' });
+          }
+          db.trackMovieView(serialCode);
+          return await sendMovie(ctx, serialMovie);
         }
 
         // Handle slash commands in message:text handler
@@ -1369,7 +1390,7 @@ function startBot(token) {
 
         if (data.startsWith('req_title:')) {
           const title = data.split(':')[1];
-          const request = db.addRequest(ctx.from.id, ctx.from.username, title);
+          const request = db.addRequest(ctx.from, title);
           if (request) {
             await ctx.reply(
               `✅ **Buyurtmangiz muvaffaqiyatli qabul qilindi!**\n\n` +

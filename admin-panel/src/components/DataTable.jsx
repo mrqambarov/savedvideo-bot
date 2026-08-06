@@ -2,11 +2,6 @@ import { useState, useMemo } from 'react';
 import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Empty } from './ui.jsx';
 
-/**
- * columns: [{ key, label, sortable, render?(row), value?(row), width, align }]
- * rows: array of objects
- * searchKeys: array of keys to search across (falls back to column keys)
- */
 export default function DataTable({
   columns,
   rows,

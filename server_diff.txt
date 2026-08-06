@@ -1,0 +1,831 @@
+﻿diff --git a/server/api.js b/server/api.js
+index 622bd9d..b61a58f 100644
+--- a/server/api.js
++++ b/server/api.js
+@@ -905,6 +905,11 @@ router.get('/system-health', authMiddleware, (req, res) => {
+       uptime: uptimeStr,
+       status: 'healthy'
+     });
++  } catch (err) {
++    res.status(500).json({ error: err.message });
++  }
++});
++
+ // Platform Smart Analytics Endpoint
+ router.get('/platform-analytics', authMiddleware, (req, res) => {
+   try {
+diff --git a/server/bot.js b/server/bot.js
+index 68cc476..a6a56a6 100644
+--- a/server/bot.js
++++ b/server/bot.js
+@@ -986,13 +986,14 @@ function startBot(token) {
+  */
+ function formatDownloadError(err) {
+   const errMsg = err.message || '';
+-  if (errMsg.includes('429') || errMsg.includes('confirm you\'re not a bot') || errMsg.includes('Too Many Requests')) {
+-    return `тЪая╕П <b>YouTube yuklashni chekladi (HTTP 429: Too Many Requests)</b>\n\n` +
+-           `Ushbu muammoni hal qilish uchun:\n` +
+-           `1. VPN o'chiring yoki internetingizni o'chirib-yoqing (yangi IP olish uchun).\n` +
+-           `2. Yoki loyiha papkasiga brauzer kuki faylini (<b>cookies.txt</b>) joylashtiring.`;
++  if (errMsg.includes('429') || errMsg.includes('confirm you\'re not a bot') || errMsg.includes('Too Many Requests') || errMsg.includes('Sign in')) {
++    return `тЪая╕П <b>YouTube / Instagram IP cheklovi (HTTP 429: Bot Detection)</b>\n\n` +
++           `Ushbu havolani yuklashda server IP chekloviga duch kelindi.\n\n` +
++           `ЁЯТб <b>Muammoni hal qilish yo'li:</b>\n` +
++           `тАв Server loyiha papkasiga <code>cookies.txt</code> faylini joylashtiring.\n` +
++           `тАв Yoki bir ozdan so'ng qayta urinib ko'ring.`;
+   }
+-  return `тЭМ <b>Yuklashda xatolik yuz berdi:</b>\n${escapeHTML(errMsg.substring(0, 150))}`;
++  return `тЭМ <b>Yuklashda xatolik yuz berdi:</b>\n${escapeHTML(errMsg.substring(0, 180))}`;
+ }
+ 
+       // Listen for text (links and search queries)
+@@ -1545,8 +1546,11 @@ function formatDownloadError(err) {
+               }
+             }
+           } catch (err) {
+-            console.error(err);
+-            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `тЭМ Musiqa ajratishda xatolik: ${err.message.substring(0, 100)}`);
++            console.error('Audio extraction error:', err.message);
++            const userErrStr = err.message.includes('ovoz') || err.message.includes('audio') || err.message.includes('musiqa')
++              ? err.message
++              : 'Ushbu videoda musiqa (ovoz) treki mavjud emas.';
++            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `тЪая╕П ${userErrStr}`);
+           }
+         }
+ 
+diff --git a/server/db.js b/server/db.js
+index 5c39bd6..361a558 100644
+--- a/server/db.js
++++ b/server/db.js
+@@ -601,22 +601,26 @@ function getPlatformAnalytics() {
+       }
+     });
+ 
+-    const total = (instagram + tiktok + youtube + other) || 3000;
++    const total = instagram + tiktok + youtube + other;
+     const platforms = [
+-      { name: 'Instagram', value: instagram || 1420, percent: Math.round(((instagram || 1420) / total) * 100), color: '#e1306c' },
+-      { name: 'TikTok', value: tiktok || 1100, percent: Math.round(((tiktok || 1100) / total) * 100), color: '#00f2fe' },
+-      { name: 'YouTube', value: youtube || 480, percent: Math.round(((youtube || 480) / total) * 100), color: '#ff0000' },
+-      { name: 'Boshqalar', value: other || 150, percent: Math.round(((other || 150) / total) * 100), color: '#8b5cf6' }
++      { name: 'Instagram', value: instagram, percent: total > 0 ? Math.round((instagram / total) * 100) : 0, color: '#e1306c' },
++      { name: 'TikTok', value: tiktok, percent: total > 0 ? Math.round((tiktok / total) * 100) : 0, color: '#00f2fe' },
++      { name: 'YouTube', value: youtube, percent: total > 0 ? Math.round((youtube / total) * 100) : 0, color: '#ff0000' },
++      { name: 'Boshqalar', value: other, percent: total > 0 ? Math.round((other / total) * 100) : 0, color: '#8b5cf6' }
+     ];
+ 
+-    const topUsers = [...users]
+-      .map(u => ({
+-        id: u.id,
+-        name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Foydalanuvchi',
+-        username: u.username ? '@' + u.username : 'Mavjud emas',
+-        downloads: u.history ? u.history.length : (u.downloadsCount || Math.floor(Math.random() * 40 + 10)),
+-        lastActive: u.lastActive ? u.lastActive.substring(0, 10) : 'Bugun'
+-      }))
++    const topUsers = users
++      .filter(u => u.history && u.history.length > 0)
++      .map(u => {
++        const fullName = `${u.first_name || u.firstName || ''} ${u.last_name || u.lastName || ''}`.trim();
++        return {
++          id: u.id,
++          name: fullName || (u.username ? '@' + u.username.replace(/^@/, '') : 'Foydalanuvchi'),
++          username: u.username ? '@' + u.username.replace(/^@/, '') : 'Mavjud emas',
++          downloads: u.history ? u.history.length : 0,
++          lastActive: u.lastSeen ? u.lastSeen.substring(0, 10) : (u.dateJoined ? u.dateJoined.substring(0, 10) : 'Bugun')
++        };
++      })
+       .sort((a, b) => b.downloads - a.downloads)
+       .slice(0, 10);
+ 
+diff --git a/server/downloader.js b/server/downloader.js
+index 8f3e0ac..399c494 100644
+--- a/server/downloader.js
++++ b/server/downloader.js
+@@ -1,17 +1,30 @@
+ const { execFile } = require('child_process');
+ const path = require('path');
+ const fs = require('fs');
++const axios = require('axios');
+ 
+ const isWindows = process.platform === 'win32';
+ const binDir = path.join(__dirname, 'bin');
+ const localYtDlp = path.join(binDir, isWindows ? 'yt-dlp.exe' : 'yt-dlp');
+-const ytDlpPath = fs.existsSync(localYtDlp) ? localYtDlp : 'yt-dlp';
+ const tempDir = path.join(__dirname, 'temp');
+ 
+-// Build environment variables with the local bin folder in PATH for ffmpeg/ffprobe discovery
++/**
++ * Dynamically gets the best yt-dlp binary path (ensuring executable permissions on Linux)
++ */
++function getYtDlpBin() {
++  if (fs.existsSync(localYtDlp)) {
++    if (!isWindows) {
++      try { fs.chmodSync(localYtDlp, 0o755); } catch (e) {}
++    }
++    return localYtDlp;
++  }
++  return 'yt-dlp';
++}
++
++// Build environment variables with local bin folder in PATH for ffmpeg/ffprobe discovery (append, don't prepend)
+ const env = { ...process.env };
+ const pathKey = isWindows ? 'Path' : 'PATH';
+-env[pathKey] = `${binDir}${path.delimiter}${env[pathKey] || ''}`;
++env[pathKey] = `${env[pathKey] || ''}${path.delimiter}${binDir}`;
+ 
+ if (!fs.existsSync(tempDir)) {
+   fs.mkdirSync(tempDir, { recursive: true });
+@@ -19,59 +32,163 @@ if (!fs.existsSync(tempDir)) {
+ 
+ // Simulated real Chrome browser User-Agent to bypass bot filters
+ const browserHeaders = [
+-  '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
++  '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
++];
++
++/**
++ * Auto-detects cookies.txt location in either project root or server directory
++ */
++function getCookiesArgs() {
++  const rootCookies = path.join(__dirname, '..', 'cookies.txt');
++  const serverCookies = path.join(__dirname, 'cookies.txt');
++  if (fs.existsSync(rootCookies)) {
++    return ['--cookies', rootCookies];
++  } else if (fs.existsSync(serverCookies)) {
++    return ['--cookies', serverCookies];
++  }
++  return [];
++}
++
++// Player client strategies to bypass YouTube/Instagram VPS datacenter IP blocks
++const CLIENT_STRATEGIES = [
++  ['--extractor-args', 'youtube:player_client=ios,android,mweb,web;player_skip=webpage'],
++  ['--extractor-args', 'youtube:player_client=android,ios'],
++  ['--extractor-args', 'youtube:player_client=tv_embedded,mweb'],
++  ['--extractor-args', 'youtube:player_client=mweb']
+ ];
+ 
+-// Network resilience for all yt-dlp calls. Previously used `--retries 0` and
+-// `--socket-timeout 5`, which made any slow/transient response fail instantly.
+-// player_client=default lets yt-dlp pick its recommended YouTube clients.
+-const NET_ARGS = [
++const BASE_NET_ARGS = [
+   '--retries', '10',
+   '--fragment-retries', '10',
+   '--socket-timeout', '30',
+-  '--extractor-args', 'youtube:player_client=default',
++  '--no-check-certificates',
++  '--geo-bypass'
+ ];
+ 
++/**
++ * Fallback download using Cobalt public APIs when yt-dlp is blocked by datacenter IP filters
++ */
++async function fallbackCobaltDownload(url, outputName, isAudio = false, quality = '720') {
++  const cobaltEndpoints = [
++    'https://api.cobalt.tools/api/json',
++    'https://co.wuk.sh/api/json',
++    'https://cobalt-api.kwippy.com/api/json'
++  ];
++
++  for (const endpoint of cobaltEndpoints) {
++    try {
++      const payload = {
++        url: url,
++        downloadMode: isAudio ? 'audio' : 'auto',
++        videoQuality: quality,
++        audioFormat: 'mp3'
++      };
++
++      const res = await axios.post(endpoint, payload, {
++        headers: {
++          'Accept': 'application/json',
++          'Content-Type': 'application/json',
++          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
++        },
++        timeout: 12000
++      });
++
++      const data = res.data;
++      if (data && (data.url || (data.picker && data.picker.length > 0))) {
++        let downloadUrl = data.url;
++        if (!downloadUrl && data.picker && data.picker.length > 0) {
++          downloadUrl = data.picker[0].url;
++        }
++
++        if (downloadUrl) {
++          const ext = isAudio ? '.mp3' : (data.filename ? path.extname(data.filename) || '.mp4' : '.mp4');
++          const destPath = path.join(tempDir, `${outputName}${ext.startsWith('.') ? ext : '.' + ext}`);
++
++          const streamRes = await axios({
++            method: 'GET',
++            url: downloadUrl,
++            responseType: 'stream',
++            timeout: 60000
++          });
++
++          const writer = fs.createWriteStream(destPath);
++          streamRes.data.pipe(writer);
++
++          await new Promise((resolve, reject) => {
++            writer.on('finish', resolve);
++            writer.on('error', reject);
++          });
++
++          if (fs.existsSync(destPath) && fs.statSync(destPath).size > 0) {
++            return destPath;
++          }
++        }
++      }
++    } catch (e) {
++      // Continue to next mirror endpoint
++    }
++  }
++  throw new Error('Fallback download services exhausted.');
++}
++
+ /**
+  * Get video metadata from a URL
+  * @param {string} url 
+  * @returns {Promise<object>}
+  */
+-function getInfo(url) {
+-  return new Promise((resolve, reject) => {
+-    const args = [
+-      '--dump-json', 
+-      '--no-playlist', 
+-      '--no-warnings', 
+-      ...NET_ARGS,
+-      ...browserHeaders
+-    ];
+-    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+-    if (fs.existsSync(cookiesPath)) {
+-      args.push('--cookies', cookiesPath);
+-    }
+-    args.push(url);
++async function getInfo(url) {
++  let lastErr = null;
++  const cookiesArgs = getCookiesArgs();
++  const ytDlpBin = getYtDlpBin();
+ 
+-    execFile(ytDlpPath, args, { maxBuffer: 20 * 1024 * 1024, env }, (err, stdout, stderr) => {
+-      if (err) {
+-        return reject(new Error(stderr || err.message));
+-      }
+-      try {
+-        const metadata = JSON.parse(stdout);
+-        resolve({
+-          title: metadata.title,
+-          duration: metadata.duration,
+-          thumbnail: metadata.thumbnail || (metadata.thumbnails && metadata.thumbnails.length > 0 ? metadata.thumbnails[metadata.thumbnails.length - 1].url : null),
+-          artist: metadata.artist || null,
+-          track: metadata.track || null,
+-          url: url,
+-          extractor: metadata.extractor_key || metadata.extractor
++  for (const strategyArgs of CLIENT_STRATEGIES) {
++    try {
++      const metadata = await new Promise((resolve, reject) => {
++        const args = [
++          '--dump-json',
++          '--no-playlist',
++          '--no-warnings',
++          ...BASE_NET_ARGS,
++          ...strategyArgs,
++          ...cookiesArgs,
++          ...browserHeaders,
++          url
++        ];
++
++        execFile(ytDlpBin, args, { maxBuffer: 20 * 1024 * 1024, env }, (err, stdout, stderr) => {
++          if (err) return reject(new Error(stderr || err.message));
++          try {
++            resolve(JSON.parse(stdout));
++          } catch (pErr) {
++            reject(new Error('JSON parse error: ' + pErr.message));
++          }
+         });
+-      } catch (parseErr) {
+-        reject(new Error('Failed to parse video metadata: ' + parseErr.message));
+-      }
+-    });
+-  });
++      });
++
++      return {
++        title: metadata.title,
++        duration: metadata.duration,
++        thumbnail: metadata.thumbnail || (metadata.thumbnails && metadata.thumbnails.length > 0 ? metadata.thumbnails[metadata.thumbnails.length - 1].url : null),
++        artist: metadata.artist || null,
++        track: metadata.track || null,
++        url: url,
++        extractor: metadata.extractor_key || metadata.extractor
++      };
++    } catch (err) {
++      lastErr = err;
++    }
++  }
++
++  // Basic fallback metadata construct if extractors fail
++  return {
++    title: 'Media Video',
++    duration: 0,
++    thumbnail: null,
++    artist: null,
++    track: null,
++    url: url,
++    extractor: 'generic'
++  };
+ }
+ 
+ /**
+@@ -79,88 +196,109 @@ function getInfo(url) {
+  * @param {string} url 
+  * @param {string} outputName 
+  * @param {'1080' | '720' | '480' | '360'} quality
+- * @returns {Promise<string>} Path to the downloaded video file
++ * @returns {Promise<string|string[]>} Path to the downloaded video file(s)
+  */
+-function downloadVideo(url, outputName, quality = '720') {
+-  return new Promise((resolve, reject) => {
+-    const templatePath = path.join(tempDir, `${outputName}.%(ext)s`);
+-    let formatFilter = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[ext=mp4]/best';
+-
+-    if (quality === '1080') {
+-      formatFilter = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[ext=mp4]/best';
+-    } else if (quality === '480') {
+-      formatFilter = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best[ext=mp4]/best';
+-    } else if (quality === '360') {
+-      formatFilter = 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[ext=mp4]/best';
+-    }
++async function downloadVideo(url, outputName, quality = '720') {
++  const templatePath = path.join(tempDir, `${outputName}.%(ext)s`);
++  let formatFilter = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[ext=mp4]/best';
+ 
+-    const args = [
+-      '-f', formatFilter,
+-      '--merge-output-format', 'mp4',
+-      '--no-playlist',
+-      '--geo-bypass',
+-      ...NET_ARGS,
+-      '-o', templatePath,
+-      ...browserHeaders
+-    ];
+-    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+-    if (fs.existsSync(cookiesPath)) {
+-      args.push('--cookies', cookiesPath);
++  if (quality === '1080') {
++    formatFilter = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[ext=mp4]/best';
++  } else if (quality === '480') {
++    formatFilter = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best[ext=mp4]/best';
++  } else if (quality === '360') {
++    formatFilter = 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[ext=mp4]/best';
++  }
++
++  const cookiesArgs = getCookiesArgs();
++  const ytDlpBin = getYtDlpBin();
++  let lastErrMsg = '';
++
++  for (const strategyArgs of CLIENT_STRATEGIES) {
++    try {
++      const resPath = await new Promise((resolve, reject) => {
++        const args = [
++          '-f', formatFilter,
++          '--merge-output-format', 'mp4',
++          '--no-playlist',
++          ...BASE_NET_ARGS,
++          ...strategyArgs,
++          ...cookiesArgs,
++          '-o', templatePath,
++          ...browserHeaders,
++          url
++        ];
++
++        execFile(ytDlpBin, args, { env }, (err, stdout, stderr) => {
++          const errMsg = stderr || (err ? err.message : '');
++          if (err) {
++            if (errMsg.includes('No video formats found') || errMsg.includes('Requested format is not available')) {
++              return downloadPhoto(url, outputName).then(resolve).catch(() => reject(new Error(errMsg)));
++            }
++            return reject(new Error(errMsg));
++          }
++
++          try {
++            const files = fs.readdirSync(tempDir);
++            const matched = files.find(f => f.startsWith(outputName));
++            if (matched) {
++              resolve(path.join(tempDir, matched));
++            } else {
++              downloadPhoto(url, outputName).then(resolve).catch(() => reject(new Error('Downloaded media file not found.')));
++            }
++          } catch (e) {
++            reject(e);
++          }
++        });
++      });
++
++      if (resPath) return resPath;
++    } catch (err) {
++      lastErrMsg = err.message || '';
+     }
+-    args.push(url);
+-
+-    execFile(ytDlpPath, args, { env }, (err, stdout, stderr) => {
+-      const errMsg = stderr || (err ? err.message : '');
+-      if (err) {
+-        if (errMsg.includes('No video formats found') || errMsg.includes('Requested format is not available')) {
+-          // Fallback to downloading image/thumbnail
+-          return downloadPhoto(url, outputName).then(resolve).catch(() => reject(new Error(errMsg)));
+-        }
+-        return reject(new Error(errMsg));
+-      }
+-      
+-      // Find the file dynamically because extension is variable
+-      try {
+-        const files = fs.readdirSync(tempDir);
+-        const matched = files.find(f => f.startsWith(outputName));
+-        if (matched) {
+-          resolve(path.join(tempDir, matched));
+-        } else {
+-          // If no video file was saved, try photo fallback
+-          downloadPhoto(url, outputName).then(resolve).catch(() => reject(new Error('Downloaded media file not found.')));
+-        }
+-      } catch (e) {
+-        reject(e);
+-      }
+-    });
+-  });
++  }
++
++  // Try photo extraction before giving up to Cobalt
++  try {
++    const photoResult = await downloadPhoto(url, outputName);
++    if (photoResult) return photoResult;
++  } catch (pErr) {}
++
++  // Fallback to Cobalt API download service if yt-dlp is blocked by IP / bot detection
++  console.log('[Downloader] yt-dlp failed on VPS. Invoking Cobalt API fallback...');
++  try {
++    return await fallbackCobaltDownload(url, outputName, false, quality);
++  } catch (fallbackErr) {
++    throw new Error(lastErrMsg || fallbackErr.message || 'Media download failed.');
++  }
+ }
+ 
+ /**
+  * Download photo/thumbnail when no video format is available
+  * @param {string} url 
+  * @param {string} outputName 
+- * @returns {Promise<string>}
++ * @returns {Promise<string|string[]>}
+  */
+ function downloadPhoto(url, outputName) {
+   return new Promise((resolve, reject) => {
+     const templatePath = path.join(tempDir, `${outputName}_%(autonumber)s.%(ext)s`);
++    const cookiesArgs = getCookiesArgs();
++    const ytDlpBin = getYtDlpBin();
++
+     const args = [
+       '--write-thumbnail',
+       '--convert-thumbnails', 'jpg',
+       '--skip-download',
+       '--ignore-no-formats-error',
+-      ...NET_ARGS,
++      ...BASE_NET_ARGS,
++      ...CLIENT_STRATEGIES[0],
++      ...cookiesArgs,
+       '-o', templatePath,
+-      ...browserHeaders
++      ...browserHeaders,
++      url
+     ];
+-    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+-    if (fs.existsSync(cookiesPath)) {
+-      args.push('--cookies', cookiesPath);
+-    }
+-    args.push(url);
+ 
+-    execFile(ytDlpPath, args, { env }, (err, stdout, stderr) => {
++    execFile(ytDlpBin, args, { env }, (err, stdout, stderr) => {
+       try {
+         const files = fs.readdirSync(tempDir);
+         const matched = files.filter(f => f.startsWith(outputName)).sort().map(f => path.join(tempDir, f));
+@@ -184,37 +322,52 @@ function downloadPhoto(url, outputName) {
+  * @param {string} outputName 
+  * @returns {Promise<string>} Path to the downloaded MP3 file
+  */
+-function downloadAudio(url, outputName) {
+-  return new Promise((resolve, reject) => {
+-    const outputPath = path.join(tempDir, `${outputName}.mp3`);
+-    const args = [
+-      '-f', 'ba/best', 
+-      '-x',
+-      '--audio-format', 'mp3',
+-      '--audio-quality', '5',
+-      '--no-playlist',
+-      '--geo-bypass',
+-      ...NET_ARGS,
+-      '-o', path.join(tempDir, `${outputName}.%(ext)s`),
+-      ...browserHeaders
+-    ];
+-    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+-    if (fs.existsSync(cookiesPath)) {
+-      args.push('--cookies', cookiesPath);
++async function downloadAudio(url, outputName) {
++  const outputPath = path.join(tempDir, `${outputName}.mp3`);
++  const cookiesArgs = getCookiesArgs();
++  const ytDlpBin = getYtDlpBin();
++  let lastErrMsg = '';
++
++  for (const strategyArgs of CLIENT_STRATEGIES) {
++    try {
++      const resPath = await new Promise((resolve, reject) => {
++        const args = [
++          '-f', 'ba/best',
++          '-x',
++          '--audio-format', 'mp3',
++          '--audio-quality', '5',
++          '--no-playlist',
++          ...BASE_NET_ARGS,
++          ...strategyArgs,
++          ...cookiesArgs,
++          '-o', path.join(tempDir, `${outputName}.%(ext)s`),
++          ...browserHeaders,
++          url
++        ];
++
++        execFile(ytDlpBin, args, { env }, (err, stdout, stderr) => {
++          if (err) return reject(new Error(stderr || err.message));
++          if (fs.existsSync(outputPath)) {
++            resolve(outputPath);
++          } else {
++            reject(new Error('Downloaded audio file not found at ' + outputPath));
++          }
++        });
++      });
++
++      if (resPath) return resPath;
++    } catch (err) {
++      lastErrMsg = err.message || '';
+     }
+-    args.push(url);
++  }
+ 
+-    execFile(ytDlpPath, args, { env }, (err, stdout, stderr) => {
+-      if (err) {
+-        return reject(new Error(stderr || err.message));
+-      }
+-      if (fs.existsSync(outputPath)) {
+-        resolve(outputPath);
+-      } else {
+-        reject(new Error('Downloaded audio file not found at ' + outputPath));
+-      }
+-    });
+-  });
++  // Fallback to Cobalt API download for audio
++  console.log('[Downloader] Audio yt-dlp failed on VPS. Invoking Cobalt API fallback...');
++  try {
++    return await fallbackCobaltDownload(url, outputName, true);
++  } catch (fallbackErr) {
++    throw new Error(lastErrMsg || fallbackErr.message || 'Audio download failed.');
++  }
+ }
+ 
+ /**
+@@ -226,27 +379,27 @@ function downloadAudio(url, outputName) {
+ function searchMusic(query, limit = 10) {
+   return new Promise((resolve, reject) => {
+     const searchTarget = `ytsearch${limit}:${query}`;
++    const cookiesArgs = getCookiesArgs();
++    const ytDlpBin = getYtDlpBin();
++
+     const args = [
+       '--flat-playlist',
+       '--dump-json',
+       '--no-playlist',
+-      '--geo-bypass',
+-      ...NET_ARGS,
+-      ...browserHeaders
++      ...BASE_NET_ARGS,
++      ...CLIENT_STRATEGIES[0],
++      ...cookiesArgs,
++      ...browserHeaders,
++      searchTarget
+     ];
+-    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+-    if (fs.existsSync(cookiesPath)) {
+-      args.push('--cookies', cookiesPath);
+-    }
+-    args.push(searchTarget);
+ 
+-    execFile(ytDlpPath, args, { maxBuffer: 15 * 1024 * 1024, env }, (err, stdout, stderr) => {
++    execFile(ytDlpBin, args, { maxBuffer: 15 * 1024 * 1024, env }, (err, stdout, stderr) => {
+       if (err && !stdout) {
+         return reject(new Error(stderr || err.message));
+       }
+ 
+       const results = [];
+-      const lines = stdout.trim().split('\n');
++      const lines = (stdout || '').trim().split('\n');
+       for (const line of lines) {
+         if (!line) continue;
+         try {
+diff --git a/server/processor.js b/server/processor.js
+index c5a0621..6cb7c99 100644
+--- a/server/processor.js
++++ b/server/processor.js
+@@ -1,9 +1,55 @@
+-const { spawn } = require('child_process');
++const { spawn, execSync } = require('child_process');
+ const path = require('path');
+ const fs = require('fs');
+ 
+-const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+-const ffprobePath = require('@ffprobe-installer/ffprobe').path;
++function resolveFFmpegPath() {
++  // 1. Try system ffmpeg (e.g. /usr/bin/ffmpeg)
++  try {
++    execSync('ffmpeg -version', { stdio: 'ignore' });
++    return 'ffmpeg';
++  } catch (e) {}
++
++  // 2. Try local bin folder
++  const isWin = process.platform === 'win32';
++  const binName = isWin ? 'ffmpeg.exe' : 'ffmpeg';
++  const localBinPath = path.join(__dirname, 'bin', binName);
++  if (fs.existsSync(localBinPath)) {
++    return localBinPath;
++  }
++
++  // 3. Try npm installer package
++  try {
++    return require('@ffmpeg-installer/ffmpeg').path;
++  } catch (e) {
++    return 'ffmpeg';
++  }
++}
++
++function resolveFFprobePath() {
++  // 1. Try system ffprobe (e.g. /usr/bin/ffprobe)
++  try {
++    execSync('ffprobe -version', { stdio: 'ignore' });
++    return 'ffprobe';
++  } catch (e) {}
++
++  // 2. Try local bin folder
++  const isWin = process.platform === 'win32';
++  const binName = isWin ? 'ffprobe.exe' : 'ffprobe';
++  const localBinPath = path.join(__dirname, 'bin', binName);
++  if (fs.existsSync(localBinPath)) {
++    return localBinPath;
++  }
++
++  // 3. Try npm installer package
++  try {
++    return require('@ffprobe-installer/ffprobe').path;
++  } catch (e) {
++    return 'ffprobe';
++  }
++}
++
++const ffmpegPath = resolveFFmpegPath();
++const ffprobePath = resolveFFprobePath();
+ const tempDir = path.join(__dirname, 'temp');
+ 
+ if (!fs.existsSync(tempDir)) {
+@@ -34,13 +80,33 @@ function runFFmpeg(args) {
+   });
+ }
+ 
++/**
++ * Checks if media file contains at least one audio stream using ffprobe
++ */
++function hasAudioStream(filePath) {
++  try {
++    const out = execSync(`"${ffprobePath}" -v error -show_entries stream=codec_type -of default=noprint_wrappers=1:nokey=1 "${filePath}"`, { encoding: 'utf8' });
++    return out.includes('audio');
++  } catch (e) {
++    return true;
++  }
++}
++
+ /**
+  * Extracts audio from a video file and encodes it as high-quality MP3
+  * @param {string} inputPath 
+  * @param {string} outputName 
+  * @returns {Promise<string>} Path to output MP3
+  */
+-function extractAudio(inputPath, outputName) {
++async function extractAudio(inputPath, outputName) {
++  if (!fs.existsSync(inputPath)) {
++    throw new Error('Fayl topilmadi.');
++  }
++
++  if (!hasAudioStream(inputPath)) {
++    throw new Error('Ushbu videoda ovoz / musiqa treki mavjud emas.');
++  }
++
+   const outputPath = path.join(tempDir, `${outputName}.mp3`);
+   const args = [
+     '-y',
+@@ -48,10 +114,25 @@ function extractAudio(inputPath, outputName) {
+     '-i', inputPath,
+     '-vn',
+     '-acodec', 'libmp3lame',
+-    '-q:a', '4', // 4 is standard high quality (~160kbps), much faster to encode than 0
++    '-q:a', '4',
+     outputPath
+   ];
+-  return runFFmpeg(args).then(() => outputPath);
++
++  try {
++    await runFFmpeg(args);
++    return outputPath;
++  } catch (err) {
++    // Fallback attempt with generic mp3 codec
++    const fallbackArgs = [
++      '-y',
++      '-i', inputPath,
++      '-vn',
++      '-c:a', 'mp3',
++      outputPath
++    ];
++    await runFFmpeg(fallbackArgs);
++    return outputPath;
++  }
+ }
+ 
+ /**
+diff --git a/server/setup.js b/server/setup.js
+index 4101a7b..34ab919 100644
+--- a/server/setup.js
++++ b/server/setup.js
+@@ -60,35 +60,45 @@ async function ensureBinaries() {
+       }
+     }
+ 
+-    // Copy ffmpeg and ffprobe from npm packages to bin/ for auto-discovery
+-    console.log('Locating and copying FFmpeg/FFprobe binaries...');
++    // Copy ffmpeg and ffprobe from npm packages to bin/ for auto-discovery if system FFmpeg is missing
++    let hasSystemFFmpeg = false;
+     try {
+-      const ffmpegSource = require('@ffmpeg-installer/ffmpeg').path;
+-      const ffprobeSource = require('@ffprobe-installer/ffprobe').path;
+-
+-      const ffmpegDestName = isWindows ? 'ffmpeg.exe' : 'ffmpeg';
+-      const ffprobeDestName = isWindows ? 'ffprobe.exe' : 'ffprobe';
+-
+-      const ffmpegDestPath = path.join(binDir, ffmpegDestName);
+-      const ffprobeDestPath = path.join(binDir, ffprobeDestName);
+-
+-      if (!fs.existsSync(ffmpegDestPath)) {
+-        fs.copyFileSync(ffmpegSource, ffmpegDestPath);
+-        if (!isWindows) {
+-          fs.chmodSync(ffmpegDestPath, 0o755);
++      const { execSync } = require('child_process');
++      execSync('ffmpeg -version', { stdio: 'ignore' });
++      hasSystemFFmpeg = true;
++      console.log('System FFmpeg detected. Skipping copy.');
++    } catch (e) {}
++
++    if (!hasSystemFFmpeg) {
++      console.log('Locating and copying FFmpeg/FFprobe binaries...');
++      try {
++        const ffmpegSource = require('@ffmpeg-installer/ffmpeg').path;
++        const ffprobeSource = require('@ffprobe-installer/ffprobe').path;
++
++        const ffmpegDestName = isWindows ? 'ffmpeg.exe' : 'ffmpeg';
++        const ffprobeDestName = isWindows ? 'ffprobe.exe' : 'ffprobe';
++
++        const ffmpegDestPath = path.join(binDir, ffmpegDestName);
++        const ffprobeDestPath = path.join(binDir, ffprobeDestName);
++
++        if (!fs.existsSync(ffmpegDestPath)) {
++          fs.copyFileSync(ffmpegSource, ffmpegDestPath);
++          if (!isWindows) {
++            fs.chmodSync(ffmpegDestPath, 0o755);
++          }
++          console.log(`FFmpeg copied successfully to ${ffmpegDestName}`);
+         }
+-        console.log(`FFmpeg copied successfully to ${ffmpegDestName}`);
+-      }
+ 
+-      if (!fs.existsSync(ffprobeDestPath)) {
+-        fs.copyFileSync(ffprobeSource, ffprobeDestPath);
+-        if (!isWindows) {
+-          fs.chmodSync(ffprobeDestPath, 0o755);
++        if (!fs.existsSync(ffprobeDestPath)) {
++          fs.copyFileSync(ffprobeSource, ffprobeDestPath);
++          if (!isWindows) {
++            fs.chmodSync(ffprobeDestPath, 0o755);
++          }
++          console.log(`FFprobe copied successfully to ${ffprobeDestName}`);
+         }
+-        console.log(`FFprobe copied successfully to ${ffprobeDestName}`);
++      } catch (copyErr) {
++        console.warn('Could not copy FFmpeg/FFprobe binaries from node_modules:', copyErr.message);
+       }
+-    } catch (copyErr) {
+-      console.warn('Could not copy FFmpeg/FFprobe binaries from node_modules:', copyErr.message);
+     }
+   } catch (err) {
+     console.error('Setup error:', err.message);

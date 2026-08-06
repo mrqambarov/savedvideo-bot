@@ -405,6 +405,7 @@ function startBot(token) {
         const activeChannel = getActiveSponsorChannel();
 
         if (activeChannel) {
+          if (!ctx.from) return await next();
           try {
             const chatMember = await ctx.api.getChatMember(activeChannel.username, ctx.from.id);
             const isMember = ['creator', 'administrator', 'member', 'restricted'].includes(chatMember.status);
@@ -422,8 +423,8 @@ function startBot(token) {
                 .text('🔄 A\'zolikni Tekshirish', 'chk_sub');
 
               return await ctx.reply(
-                `⚠️ **Botdan foydalanish uchun kanalimizga a'zo bo'ling!**\n\n📢 ${activeChannel.username}\n\nA'zo bo'lgach, "A'zolikni Tekshirish" tugmasini bosing — bot so'rovingizni darhol bajaradi.`,
-                { parse_mode: 'Markdown', reply_markup: keyboard }
+                `⚠️ <b>Botdan foydalanish uchun kanalimizga a'zo bo'ling!</b>\n\n📢 ${escapeHTML(activeChannel.username)}\n\nA'zo bo'lgach, "A'zolikni Tekshirish" tugmasini bosing — bot so'rovingizni darhol bajaradi.`,
+                { parse_mode: 'HTML', reply_markup: keyboard }
               );
             }
           } catch (err) {
@@ -776,7 +777,8 @@ function startBot(token) {
             const captionText = `❤️ @${botUsername} orqali (${quality}p) yuklab olindi 🚀\n\n🍿 Yangi kinolar bepul: @${movieBotUsername}`;
             
             await ctx.replyWithVideo(new InputFile(mediaPath), {
-              caption: captionText
+              caption: captionText,
+              supports_streaming: true
             });
             db.trackDownload('video');
             db.trackUserDownload(ctx.from.id, `Video ${quality}p`, 'video', url);
@@ -841,7 +843,8 @@ function startBot(token) {
             const compPath = await processor.compressVideo(mediaPath, `comp_${shortId}`);
             await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
             await ctx.replyWithVideo(new InputFile(compPath), {
-              caption: `🗜 **Video hajmi siqildi!**\n❤️ @${ctx.me.username} orqali siqildi 🚀`
+              caption: `🗜 **Video hajmi siqildi!**\n❤️ @${ctx.me.username} orqali siqildi 🚀`,
+              supports_streaming: true
             });
 
             try {
@@ -1067,6 +1070,7 @@ function formatDownloadError(err) {
                 await ctx.replyWithVideo(cached.fileId, {
                   caption: instantCaption,
                   reply_markup: keyboard,
+                  supports_streaming: true,
                   ...replyOptions
                 });
                 db.trackDownload('video');
@@ -1117,6 +1121,7 @@ function formatDownloadError(err) {
                 const sentMsg = await ctx.replyWithVideo(new InputFile(mediaPath), {
                   caption: captionText,
                   reply_markup: keyboard,
+                  supports_streaming: true,
                   ...replyOptions
                 });
                 if (sentMsg && sentMsg.video) {
@@ -1411,7 +1416,7 @@ function formatDownloadError(err) {
           try {
             const videoPath = await downloader.downloadVideo(url, outputName);
             await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '📤 Video Telegramga yuklanmoqda...');
-            await ctx.replyWithVideo(new InputFile(videoPath));
+            await ctx.replyWithVideo(new InputFile(videoPath), { supports_streaming: true });
             db.trackDownload('video');
             await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
             fs.unlinkSync(videoPath); // Cleanup
@@ -1665,7 +1670,7 @@ function formatDownloadError(err) {
               await ctx.replyWithVideoNote(new InputFile(outPath));
             } else {
               // Styled round MP4 with black borders
-              await ctx.replyWithVideo(new InputFile(outPath));
+              await ctx.replyWithVideo(new InputFile(outPath), { supports_streaming: true });
             }
 
             await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
@@ -1730,7 +1735,8 @@ function formatDownloadError(err) {
             await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
             await ctx.replyWithVideo(new InputFile(outPath), {
               caption: `🐌 **Slow-Motion (0.5x) Video!**\n❤️ @${ctx.me.username} orqali tayyorlandi`,
-              parse_mode: 'Markdown'
+              parse_mode: 'Markdown',
+              supports_streaming: true
             });
             fs.unlinkSync(tempInput);
             fs.unlinkSync(outPath);
@@ -1755,7 +1761,8 @@ function formatDownloadError(err) {
             await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
             await ctx.replyWithVideo(new InputFile(outPath), {
               caption: `📉 **Video hajmi kichraytirildi!**\n❤️ @${ctx.me.username} orqali siqildi`,
-              parse_mode: 'Markdown'
+              parse_mode: 'Markdown',
+              supports_streaming: true
             });
             fs.unlinkSync(tempInput);
             fs.unlinkSync(outPath);
@@ -1805,7 +1812,8 @@ function formatDownloadError(err) {
             await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
             await ctx.replyWithVideo(new InputFile(outPath), {
               caption: `🎨 **Visualizer Video tayyor!**\n❤️ @${ctx.me.username} orqali tayyorlandi`,
-              parse_mode: 'Markdown'
+              parse_mode: 'Markdown',
+              supports_streaming: true
             });
             fs.unlinkSync(tempInput);
             fs.unlinkSync(outPath);

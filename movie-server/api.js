@@ -299,6 +299,46 @@ router.delete('/movies/:code', (req, res) => {
   }
 });
 
+// 1e-serial. Serial episodes management
+router.get('/movies/:code/episodes', (req, res) => {
+  const movie = db.getMovieByCode(req.params.code);
+  if (!movie) return res.status(404).json({ error: 'Serial topilmadi.' });
+  res.json(movie.episodes || []);
+});
+
+router.post('/movies/:code/episodes', (req, res) => {
+  const { code } = req.params;
+  const { episodeNumber, fileId, title } = req.body;
+  if (!episodeNumber || !fileId) {
+    return res.status(400).json({ error: 'episodeNumber va fileId majburiy.' });
+  }
+  const result = db.addEpisode(code, episodeNumber, fileId, title);
+  if (result) {
+    res.json({ success: true, ...result });
+  } else {
+    res.status(500).json({ error: 'Epizod saqlashda xatolik.' });
+  }
+});
+
+router.delete('/movies/:code/episodes/:epNum', (req, res) => {
+  const { code, epNum } = req.params;
+  const movies = db.getMovies();
+  const idx = movies.findIndex(m => String(m.code).trim() === String(code).trim());
+  if (idx === -1) return res.status(404).json({ error: 'Serial topilmadi.' });
+  const movie = movies[idx];
+  if (!Array.isArray(movie.episodes)) return res.status(404).json({ error: 'Epizodlar mavjud emas.' });
+  const beforeLen = movie.episodes.length;
+  movie.episodes = movie.episodes.filter(e => Number(e.episode) !== Number(epNum));
+  if (movie.episodes.length === beforeLen) return res.status(404).json({ error: 'Epizod topilmadi.' });
+  db.saveMovies(movies);
+  res.json({ success: true });
+});
+
+router.get('/serials', (req, res) => {
+  const movies = db.getMovies().filter(m => m.isSerial);
+  res.json(movies);
+});
+
 // 2. Get/Update Config
 router.get('/config', (req, res) => {
   const token = process.env.MOVIE_BOT_TOKEN || '';
@@ -477,7 +517,33 @@ router.post('/broadcast', async (req, res) => {
 
 // 6. Request Endpoints
 router.get('/requests', (req, res) => {
-  res.json(db.getRequests());
+  const requests = db.getRequests() || [];
+  const users = db.getUsers() || [];
+  const userMap = new Map();
+  users.forEach(u => {
+    if (u && u.id) userMap.set(Number(u.id), u);
+  });
+
+  const enriched = requests.map(r => {
+    const u = userMap.get(Number(r.userId));
+    let username = r.username;
+    let firstName = r.firstName || (u ? u.first_name : null);
+
+    if (!username || username.includes('Noma')) {
+      if (u && u.username) {
+        username = u.username.startsWith('@') ? u.username : '@' + u.username;
+      } else {
+        username = null;
+      }
+    }
+    return {
+      ...r,
+      username: username,
+      firstName: firstName
+    };
+  });
+
+  res.json(enriched);
 });
 
 router.post('/requests/:id/complete', (req, res) => {

@@ -19,16 +19,18 @@ app.use(express.json());
 // API Routes
 app.use('/api', apiRouter);
 
-// Serve Static Frontend files (if compiled)
-const clientDist = path.join(__dirname, '..', 'client', 'dist');
-if (fs.existsSync(clientDist)) {
-  app.use(express.static(clientDist));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(clientDist, 'index.html'));
+// Serve Admin Panel (admin-panel/dist) on / and /panel
+const adminDist = path.join(__dirname, '..', 'admin-panel', 'dist');
+if (fs.existsSync(adminDist)) {
+  app.use('/panel', express.static(adminDist));
+  app.use(express.static(adminDist));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(adminDist, 'index.html'));
   });
 } else {
   app.get('/', (req, res) => {
-    res.send('SavedVideo Backend is running. Please compile the client to access the web panel here, or connect your bot!');
+    res.send('SavedVideo Backend is running.');
   });
 }
 

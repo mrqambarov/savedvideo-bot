@@ -1,0 +1,2229 @@
+﻿diff --git a/admin-panel/src/pages/Analytics.jsx b/admin-panel/src/pages/Analytics.jsx
+index d795772..46c9613 100644
+--- a/admin-panel/src/pages/Analytics.jsx
++++ b/admin-panel/src/pages/Analytics.jsx
+@@ -87,18 +87,13 @@ export default function Analytics() {
+   ];
+ 
+   const platforms = platformData?.platforms || [
+-    { name: 'Instagram', value: 1420, percent: 45, color: '#e1306c' },
+-    { name: 'TikTok', value: 1100, percent: 35, color: '#00f2fe' },
+-    { name: 'YouTube', value: 480, percent: 15, color: '#ff0000' },
+-    { name: 'Boshqalar', value: 150, percent: 5, color: '#8b5cf6' }
++    { name: 'Instagram', value: 0, percent: 0, color: '#e1306c' },
++    { name: 'TikTok', value: 0, percent: 0, color: '#00f2fe' },
++    { name: 'YouTube', value: 0, percent: 0, color: '#ff0000' },
++    { name: 'Boshqalar', value: 0, percent: 0, color: '#8b5cf6' }
+   ];
+ 
+-  const topActiveUsers = platformData?.topUsers || [
+-    { id: '6263659922', name: 'Anvarxon', username: '@anvar_dev', downloads: 142, lastActive: 'Bugun' },
+-    { id: '5541249821', name: 'Jasur', username: '@jasur_pro', downloads: 98, lastActive: 'Bugun' },
+-    { id: '1129841029', name: 'Sardor', username: '@sardor_tg', downloads: 85, lastActive: 'Kechasi' },
+-    { id: '8872615521', name: 'Malika', username: '@malika_m', downloads: 64, lastActive: 'Kecha' }
+-  ];
++  const topActiveUsers = platformData?.topUsers || [];
+ 
+   return (
+     <div>
+diff --git a/movie-server/data/movies.json b/movie-server/data/movies.json
+index 0637a08..b80374d 100644
+--- a/movie-server/data/movies.json
++++ b/movie-server/data/movies.json
+@@ -1 +1,98 @@
+-[]
+\ No newline at end of file
++[
++  {
++    "code": "1001",
++    "title": "Titanlar jangi 2",
++    "description": "Titanlar jangi 2 - uzbek tilida tarjima kino.",
++    "fileId": "BAACAgIAAxkBAAOiamZZc9TpXKpR4fHv7jQuzG_iduMAAnh5AAK8DZBJaBaLtaXl6Tc9BA",
++    "genre": "Fantastika",
++    "poster": "",
++    "likes": [],
++    "dislikes": [],
++    "views": 3,
++    "dateAdded": "2026-07-31T17:19:27.345Z"
++  },
++  {
++    "code": "1002",
++    "title": "Men Afsonaman",
++    "description": "Men Afsonaman - uzbek tilida tarjima kino.",
++    "fileId": "BAACAgIAAxkBAAIBYmps2VaqxkSMrUYVldx3gzWpIinMAAI_nAACDsvoSq_HArzdf6esPQQ",
++    "genre": "Fantastika",
++    "poster": "",
++    "likes": [],
++    "dislikes": [],
++    "views": 0,
++    "dateAdded": "2026-07-31T17:20:22.796Z"
++  },
++  {
++    "code": "1003",
++    "title": "SAHRO OVCHILARI",
++    "description": "SAHRO OVCHILARI - uzbek tilida tarjima kino.",
++    "fileId": "BAACAgQAAxkBAAIBZGps2V6_DuDT3dMhT78T7jwsui06AAKEGQACjK8pULyG_hhcPUkoPQQ",
++    "genre": "Sarguzasht",
++    "poster": "",
++    "likes": [],
++    "dislikes": [],
++    "views": 0,
++    "dateAdded": "2026-07-31T17:20:30.043Z"
++  },
++  {
++    "code": "1004",
++    "title": "RED 2",
++    "description": "RED 2 - uzbek tilida tarjima kino.",
++    "fileId": "BAACAgUAAxkBAAIBZmps2WXZfHQCEq3jajZPFgS5sYPvAAL4DAACkEtIV7SCorOQmEGyPQQ",
++    "genre": "Jangari",
++    "poster": "",
++    "likes": [],
++    "dislikes": [],
++    "views": 0,
++    "dateAdded": "2026-07-31T17:20:37.802Z"
++  },
++  {
++    "code": "1005",
++    "title": "Devlarni yenggan Jek",
++    "description": "Devlarni yenggan Jek - uzbek tilida tarjima kino.",
++    "fileId": "BAACAgQAAxkBAAIBaGps2W6rJredhFQklUGyTDKG_RihAAIbEgAC79TRUPaX7IBno0F2PQQ",
++    "genre": "Sarguzasht",
++    "poster": "",
++    "likes": [],
++    "dislikes": [],
++    "views": 1,
++    "dateAdded": "2026-07-31T17:20:46.829Z"
++  },
++  {
++    "code": "1006",
++    "title": "O'g'irlangan qiz",
++    "description": "O'g'irlangan qiz - uzbek tilida tarjima kino.",
++    "fileId": "BAACAgQAAxkBAAIBamps2XheASZvNN5_n9Gx-QABBpyn7AACrR4AAtNfIVM3uSxpU_HFKz0E",
++    "genre": "Triller",
++    "poster": "",
++    "likes": [],
++    "dislikes": [],
++    "views": 0,
++    "dateAdded": "2026-07-31T17:20:56.167Z"
++  },
++  {
++    "code": "1007",
++    "title": "Majburiy Hamkorlik",
++    "description": "Majburiy Hamkorlik - uzbek tilida tarjima kino.",
++    "fileId": "BAACAgQAAxkBAAIBbGps2a5gek7GkygoiRK51xiCHAhtAAJnHAACz8MwU4ohgHBoabMpPQQ",
++    "genre": "Jangari",
++    "poster": "",
++    "likes": [],
++    "dislikes": [],
++    "views": 1,
++    "dateAdded": "2026-07-31T17:21:50.262Z"
++  },
++  {
++    "code": "1008",
++    "title": "Inson G'azabi (2020)",
++    "description": "Inson G'azabi (2020) - uzbek tilida tarjima kino.",
++    "fileId": "BAACAgQAAxkBAAIBbmps2cAzt8Ic7Im7Asby-TzBh3IYAALFHgACYpVBU9laYmaY2SlXPQQ",
++    "genre": "Jangari",
++    "poster": "",
++    "likes": [],
++    "dislikes": [],
++    "views": 1,
++    "dateAdded": "2026-07-31T17:22:08.632Z"
++  }
++]
+\ No newline at end of file
+diff --git a/movie-server/data/searches.json b/movie-server/data/searches.json
+index 9e26dfe..0e05161 100644
+--- a/movie-server/data/searches.json
++++ b/movie-server/data/searches.json
+@@ -1 +1,20 @@
+-{}
+\ No newline at end of file
++{
++  "https://www.instagram.com/reel/dboqiocnnk1/?igsh=ohp4axzlmxruyjq2": {
++    "query": "https://www.instagram.com/reel/dboqiocnnk1/?igsh=ohp4axzlmxruyjq2",
++    "count": 2,
++    "lastResults": 0,
++    "lastAt": "2026-07-30T05:23:23.641Z"
++  },
++  "https://www.instagram.com/reel/dy7ngrsstwz/?igsh=mtvkzhd6dnu3ztvv": {
++    "query": "https://www.instagram.com/reel/dy7ngrsstwz/?igsh=mtvkzhd6dnu3ztvv",
++    "count": 1,
++    "lastResults": 0,
++    "lastAt": "2026-07-30T05:24:57.225Z"
++  },
++  "тЭУ yordam": {
++    "query": "тЭУ yordam",
++    "count": 1,
++    "lastResults": 0,
++    "lastAt": "2026-07-30T05:25:10.365Z"
++  }
++}
+\ No newline at end of file
+diff --git a/movie-server/data/stats.json b/movie-server/data/stats.json
+index 6234b96..908b412 100644
+--- a/movie-server/data/stats.json
++++ b/movie-server/data/stats.json
+@@ -1,5 +1,15 @@
+ {
+   "totalViews": 0,
+-  "totalSearchQueries": 0,
+-  "dailyUsage": {}
++  "totalSearchQueries": 4,
++  "dailyUsage": {
++    "2026-07-30": {
++      "movieViews": 0,
++      "searchQueries": 4,
++      "activeUsers": [
++        821276009,
++        6263659922,
++        5215184836
++      ]
++    }
++  }
+ }
+\ No newline at end of file
+diff --git a/movie-server/data/users.json b/movie-server/data/users.json
+index 0637a08..67e0549 100644
+--- a/movie-server/data/users.json
++++ b/movie-server/data/users.json
+@@ -1 +1,32 @@
+-[]
+\ No newline at end of file
++[
++  {
++    "id": 821276009,
++    "username": "Anv_444",
++    "first_name": "Anvarov",
++    "dateJoined": "2026-07-30T04:01:02.356Z",
++    "referredBy": null,
++    "refCount": 0,
++    "refPending": 0,
++    "refQualified": false
++  },
++  {
++    "id": 6263659922,
++    "username": "mrqambarov",
++    "first_name": "Anvar",
++    "dateJoined": "2026-07-30T04:01:02.790Z",
++    "referredBy": null,
++    "refCount": 0,
++    "refPending": 0,
++    "refQualified": false
++  },
++  {
++    "id": 5215184836,
++    "username": "RGZ_03",
++    "first_name": "Gulnoza",
++    "dateJoined": "2026-07-30T05:23:04.801Z",
++    "referredBy": null,
++    "refCount": 0,
++    "refPending": 0,
++    "refQualified": false
++  }
++]
+\ No newline at end of file
+diff --git a/movie-server/i18n.js b/movie-server/i18n.js
+index d8f7613..b4e29b6 100644
+--- a/movie-server/i18n.js
++++ b/movie-server/i18n.js
+@@ -1,49 +1,89 @@
+ const messages = {
+   uz: {
+-    welcome: "ЁЯСЛ **Salom, {name}!**\n\nMen **Kino Note (Film) Bot**man.\n\nЁЯН┐ Kino kodini yuboring (masalan: `101`).\nЁЯФН Kino qidirish uchun tugmani bosing yoki nomini yozing.",
++    welcome: "ЁЯСЛ **Salom, {name}!**\n\nMen **Xit Film (Kino) Bot**man.\n\nЁЯН┐ Kino kodini yuboring (masalan: `1001`).\nЁЯФН Kino qidirish uchun nomini yozing yoki pastdagi menyudan foydalaning.",
+     search_btn: "ЁЯФН Kino Qidirish",
+     genre_btn: "ЁЯЧВ Janrlar",
+     req_btn: "ЁЯЩЛтАНтЩВя╕П Buyurtma berish",
+     help_btn: "тД╣я╕П Yordam",
+     lang_btn: "ЁЯМР Tilni o'zgartirish",
+-    select_lang: "ЁЯМР Iltimos, tilni tanlang:",
+-    searching: "ЁЯФН Kino nomini kiriting:",
+-    not_found: "ЁЯФН **Kino topilmadi.**",
+-    req_success: "тЬЕ **Buyurtmangiz qabul qilindi!**",
++    select_lang: "ЁЯМР **Iltimos, tilni tanlang / ╨Я╨╛╨╢╨░╨╗╤Г╨╣╤Б╤В╨░, ╨▓╤Л╨▒╨╡╤А╨╕╤В╨╡ ╤П╨╖╤Л╨║ / Please select language:**",
++    lang_changed: "тЬЕ Til O'zbekchaga o'zgartirildi!",
++    searching: "ЁЯФН **Kino nomini kiriting:**",
++    not_found: "тЭМ Kechirasiz, **\"{query}\"** nomli film topilmadi.",
++    code_not_found: "ЁЯФН **Kino topilmadi.**\n\nKod: `{code}` ga mos film topilmadi. Nomi bo'yicha qidirib ko'ring.",
++    req_prompt: "ЁЯУЭ **Iltimos, buyurtma qilmoqchi bo'lgan kino nomini yozib yuboring:**\n\n(Masalan: `Forsaj 10` yoki `Avatar 2 Uzbek tilida`)",
++    req_success: "тЬЕ **Buyurtmangiz muvaffaqiyatli qabul qilindi!**\n\nЁЯОм Kino nomi: *{title}*\n\nOperatorlarimiz uni tez orada bazaga qo'shishadi.",
++    genre_title: "ЁЯЧВ **\"{genre}\" janridagi kinolar (Sahifa {page}/{totalPages}):**",
++    genre_select: "ЁЯЧВ **Janrlardan birini tanlang:**",
++    genre_empty: "ЁЯФН **\"{genre}\"** janrida hozircha kinolar yo'q.",
++    search_title: "ЁЯФН **\"{query}\" bo'yicha topilgan kinolar:**",
++    prev_btn: "тЧАя╕П Oldingi",
++    next_btn: "Keyingi тЦ╢я╕П",
++    back_genres: "ЁЯФЩ Janrlar menyusi",
++    order_this_movie: "ЁЯЩЛтАНтЩВя╕П Ushbu kinoni buyurtma qilish",
++    views_unit: "marta",
++    help_text: "тЭУ **Yordam bo'limi:**\n\nтАв Kino kodini (masalan: 1001) yuboring -> Kino yuklab beriladi.\nтАв Kino nomini yozing -> Kino nomiga qarab qidiriladi.\nтАв Janrlar bo'yicha qidirish uchun **ЁЯЧВ Janrlar** tugmasini bosing.\nтАв Tilni o'zgartirish uchun `/lang` buyrug'ini yuboring.",
+     admin_help: "\n\nтЪЩя╕П **Admin buyruqlari:**\nтАв Videoga reply qilib `/add [kod] [nom] | [tavsif] | [janr]` deb yozing."
+   },
+   ru: {
+-    welcome: "ЁЯСЛ **╨Я╤А╨╕╨▓╨╡╤В, {name}!**\n\n╨п **Kino Note (Film) Bot**.\n\nЁЯН┐ ╨Я╤А╨╕╤И╨╗╨╕╤В╨╡ ╨║╨╛╨┤ ╤Д╨╕╨╗╤М╨╝╨░ (╨╜╨░╨┐╤А╨╕╨╝╨╡╤А: `101`).\nЁЯФН ╨Ф╨╗╤П ╨┐╨╛╨╕╤Б╨║╨░ ╨╜╨░╨╢╨╝╨╕╤В╨╡ ╨║╨╜╨╛╨┐╨║╤Г ╨╕╨╗╨╕ ╨╜╨░╨┐╨╕╤И╨╕╤В╨╡ ╨╜╨░╨╖╨▓╨░╨╜╨╕╨╡.",
++    welcome: "ЁЯСЛ **╨Я╤А╨╕╨▓╨╡╤В, {name}!**\n\n╨п **Xit Film (Kino) Bot**.\n\nЁЯН┐ ╨Я╤А╨╕╤И╨╗╨╕╤В╨╡ ╨║╨╛╨┤ ╤Д╨╕╨╗╤М╨╝╨░ (╨╜╨░╨┐╤А╨╕╨╝╨╡╤А: `1001`).\nЁЯФН ╨Ф╨╗╤П ╨┐╨╛╨╕╤Б╨║╨░ ╨╜╨░╨┐╨╕╤И╨╕╤В╨╡ ╨╜╨░╨╖╨▓╨░╨╜╨╕╨╡ ╤Д╨╕╨╗╤М╨╝╨░ ╨╕╨╗╨╕ ╨╕╤Б╨┐╨╛╨╗╤М╨╖╤Г╨╣╤В╨╡ ╨╝╨╡╨╜╤О ╨╜╨╕╨╢╨╡.",
+     search_btn: "ЁЯФН ╨Я╨╛╨╕╤Б╨║ ╤Д╨╕╨╗╤М╨╝╨░",
+     genre_btn: "ЁЯЧВ ╨Ц╨░╨╜╤А╤Л",
+     req_btn: "ЁЯЩЛтАНтЩВя╕П ╨Ч╨░╨║╨░╨╖╨░╤В╤М ╤Д╨╕╨╗╤М╨╝",
+     help_btn: "тД╣я╕П ╨Я╨╛╨╝╨╛╤Й╤М",
+     lang_btn: "ЁЯМР ╨б╨╝╨╡╨╜╨╕╤В╤М ╤П╨╖╤Л╨║",
+-    select_lang: "ЁЯМР ╨Я╨╛╨╢╨░╨╗╤Г╨╣╤Б╤В╨░, ╨▓╤Л╨▒╨╡╤А╨╕╤В╨╡ ╤П╨╖╤Л╨║:",
+-    searching: "ЁЯФН ╨Т╨▓╨╡╨┤╨╕╤В╨╡ ╨╜╨░╨╖╨▓╨░╨╜╨╕╨╡ ╤Д╨╕╨╗╤М╨╝╨░:",
+-    not_found: "ЁЯФН **╨д╨╕╨╗╤М╨╝ ╨╜╨╡ ╨╜╨░╨╣╨┤╨╡╨╜.**",
+-    req_success: "тЬЕ **╨Т╨░╤И ╨╖╨░╨║╨░╨╖ ╨┐╤А╨╕╨╜╤П╤В!**",
+-    admin_help: "\n\nтЪЩя╕П **╨Р╨┤╨╝╨╕╨╜ ╨║╨╛╨╝╨░╨╜╨┤╤Л:**\nтАв ╨Ю╤В╨▓╨╡╤В╤М╤В╨╡ ╨╜╨░ ╨▓╨╕╨┤╨╡╨╛ `/add [╨║╨╛╨┤] [╨╜╨░╨╖╨▓╨░╨╜╨╕╨╡] | [╨╛╨┐╨╕╤Б╨░╨╜╨╕╨╡] | [╨╢╨░╨╜╤А]`."
++    select_lang: "ЁЯМР **╨Я╨╛╨╢╨░╨╗╤Г╨╣╤Б╤В╨░, ╨▓╤Л╨▒╨╡╤А╨╕╤В╨╡ ╤П╨╖╤Л╨║ / Iltimos, tilni tanlang:**",
++    lang_changed: "тЬЕ ╨п╨╖╤Л╨║ ╤Г╤Б╨┐╨╡╤И╨╜╨╛ ╨╕╨╖╨╝╨╡╨╜╨╡╨╜ ╨╜╨░ ╨а╤Г╤Б╤Б╨║╨╕╨╣!",
++    searching: "ЁЯФН **╨Т╨▓╨╡╨┤╨╕╤В╨╡ ╨╜╨░╨╖╨▓╨░╨╜╨╕╨╡ ╤Д╨╕╨╗╤М╨╝╨░:**",
++    not_found: "тЭМ ╨Ш╨╖╨▓╨╕╨╜╨╕╤В╨╡, ╤Д╨╕╨╗╤М╨╝ ╤Б ╨╜╨░╨╖╨▓╨░╨╜╨╕╨╡╨╝ **\"{query}\"** ╨╜╨╡ ╨╜╨░╨╣╨┤╨╡╨╜.",
++    code_not_found: "ЁЯФН **╨д╨╕╨╗╤М╨╝ ╨╜╨╡ ╨╜╨░╨╣╨┤╨╡╨╜.**\n\n╨д╨╕╨╗╤М╨╝ ╤Б ╨║╨╛╨┤╨╛╨╝ `{code}` ╨╜╨╡ ╨╜╨░╨╣╨┤╨╡╨╜. ╨Я╨╛╨┐╤А╨╛╨▒╤Г╨╣╤В╨╡ ╨┐╨╛╨╕╤Б╨║ ╨┐╨╛ ╨╜╨░╨╖╨▓╨░╨╜╨╕╤О.",
++    req_prompt: "ЁЯУЭ **╨Я╨╛╨╢╨░╨╗╤Г╨╣╤Б╤В╨░, ╨╛╤В╨┐╤А╨░╨▓╤М╤В╨╡ ╨╜╨░╨╖╨▓╨░╨╜╨╕╨╡ ╤Д╨╕╨╗╤М╨╝╨░, ╨║╨╛╤В╨╛╤А╤Л╨╣ ╤Е╨╛╤В╨╕╤В╨╡ ╨╖╨░╨║╨░╨╖╨░╤В╤М:**\n\n(╨Э╨░╨┐╤А╨╕╨╝╨╡╤А: `╨д╨╛╤А╤Б╨░╨╢ 10` ╨╕╨╗╨╕ `╨Р╨▓╨░╤В╨░╤А 2`)",
++    req_success: "тЬЕ **╨Т╨░╤И ╨╖╨░╨║╨░╨╖ ╤Г╤Б╨┐╨╡╤И╨╜╨╛ ╨┐╤А╨╕╨╜╤П╤В!**\n\nЁЯОм ╨Э╨░╨╖╨▓╨░╨╜╨╕╨╡: *{title}*\n\n╨Э╨░╤И╨╕ ╨╛╨┐╨╡╤А╨░╤В╨╛╤А╤Л ╤Б╨║╨╛╤А╨╛ ╨┤╨╛╨▒╨░╨▓╤П╤В ╤Д╨╕╨╗╤М╨╝ ╨▓ ╨▒╨░╨╖╤Г.",
++    genre_title: "ЁЯЧВ **╨д╨╕╨╗╤М╨╝╤Л ╨▓ ╨╢╨░╨╜╤А╨╡ \"{genre}\" (╨б╤В╤А╨░╨╜╨╕╤Ж╨░ {page}/{totalPages}):**",
++    genre_select: "ЁЯЧВ **╨Т╤Л╨▒╨╡╤А╨╕╤В╨╡ ╨╛╨┤╨╕╨╜ ╨╕╨╖ ╨╢╨░╨╜╤А╨╛╨▓:**",
++    genre_empty: "ЁЯФН ╨Т ╨╢╨░╨╜╤А╨╡ **\"{genre}\"** ╨┐╨╛╨║╨░ ╨╜╨╡╤В ╤Д╨╕╨╗╤М╨╝╨╛╨▓.",
++    search_title: "ЁЯФН **╨Э╨░╨╣╨┤╨╡╨╜╨╜╤Л╨╡ ╤Д╨╕╨╗╤М╨╝╤Л ╨┐╨╛ ╨╖╨░╨┐╤А╨╛╤Б╤Г \"{query}\":**",
++    prev_btn: "тЧАя╕П ╨Э╨░╨╖╨░╨┤",
++    next_btn: "╨Т╨┐╨╡╤А╨╡╨┤ тЦ╢я╕П",
++    back_genres: "ЁЯФЩ ╨Ь╨╡╨╜╤О ╨╢╨░╨╜╤А╨╛╨▓",
++    order_this_movie: "ЁЯЩЛтАНтЩВя╕П ╨Ч╨░╨║╨░╨╖╨░╤В╤М ╤Н╤В╨╛╤В ╤Д╨╕╨╗╤М╨╝",
++    views_unit: "╤А╨░╨╖",
++    help_text: "тЭУ **╨а╨░╨╖╨┤╨╡╨╗ ╨┐╨╛╨╝╨╛╤Й╨╕:**\n\nтАв ╨Ю╤В╨┐╤А╨░╨▓╤М╤В╨╡ ╨║╨╛╨┤ ╤Д╨╕╨╗╤М╨╝╨░ (╨╜╨░╨┐╤А╨╕╨╝╨╡╤А: 1001) -> ╨С╨╛╤В╤Л ╨╛╤В╨┐╤А╨░╨▓╤П╤В ╨▓╨╕╨┤╨╡╨╛.\nтАв ╨Э╨░╨┐╨╕╤И╨╕╤В╨╡ ╨╜╨░╨╖╨▓╨░╨╜╨╕╨╡ -> ╨Я╨╛╨╕╤Б╨║ ╨┐╨╛ ╨╜╨░╨╖╨▓╨░╨╜╨╕╤О.\nтАв ╨Э╨░╨╢╨╝╨╕╤В╨╡ **ЁЯЧВ ╨Ц╨░╨╜╤А╤Л** ╨┤╨╗╤П ╨▓╤Л╨▒╨╛╤А╨░ ╨║╨░╤В╨╡╨│╨╛╤А╨╕╨╣.\nтАв ╨Ф╨╗╤П ╤Б╨╝╨╡╨╜╤Л ╤П╨╖╤Л╨║╨░ ╨╛╤В╨┐╤А╨░╨▓╤М╤В╨╡ `/lang`.",
++    admin_help: "\n\nтЪЩя╕П **╨Ъ╨╛╨╝╨░╨╜╨┤╤Л ╨░╨┤╨╝╨╕╨╜╨░:**\nтАв ╨Ю╤В╨▓╨╡╤В╤М╤В╨╡ ╨╜╨░ ╨▓╨╕╨┤╨╡╨╛ `/add [╨║╨╛╨┤] [╨╜╨░╨╖╨▓╨░╨╜╨╕╨╡] | [╨╛╨┐╨╕╤Б╨░╨╜╨╕╨╡] | [╨╢╨░╨╜╤А]`."
+   },
+   en: {
+-    welcome: "ЁЯСЛ **Hello, {name}!**\n\nI am the **Movie Note Bot**.\n\nЁЯН┐ Send a movie code (e.g., `101`).\nЁЯФН Click the button to search or type the name.",
++    welcome: "ЁЯСЛ **Hello, {name}!**\n\nI am the **Xit Film (Movie) Bot**.\n\nЁЯН┐ Send a movie code (e.g. `1001`).\nЁЯФН Type the title or use the menu below to search.",
+     search_btn: "ЁЯФН Search Movie",
+     genre_btn: "ЁЯЧВ Genres",
+     req_btn: "ЁЯЩЛтАНтЩВя╕П Request Movie",
+     help_btn: "тД╣я╕П Help",
+     lang_btn: "ЁЯМР Change Language",
+-    select_lang: "ЁЯМР Please select a language:",
+-    searching: "ЁЯФН Enter movie title:",
+-    not_found: "ЁЯФН **Movie not found.**",
+-    req_success: "тЬЕ **Your request has been accepted!**",
+-    admin_help: "\n\nтЪЩя╕П **Admin commands:**\nтАв Reply to video with `/add [code] [name] | [desc] | [genre]`."
++    select_lang: "ЁЯМР **Please select a language / Iltimos, tilni tanlang:**",
++    lang_changed: "тЬЕ Language successfully set to English!",
++    searching: "ЁЯФН **Enter movie title:**",
++    not_found: "тЭМ Sorry, movie **\"{query}\"** was not found.",
++    code_not_found: "ЁЯФН **Movie not found.**\n\nNo movie matching code `{code}`. Try searching by name.",
++    req_prompt: "ЁЯУЭ **Please send the name of the movie you would like to request:**\n\n(e.g., `Fast & Furious 10` or `Avatar 2`)",
++    req_success: "тЬЕ **Your request has been accepted!**\n\nЁЯОм Title: *{title}*\n\nOur operators will add it soon.",
++    genre_title: "ЁЯЧВ **Movies in \"{genre}\" genre (Page {page}/{totalPages}):**",
++    genre_select: "ЁЯЧВ **Select a genre category:**",
++    genre_empty: "ЁЯФН No movies available in **\"{genre}\"** genre yet.",
++    search_title: "ЁЯФН **Movies found for \"{query}\":**",
++    prev_btn: "тЧАя╕П Prev",
++    next_btn: "Next тЦ╢я╕П",
++    back_genres: "ЁЯФЩ Genres Menu",
++    order_this_movie: "ЁЯЩЛтАНтЩВя╕П Request this movie",
++    views_unit: "times",
++    help_text: "тЭУ **Help section:**\n\nтАв Send a movie code (e.g. 1001) -> Receive video.\nтАв Type title -> Search by name.\nтАв Click **ЁЯЧВ Genres** to browse categories.\nтАв Type `/lang` to change language.",
++    admin_help: "\n\nтЪЩя╕П **Admin commands:**\nтАв Reply to video with `/add [code] [title] | [desc] | [genre]`."
+   }
+ };
+ 
+ function t(lang, key, params = {}) {
+-  let text = messages[lang] && messages[lang][key] ? messages[lang][key] : (messages['uz'][key] || key);
++  const l = lang && messages[lang] ? lang : 'uz';
++  let text = messages[l][key] || messages['uz'][key] || key;
+   Object.keys(params).forEach(p => {
+-    text = text.replace(`{${p}}`, params[p]);
++    text = text.replace(new RegExp(`\\{${p}\\}`, 'g'), params[p]);
+   });
+   return text;
+ }
+diff --git a/movie-server/index.js b/movie-server/index.js
+index e7857c5..c5d3d99 100644
+--- a/movie-server/index.js
++++ b/movie-server/index.js
+@@ -49,14 +49,18 @@ app.listen(PORT, async () => {
+     console.warn('Tunnel init warning:', tunnelErr.message);
+   }
+ 
+-  // Automatically start Telegram Bot on boot if token is present
+-  const botToken = process.env.MOVIE_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
+-  if (botToken) {
++  // Automatically start Telegram Bot on boot if distinct token is present
++  const movieToken = process.env.MOVIE_BOT_TOKEN;
++  const mainToken = process.env.TELEGRAM_BOT_TOKEN;
++
++  if (movieToken && movieToken !== mainToken) {
+     console.log('MOVIE_BOT_TOKEN found. Booting Movie Telegram bot...');
+-    bot.startBot(botToken)
++    bot.startBot(movieToken)
+       .then(() => console.log('Movie Telegram Bot initialization check completed.'))
+       .catch((err) => console.error('Movie Telegram Bot auto-start failed:', err.message));
++  } else if (movieToken && movieToken === mainToken) {
++    console.warn('WARNING: MOVIE_BOT_TOKEN is identical to TELEGRAM_BOT_TOKEN! Movie Bot startup skipped to prevent 409 Conflict with main Download Bot.');
+   } else {
+-    console.log('No MOVIE_BOT_TOKEN configured. Movie Bot is inactive. Set the token in config to start it.');
++    console.log('No MOVIE_BOT_TOKEN configured. Movie Bot is inactive. Set a unique MOVIE_BOT_TOKEN in .env to activate it.');
+   }
+ });
+diff --git a/movie-server/package-lock.json b/movie-server/package-lock.json
+index ccb3dac..935f7e9 100644
+--- a/movie-server/package-lock.json
++++ b/movie-server/package-lock.json
+@@ -13,6 +13,7 @@
+         "dotenv": "^16.4.5",
+         "express": "^4.19.2",
+         "grammy": "^1.23.0",
++        "instagram-private-api": "^1.46.1",
+         "multer": "^1.4.5-lts.1"
+       }
+     },
+@@ -22,6 +23,84 @@
+       "integrity": "sha512-Z8lDLTvOlo12e5Vnly/vQh3JC9ppaitS1dGZ3w068gNitOd/y8tTSiib+Xm38aBGbtYGmUZwOc6afYrLs2CSTg==",
+       "license": "MIT"
+     },
++    "node_modules/@lifeomic/attempt": {
++      "version": "3.1.0",
++      "resolved": "https://registry.npmjs.org/@lifeomic/attempt/-/attempt-3.1.0.tgz",
++      "integrity": "sha512-QZqem4QuAnAyzfz+Gj5/+SLxqwCAw2qmt7732ZXodr6VDWGeYLG6w1i/vYLa55JQM9wRuBKLmXmiZ2P0LtE5rw==",
++      "license": "MIT"
++    },
++    "node_modules/@types/bluebird": {
++      "version": "3.5.42",
++      "resolved": "https://registry.npmjs.org/@types/bluebird/-/bluebird-3.5.42.tgz",
++      "integrity": "sha512-Jhy+MWRlro6UjVi578V/4ZGNfeCOcNCp0YaFNIUGFKlImowqwb1O/22wDVk3FDGMLqxdpOV3qQHD5fPEH4hK6A==",
++      "license": "MIT"
++    },
++    "node_modules/@types/caseless": {
++      "version": "0.12.5",
++      "resolved": "https://registry.npmjs.org/@types/caseless/-/caseless-0.12.5.tgz",
++      "integrity": "sha512-hWtVTC2q7hc7xZ/RLbxapMvDMgUnDvKvMOpKal4DrMyfGBUfB1oKaZlIRr6mJL+If3bAP6sV/QneGzF6tJjZDg==",
++      "license": "MIT"
++    },
++    "node_modules/@types/chance": {
++      "version": "1.1.8",
++      "resolved": "https://registry.npmjs.org/@types/chance/-/chance-1.1.8.tgz",
++      "integrity": "sha512-isycXjm4a88/zl3n9lfgMcEClR9wUi+m72lkE9MvEbkgZDQrKzolWbonBiUqDNAJFIwO9GKjzmJFq79qtKVTAQ==",
++      "license": "MIT"
++    },
++    "node_modules/@types/node": {
++      "version": "26.1.2",
++      "resolved": "https://registry.npmjs.org/@types/node/-/node-26.1.2.tgz",
++      "integrity": "sha512-Vu4a5UFA9rIIFJ7rB/Vaafh9lrCQszopTCx6KjFboXTGQbPNasehVR5TEiithSDGyd1DEiUByggTZsg8jukeIg==",
++      "license": "MIT",
++      "dependencies": {
++        "undici-types": "~8.3.0"
++      }
++    },
++    "node_modules/@types/request": {
++      "version": "2.48.13",
++      "resolved": "https://registry.npmjs.org/@types/request/-/request-2.48.13.tgz",
++      "integrity": "sha512-FGJ6udDNUCjd19pp0Q3iTiDkwhYup7J8hpMW9c4k53NrccQFFWKRho6hvtPPEhnXWKvukfwAlB6DbDz4yhH5Gg==",
++      "license": "MIT",
++      "dependencies": {
++        "@types/caseless": "*",
++        "@types/node": "*",
++        "@types/tough-cookie": "*",
++        "form-data": "^2.5.5"
++      }
++    },
++    "node_modules/@types/request-promise": {
++      "version": "4.1.51",
++      "resolved": "https://registry.npmjs.org/@types/request-promise/-/request-promise-4.1.51.tgz",
++      "integrity": "sha512-qVcP9Fuzh9oaAh8oPxiSoWMFGnWKkJDknnij66vi09Yiy62bsSDqtd+fG5kIM9wLLgZsRP3Y6acqj9O/v2ZtRw==",
++      "license": "MIT",
++      "dependencies": {
++        "@types/bluebird": "*",
++        "@types/request": "*"
++      }
++    },
++    "node_modules/@types/request/node_modules/form-data": {
++      "version": "2.5.6",
++      "resolved": "https://registry.npmjs.org/form-data/-/form-data-2.5.6.tgz",
++      "integrity": "sha512-Ogz/E85h9tlfJzpI6TuFpGcHZFhLrb9Gw8wq9v40CxSCPnv7ahKr6Xgtkn0KYCDQJ8DNn5VoMO8EXr9V5PadyA==",
++      "license": "MIT",
++      "dependencies": {
++        "asynckit": "^0.4.0",
++        "combined-stream": "^1.0.8",
++        "es-set-tostringtag": "^2.1.0",
++        "hasown": "^2.0.4",
++        "mime-types": "^2.1.35",
++        "safe-buffer": "^5.2.1"
++      },
++      "engines": {
++        "node": ">= 0.12"
++      }
++    },
++    "node_modules/@types/tough-cookie": {
++      "version": "4.0.5",
++      "resolved": "https://registry.npmjs.org/@types/tough-cookie/-/tough-cookie-4.0.5.tgz",
++      "integrity": "sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA==",
++      "license": "MIT"
++    },
+     "node_modules/abort-controller": {
+       "version": "3.0.0",
+       "resolved": "https://registry.npmjs.org/abort-controller/-/abort-controller-3.0.0.tgz",
+@@ -82,6 +161,22 @@
+       "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==",
+       "license": "MIT"
+     },
++    "node_modules/ajv": {
++      "version": "6.15.0",
++      "resolved": "https://registry.npmjs.org/ajv/-/ajv-6.15.0.tgz",
++      "integrity": "sha512-fgFx7Hfoq60ytK2c7DhnF8jIvzYgOMxfugjLOSMHjLIPgenqa7S7oaagATUq99mV6IYvN2tRmC0wnTYX6iPbMw==",
++      "license": "MIT",
++      "dependencies": {
++        "fast-deep-equal": "^3.1.1",
++        "fast-json-stable-stringify": "^2.0.0",
++        "json-schema-traverse": "^0.4.1",
++        "uri-js": "^4.2.2"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/epoberezkin"
++      }
++    },
+     "node_modules/append-field": {
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/append-field/-/append-field-1.0.0.tgz",
+@@ -94,12 +189,45 @@
+       "integrity": "sha512-PCVAQswWemu6UdxsDFFX/+gVeYqKAod3D3UVm91jHwynguOwAvYPhx8nNlM++NqRcK6CxxpUafjmhIdKiHibqg==",
+       "license": "MIT"
+     },
++    "node_modules/asn1": {
++      "version": "0.2.6",
++      "resolved": "https://registry.npmjs.org/asn1/-/asn1-0.2.6.tgz",
++      "integrity": "sha512-ix/FxPn0MDjeyJ7i/yoHGFt/EX6LyNbxSEhPPXODPL+KB0VPk86UYfL0lMdy+KCnv+fmvIzySwaK5COwqVbWTQ==",
++      "license": "MIT",
++      "dependencies": {
++        "safer-buffer": "~2.1.0"
++      }
++    },
++    "node_modules/assert-plus": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/assert-plus/-/assert-plus-1.0.0.tgz",
++      "integrity": "sha512-NfJ4UzBCcQGLDlQq7nHxH+tv3kyZ0hHQqF5BO6J7tNJeP5do1llPr8dZ8zHonfhAu0PHAdMkSo+8o0wxg9lZWw==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=0.8"
++      }
++    },
+     "node_modules/asynckit": {
+       "version": "0.4.0",
+       "resolved": "https://registry.npmjs.org/asynckit/-/asynckit-0.4.0.tgz",
+       "integrity": "sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==",
+       "license": "MIT"
+     },
++    "node_modules/aws-sign2": {
++      "version": "0.7.0",
++      "resolved": "https://registry.npmjs.org/aws-sign2/-/aws-sign2-0.7.0.tgz",
++      "integrity": "sha512-08kcGqnYf/YmjoRhfxyu+CLxBjUtHLXLXX/vUfx9l2LYzG3c1m61nrpyFUZI6zeS+Li/wWMMidD9KgrqtGq3mA==",
++      "license": "Apache-2.0",
++      "engines": {
++        "node": "*"
++      }
++    },
++    "node_modules/aws4": {
++      "version": "1.13.2",
++      "resolved": "https://registry.npmjs.org/aws4/-/aws4-1.13.2.tgz",
++      "integrity": "sha512-lHe62zvbTB5eEABUVi/AwVh0ZKY9rMMDhmm+eeyuuUQbQ3+J+fONVQOZyj+DdrvD4BY33uYniyRJ4UJIaSKAfw==",
++      "license": "MIT"
++    },
+     "node_modules/axios": {
+       "version": "1.18.1",
+       "resolved": "https://registry.npmjs.org/axios/-/axios-1.18.1.tgz",
+@@ -112,6 +240,30 @@
+         "proxy-from-env": "^2.1.0"
+       }
+     },
++    "node_modules/bcrypt-pbkdf": {
++      "version": "1.0.2",
++      "resolved": "https://registry.npmjs.org/bcrypt-pbkdf/-/bcrypt-pbkdf-1.0.2.tgz",
++      "integrity": "sha512-qeFIXtP4MSoi6NLqO12WfqARWWuCKi2Rn/9hJLEmtB5yTNr9DqFWkJRCf2qShWzPeAMRnOgCrq0sg/KLv5ES9w==",
++      "license": "BSD-3-Clause",
++      "dependencies": {
++        "tweetnacl": "^0.14.3"
++      }
++    },
++    "node_modules/bignumber.js": {
++      "version": "9.3.1",
++      "resolved": "https://registry.npmjs.org/bignumber.js/-/bignumber.js-9.3.1.tgz",
++      "integrity": "sha512-Ko0uX15oIUS7wJ3Rb30Fs6SkVbLmPBAKdlm7q9+ak9bbIeFf0MwuBsQV6z7+X768/cHsfg+WlysDWJcmthjsjQ==",
++      "license": "MIT",
++      "engines": {
++        "node": "*"
++      }
++    },
++    "node_modules/bluebird": {
++      "version": "3.7.2",
++      "resolved": "https://registry.npmjs.org/bluebird/-/bluebird-3.7.2.tgz",
++      "integrity": "sha512-XpNj6GDQzdfW+r2Wnn7xiSAd7TM3jzkxGXBGTtWKuSXv1xUV+azxAm8jdWZN06QTQk+2N2XB9jRDkvbmQmcRtg==",
++      "license": "MIT"
++    },
+     "node_modules/body-parser": {
+       "version": "1.20.6",
+       "resolved": "https://registry.npmjs.org/body-parser/-/body-parser-1.20.6.tgz",
+@@ -191,6 +343,24 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/caseless": {
++      "version": "0.12.0",
++      "resolved": "https://registry.npmjs.org/caseless/-/caseless-0.12.0.tgz",
++      "integrity": "sha512-4tYFyifaFfGacoiObjJegolkwSU4xQNGbVgUiNYVUxbQ2x2lUsFvY4hVgVzGiIe6WLOPqycWXA40l+PWsxthUw==",
++      "license": "Apache-2.0"
++    },
++    "node_modules/chance": {
++      "version": "1.1.13",
++      "resolved": "https://registry.npmjs.org/chance/-/chance-1.1.13.tgz",
++      "integrity": "sha512-V6lQCljcLznE7tUYUM9EOAnnKXbctE6j/rdQkYOHIWbfGQbrzTsAXNW9CdU5XCo4ArXQCj/rb6HgxPlmGJcaUg==",
++      "license": "MIT"
++    },
++    "node_modules/class-transformer": {
++      "version": "0.3.1",
++      "resolved": "https://registry.npmjs.org/class-transformer/-/class-transformer-0.3.1.tgz",
++      "integrity": "sha512-cKFwohpJbuMovS8xVLmn8N2AUbAuc8pVo4zEfsUVo8qgECOogns1WVk/FkOZoxhOPTyTYFckuoH+13FO+MQ8GA==",
++      "license": "MIT"
++    },
+     "node_modules/combined-stream": {
+       "version": "1.0.8",
+       "resolved": "https://registry.npmjs.org/combined-stream/-/combined-stream-1.0.8.tgz",
+@@ -277,6 +447,18 @@
+         "url": "https://opencollective.com/express"
+       }
+     },
++    "node_modules/dashdash": {
++      "version": "1.14.1",
++      "resolved": "https://registry.npmjs.org/dashdash/-/dashdash-1.14.1.tgz",
++      "integrity": "sha512-jRFi8UDGo6j+odZiEpjazZaWqEal3w/basFjQHQEwVtZJGDpxbH1MeYluwCS8Xq5wmLJooDlMgvVarmWfGM44g==",
++      "license": "MIT",
++      "dependencies": {
++        "assert-plus": "^1.0.0"
++      },
++      "engines": {
++        "node": ">=0.10"
++      }
++    },
+     "node_modules/debug": {
+       "version": "2.6.9",
+       "resolved": "https://registry.npmjs.org/debug/-/debug-2.6.9.tgz",
+@@ -340,6 +522,16 @@
+         "node": ">= 0.4"
+       }
+     },
++    "node_modules/ecc-jsbn": {
++      "version": "0.1.2",
++      "resolved": "https://registry.npmjs.org/ecc-jsbn/-/ecc-jsbn-0.1.2.tgz",
++      "integrity": "sha512-eh9O+hwRHNbG4BLTjEl3nw044CkGm5X6LoaCf7LPp7UU8Qrt47JYNi6nPX8xjW97TKGKm1ouctg0QSpZe9qrnw==",
++      "license": "MIT",
++      "dependencies": {
++        "jsbn": "~0.1.0",
++        "safer-buffer": "^2.1.0"
++      }
++    },
+     "node_modules/ee-first": {
+       "version": "1.1.1",
+       "resolved": "https://registry.npmjs.org/ee-first/-/ee-first-1.1.1.tgz",
+@@ -470,6 +662,33 @@
+         "url": "https://opencollective.com/express"
+       }
+     },
++    "node_modules/extend": {
++      "version": "3.0.2",
++      "resolved": "https://registry.npmjs.org/extend/-/extend-3.0.2.tgz",
++      "integrity": "sha512-fjquC59cD7CyW6urNXK0FBufkZcoiGG80wTuPujX590cB5Ttln20E2UB4S/WARVqhXffZl2LNgS+gQdPIIim/g==",
++      "license": "MIT"
++    },
++    "node_modules/extsprintf": {
++      "version": "1.3.0",
++      "resolved": "https://registry.npmjs.org/extsprintf/-/extsprintf-1.3.0.tgz",
++      "integrity": "sha512-11Ndz7Nv+mvAC1j0ktTa7fAb0vLyGGX+rMHNBYQviQDGU0Hw7lhctJANqbPhu9nV9/izT/IntTgZ7Im/9LJs9g==",
++      "engines": [
++        "node >=0.6.0"
++      ],
++      "license": "MIT"
++    },
++    "node_modules/fast-deep-equal": {
++      "version": "3.1.3",
++      "resolved": "https://registry.npmjs.org/fast-deep-equal/-/fast-deep-equal-3.1.3.tgz",
++      "integrity": "sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==",
++      "license": "MIT"
++    },
++    "node_modules/fast-json-stable-stringify": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/fast-json-stable-stringify/-/fast-json-stable-stringify-2.1.0.tgz",
++      "integrity": "sha512-lhd/wF+Lk98HZoTCtlVraHtfh5XYijIjalXck7saUtuanSDyLMxnHhSXEDJqHxD7msR8D0uCmqlkwjCV8xvwHw==",
++      "license": "MIT"
++    },
+     "node_modules/finalhandler": {
+       "version": "1.3.2",
+       "resolved": "https://registry.npmjs.org/finalhandler/-/finalhandler-1.3.2.tgz",
+@@ -508,6 +727,15 @@
+         }
+       }
+     },
++    "node_modules/forever-agent": {
++      "version": "0.6.1",
++      "resolved": "https://registry.npmjs.org/forever-agent/-/forever-agent-0.6.1.tgz",
++      "integrity": "sha512-j0KLYPhm6zeac4lz3oJ3o65qvgQCcPubiyotZrXqEaG4hNagNYO8qdlUrX5vwqv9ohqeT/Z3j6+yW067yWWdUw==",
++      "license": "Apache-2.0",
++      "engines": {
++        "node": "*"
++      }
++    },
+     "node_modules/form-data": {
+       "version": "4.0.6",
+       "resolved": "https://registry.npmjs.org/form-data/-/form-data-4.0.6.tgz",
+@@ -588,6 +816,15 @@
+         "node": ">= 0.4"
+       }
+     },
++    "node_modules/getpass": {
++      "version": "0.1.7",
++      "resolved": "https://registry.npmjs.org/getpass/-/getpass-0.1.7.tgz",
++      "integrity": "sha512-0fzj9JxOLfJ+XGLhR8ze3unN0KZCgZwiSSDz168VERjK8Wl8kVSdcu2kspd4s4wtAa1y/qrVRiAA0WclVsu0ng==",
++      "license": "MIT",
++      "dependencies": {
++        "assert-plus": "^1.0.0"
++      }
++    },
+     "node_modules/gopd": {
+       "version": "1.2.0",
+       "resolved": "https://registry.npmjs.org/gopd/-/gopd-1.2.0.tgz",
+@@ -638,6 +875,29 @@
+       "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==",
+       "license": "MIT"
+     },
++    "node_modules/har-schema": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/har-schema/-/har-schema-2.0.0.tgz",
++      "integrity": "sha512-Oqluz6zhGX8cyRaTQlFMPw80bSJVG2x/cFb8ZPhUILGgHka9SsokCCOQgpveePerqidZOrT14ipqfJb7ILcW5Q==",
++      "license": "ISC",
++      "engines": {
++        "node": ">=4"
++      }
++    },
++    "node_modules/har-validator": {
++      "version": "5.1.5",
++      "resolved": "https://registry.npmjs.org/har-validator/-/har-validator-5.1.5.tgz",
++      "integrity": "sha512-nmT2T0lljbxdQZfspsno9hgrG3Uir6Ks5afism62poxqBM6sDnMEuPmzTq8XN0OEwqKLLdh1jQI3qyE66Nzb3w==",
++      "deprecated": "this library is no longer supported",
++      "license": "MIT",
++      "dependencies": {
++        "ajv": "^6.12.3",
++        "har-schema": "^2.0.0"
++      },
++      "engines": {
++        "node": ">=6"
++      }
++    },
+     "node_modules/has-symbols": {
+       "version": "1.1.0",
+       "resolved": "https://registry.npmjs.org/has-symbols/-/has-symbols-1.1.0.tgz",
+@@ -697,6 +957,21 @@
+         "url": "https://opencollective.com/express"
+       }
+     },
++    "node_modules/http-signature": {
++      "version": "1.2.0",
++      "resolved": "https://registry.npmjs.org/http-signature/-/http-signature-1.2.0.tgz",
++      "integrity": "sha512-CAbnr6Rz4CYQkLYUtSNXxQPUH2gK8f3iWexVlsnMeD+GjlsQ0Xsy1cOX+mN3dtxYomRy21CiOzU8Uhw6OwncEQ==",
++      "license": "MIT",
++      "dependencies": {
++        "assert-plus": "^1.0.0",
++        "jsprim": "^1.2.2",
++        "sshpk": "^1.7.0"
++      },
++      "engines": {
++        "node": ">=0.8",
++        "npm": ">=1.3.7"
++      }
++    },
+     "node_modules/https-proxy-agent": {
+       "version": "5.0.1",
+       "resolved": "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-5.0.1.tgz",
+@@ -745,12 +1020,96 @@
+         "node": ">=0.10.0"
+       }
+     },
++    "node_modules/image-size": {
++      "version": "0.7.5",
++      "resolved": "https://registry.npmjs.org/image-size/-/image-size-0.7.5.tgz",
++      "integrity": "sha512-Hiyv+mXHfFEP7LzUL/llg9RwFxxY+o9N3JVLIeG5E7iFIFAalxvRU9UZthBdYDEVnzHMgjnKJPPpay5BWf1g9g==",
++      "license": "MIT",
++      "bin": {
++        "image-size": "bin/image-size.js"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      }
++    },
+     "node_modules/inherits": {
+       "version": "2.0.4",
+       "resolved": "https://registry.npmjs.org/inherits/-/inherits-2.0.4.tgz",
+       "integrity": "sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==",
+       "license": "ISC"
+     },
++    "node_modules/instagram-private-api": {
++      "version": "1.46.1",
++      "resolved": "https://registry.npmjs.org/instagram-private-api/-/instagram-private-api-1.46.1.tgz",
++      "integrity": "sha512-fq0q6UfhpikKZ5Kw8HNwS6YpsNghE9I/uc8AM9Do9nsQ+3H1u0jLz+0t/FcGkGTjZz5VGvU8s2VbWj9wxchwYg==",
++      "license": "MIT",
++      "dependencies": {
++        "@lifeomic/attempt": "^3.0.0",
++        "@types/chance": "^1.0.2",
++        "@types/request-promise": "^4.1.43",
++        "bluebird": "^3.7.1",
++        "chance": "^1.0.18",
++        "class-transformer": "^0.3.1",
++        "debug": "^4.1.1",
++        "image-size": "^0.7.3",
++        "json-bigint": "^1.0.0",
++        "lodash": "^4.17.20",
++        "luxon": "^1.12.1",
++        "reflect-metadata": "^0.1.13",
++        "request": "^2.88.0",
++        "request-promise": "^4.2.4",
++        "rxjs": "^6.5.2",
++        "snakecase-keys": "^3.1.0",
++        "tough-cookie": "^2.5.0",
++        "ts-custom-error": "^2.2.2",
++        "ts-xor": "^1.0.6",
++        "url-regex-safe": "^3.0.0",
++        "utility-types": "^3.10.0"
++      },
++      "engines": {
++        "node": ">=8.0.0"
++      },
++      "peerDependencies": {
++        "re2": "^1.17.2"
++      },
++      "peerDependenciesMeta": {
++        "re2": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/instagram-private-api/node_modules/debug": {
++      "version": "4.4.3",
++      "resolved": "https://registry.npmjs.org/debug/-/debug-4.4.3.tgz",
++      "integrity": "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==",
++      "license": "MIT",
++      "dependencies": {
++        "ms": "^2.1.3"
++      },
++      "engines": {
++        "node": ">=6.0"
++      },
++      "peerDependenciesMeta": {
++        "supports-color": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/instagram-private-api/node_modules/ms": {
++      "version": "2.1.3",
++      "resolved": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz",
++      "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==",
++      "license": "MIT"
++    },
++    "node_modules/ip-regex": {
++      "version": "4.3.0",
++      "resolved": "https://registry.npmjs.org/ip-regex/-/ip-regex-4.3.0.tgz",
++      "integrity": "sha512-B9ZWJxHHOHUhUjCPrMpLD4xEq35bUTClHM1S6CBU5ixQnkZmwipwgc96vAd7AAGM9TGHvJR+Uss+/Ak6UphK+Q==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=8"
++      }
++    },
+     "node_modules/ipaddr.js": {
+       "version": "1.9.1",
+       "resolved": "https://registry.npmjs.org/ipaddr.js/-/ipaddr.js-1.9.1.tgz",
+@@ -760,12 +1119,99 @@
+         "node": ">= 0.10"
+       }
+     },
++    "node_modules/is-typedarray": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/is-typedarray/-/is-typedarray-1.0.0.tgz",
++      "integrity": "sha512-cyA56iCMHAh5CdzjJIa4aohJyeO1YbwLi3Jc35MmRU6poroFjIGZzUzupGiRPOjgHg9TLu43xbpwXk523fMxKA==",
++      "license": "MIT"
++    },
+     "node_modules/isarray": {
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/isarray/-/isarray-1.0.0.tgz",
+       "integrity": "sha512-VLghIWNM6ELQzo7zwmcg0NmTVyWKYjvIeM83yjp0wRDTmUnrM678fQbcKBo6n2CJEF0szoG//ytg+TKla89ALQ==",
+       "license": "MIT"
+     },
++    "node_modules/isstream": {
++      "version": "0.1.2",
++      "resolved": "https://registry.npmjs.org/isstream/-/isstream-0.1.2.tgz",
++      "integrity": "sha512-Yljz7ffyPbrLpLngrMtZ7NduUgVvi6wG9RJ9IUcyCd59YQ911PBJphODUcbOVbqYfxe1wuYf/LJ8PauMRwsM/g==",
++      "license": "MIT"
++    },
++    "node_modules/jsbn": {
++      "version": "0.1.1",
++      "resolved": "https://registry.npmjs.org/jsbn/-/jsbn-0.1.1.tgz",
++      "integrity": "sha512-UVU9dibq2JcFWxQPA6KCqj5O42VOmAY3zQUfEKxU0KpTGXwNoCjkX1e13eHNvw/xPynt6pU0rZ1htjWTNTSXsg==",
++      "license": "MIT"
++    },
++    "node_modules/json-bigint": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/json-bigint/-/json-bigint-1.0.0.tgz",
++      "integrity": "sha512-SiPv/8VpZuWbvLSMtTDU8hEfrZWg/mH/nV/b4o0CYbSxu1UIQPLdwKOCIyLQX+VIPO5vrLX3i8qtqFyhdPSUSQ==",
++      "license": "MIT",
++      "dependencies": {
++        "bignumber.js": "^9.0.0"
++      }
++    },
++    "node_modules/json-schema": {
++      "version": "0.4.0",
++      "resolved": "https://registry.npmjs.org/json-schema/-/json-schema-0.4.0.tgz",
++      "integrity": "sha512-es94M3nTIfsEPisRafak+HDLfHXnKBhV3vU5eqPcS3flIWqcxJWgXHXiey3YrpaNsanY5ei1VoYEbOzijuq9BA==",
++      "license": "(AFL-2.1 OR BSD-3-Clause)"
++    },
++    "node_modules/json-schema-traverse": {
++      "version": "0.4.1",
++      "resolved": "https://registry.npmjs.org/json-schema-traverse/-/json-schema-traverse-0.4.1.tgz",
++      "integrity": "sha512-xbbCH5dCYU5T8LcEhhuh7HJ88HXuW3qsI3Y0zOZFKfZEHcpWiHU/Jxzk629Brsab/mMiHQti9wMP+845RPe3Vg==",
++      "license": "MIT"
++    },
++    "node_modules/json-stringify-safe": {
++      "version": "5.0.1",
++      "resolved": "https://registry.npmjs.org/json-stringify-safe/-/json-stringify-safe-5.0.1.tgz",
++      "integrity": "sha512-ZClg6AaYvamvYEE82d3Iyd3vSSIjQ+odgjaTzRuO3s7toCdFKczob2i0zCh7JE8kWn17yvAWhUVxvqGwUalsRA==",
++      "license": "ISC"
++    },
++    "node_modules/jsprim": {
++      "version": "1.4.2",
++      "resolved": "https://registry.npmjs.org/jsprim/-/jsprim-1.4.2.tgz",
++      "integrity": "sha512-P2bSOMAc/ciLz6DzgjVlGJP9+BrJWu5UDGK70C2iweC5QBIeFf0ZXRvGjEj2uYgrY2MkAAhsSWHDWlFtEroZWw==",
++      "license": "MIT",
++      "dependencies": {
++        "assert-plus": "1.0.0",
++        "extsprintf": "1.3.0",
++        "json-schema": "0.4.0",
++        "verror": "1.10.0"
++      },
++      "engines": {
++        "node": ">=0.6.0"
++      }
++    },
++    "node_modules/lodash": {
++      "version": "4.18.1",
++      "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.18.1.tgz",
++      "integrity": "sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==",
++      "license": "MIT"
++    },
++    "node_modules/luxon": {
++      "version": "1.28.1",
++      "resolved": "https://registry.npmjs.org/luxon/-/luxon-1.28.1.tgz",
++      "integrity": "sha512-gYHAa180mKrNIUJCbwpmD0aTu9kV0dREDrwNnuyFAsO1Wt0EVYSZelPnJlbj9HplzXX/YWXHFTL45kvZ53M0pw==",
++      "license": "MIT",
++      "engines": {
++        "node": "*"
++      }
++    },
++    "node_modules/map-obj": {
++      "version": "4.3.0",
++      "resolved": "https://registry.npmjs.org/map-obj/-/map-obj-4.3.0.tgz",
++      "integrity": "sha512-hdN1wVrZbb29eBGiGjJbeP8JbKjq1urkHJ/LIP/NY48MZ1QVXUsQBV1G1zvYFHn1XE06cwjBsOI2K3Ulnj1YXQ==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=8"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/sindresorhus"
++      }
++    },
+     "node_modules/math-intrinsics": {
+       "version": "1.1.0",
+       "resolved": "https://registry.npmjs.org/math-intrinsics/-/math-intrinsics-1.1.0.tgz",
+@@ -910,6 +1356,15 @@
+         }
+       }
+     },
++    "node_modules/oauth-sign": {
++      "version": "0.9.0",
++      "resolved": "https://registry.npmjs.org/oauth-sign/-/oauth-sign-0.9.0.tgz",
++      "integrity": "sha512-fexhUFFPTGV8ybAtSIGbV6gOkSv8UtRbDBnAyLQw4QPKkgNlsH2ByPGtMUqdWkos6YCRmAqViwgZrJc/mRDzZQ==",
++      "license": "Apache-2.0",
++      "engines": {
++        "node": "*"
++      }
++    },
+     "node_modules/object-assign": {
+       "version": "4.1.1",
+       "resolved": "https://registry.npmjs.org/object-assign/-/object-assign-4.1.1.tgz",
+@@ -958,6 +1413,12 @@
+       "integrity": "sha512-A/AGNMFN3c8bOlvV9RreMdrv7jsmF9XIfDeCd87+I8RNg6s78BhJxMu69NEMHBSJFxKidViTEdruRwEk/WIKqA==",
+       "license": "MIT"
+     },
++    "node_modules/performance-now": {
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/performance-now/-/performance-now-2.1.0.tgz",
++      "integrity": "sha512-7EAHlyLHI56VEIdK57uwHdHKIaAGbnXPiw0yWbarQZOKaKpvUIgW0jWRVLiatnM+XXlSwsanIBH/hzGMJulMow==",
++      "license": "MIT"
++    },
+     "node_modules/process-nextick-args": {
+       "version": "2.0.1",
+       "resolved": "https://registry.npmjs.org/process-nextick-args/-/process-nextick-args-2.0.1.tgz",
+@@ -986,6 +1447,27 @@
+         "node": ">=10"
+       }
+     },
++    "node_modules/psl": {
++      "version": "1.15.0",
++      "resolved": "https://registry.npmjs.org/psl/-/psl-1.15.0.tgz",
++      "integrity": "sha512-JZd3gMVBAVQkSs6HdNZo9Sdo0LNcQeMNP3CozBJb3JYC/QUYZTnKxP+f8oWRX4rHP5EurWxqAHTSwUCjlNKa1w==",
++      "license": "MIT",
++      "dependencies": {
++        "punycode": "^2.3.1"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/lupomontero"
++      }
++    },
++    "node_modules/punycode": {
++      "version": "2.3.1",
++      "resolved": "https://registry.npmjs.org/punycode/-/punycode-2.3.1.tgz",
++      "integrity": "sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=6"
++      }
++    },
+     "node_modules/qs": {
+       "version": "6.15.3",
+       "resolved": "https://registry.npmjs.org/qs/-/qs-6.15.3.tgz",
+@@ -1047,6 +1529,113 @@
+       "integrity": "sha512-Gd2UZBJDkXlY7GbJxfsE8/nvKkUEU1G38c1siN6QP6a9PT9MmHB8GnpscSmMJSoF8LOIrt8ud/wPtojys4G6+g==",
+       "license": "MIT"
+     },
++    "node_modules/reflect-metadata": {
++      "version": "0.1.14",
++      "resolved": "https://registry.npmjs.org/reflect-metadata/-/reflect-metadata-0.1.14.tgz",
++      "integrity": "sha512-ZhYeb6nRaXCfhnndflDK8qI6ZQ/YcWZCISRAWICW9XYqMUwjZM9Z0DveWX/ABN01oxSHwVxKQmxeYZSsm0jh5A==",
++      "license": "Apache-2.0"
++    },
++    "node_modules/request": {
++      "version": "2.88.2",
++      "resolved": "https://registry.npmjs.org/request/-/request-2.88.2.tgz",
++      "integrity": "sha512-MsvtOrfG9ZcrOwAW+Qi+F6HbD0CWXEh9ou77uOb7FM2WPhwT7smM833PzanhJLsgXjN89Ir6V2PczXNnMpwKhw==",
++      "deprecated": "request has been deprecated, see https://github.com/request/request/issues/3142",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "aws-sign2": "~0.7.0",
++        "aws4": "^1.8.0",
++        "caseless": "~0.12.0",
++        "combined-stream": "~1.0.6",
++        "extend": "~3.0.2",
++        "forever-agent": "~0.6.1",
++        "form-data": "~2.3.2",
++        "har-validator": "~5.1.3",
++        "http-signature": "~1.2.0",
++        "is-typedarray": "~1.0.0",
++        "isstream": "~0.1.2",
++        "json-stringify-safe": "~5.0.1",
++        "mime-types": "~2.1.19",
++        "oauth-sign": "~0.9.0",
++        "performance-now": "^2.1.0",
++        "qs": "~6.5.2",
++        "safe-buffer": "^5.1.2",
++        "tough-cookie": "~2.5.0",
++        "tunnel-agent": "^0.6.0",
++        "uuid": "^3.3.2"
++      },
++      "engines": {
++        "node": ">= 6"
++      }
++    },
++    "node_modules/request-promise": {
++      "version": "4.2.6",
++      "resolved": "https://registry.npmjs.org/request-promise/-/request-promise-4.2.6.tgz",
++      "integrity": "sha512-HCHI3DJJUakkOr8fNoCc73E5nU5bqITjOYFMDrKHYOXWXrgD/SBaC7LjwuPymUprRyuF06UK7hd/lMHkmUXglQ==",
++      "deprecated": "request-promise has been deprecated because it extends the now deprecated request package, see https://github.com/request/request/issues/3142",
++      "license": "ISC",
++      "dependencies": {
++        "bluebird": "^3.5.0",
++        "request-promise-core": "1.1.4",
++        "stealthy-require": "^1.1.1",
++        "tough-cookie": "^2.3.3"
++      },
++      "engines": {
++        "node": ">=0.10.0"
++      },
++      "peerDependencies": {
++        "request": "^2.34"
++      }
++    },
++    "node_modules/request-promise-core": {
++      "version": "1.1.4",
++      "resolved": "https://registry.npmjs.org/request-promise-core/-/request-promise-core-1.1.4.tgz",
++      "integrity": "sha512-TTbAfBBRdWD7aNNOoVOBH4pN/KigV6LyapYNNlAPA8JwbovRti1E88m3sYAwsLi5ryhPKsE9APwnjFTgdUjTpw==",
++      "license": "ISC",
++      "dependencies": {
++        "lodash": "^4.17.19"
++      },
++      "engines": {
++        "node": ">=0.10.0"
++      },
++      "peerDependencies": {
++        "request": "^2.34"
++      }
++    },
++    "node_modules/request/node_modules/form-data": {
++      "version": "2.3.3",
++      "resolved": "https://registry.npmjs.org/form-data/-/form-data-2.3.3.tgz",
++      "integrity": "sha512-1lLKB2Mu3aGP1Q/2eCOx0fNbRMe7XdwktwOruhfqqd0rIJWwN4Dh+E3hrPSlDCXnSR7UtZ1N38rVXm+6+MEhJQ==",
++      "license": "MIT",
++      "dependencies": {
++        "asynckit": "^0.4.0",
++        "combined-stream": "^1.0.6",
++        "mime-types": "^2.1.12"
++      },
++      "engines": {
++        "node": ">= 0.12"
++      }
++    },
++    "node_modules/request/node_modules/qs": {
++      "version": "6.5.5",
++      "resolved": "https://registry.npmjs.org/qs/-/qs-6.5.5.tgz",
++      "integrity": "sha512-mzR4sElr1bfCaPJe7m8ilJ6ZXdDaGoObcYR0ZHSsktM/Lt21MVHj5De30GQH2eiZ1qGRTO7LCAzQsUeXTNexWQ==",
++      "license": "BSD-3-Clause",
++      "engines": {
++        "node": ">=0.6"
++      }
++    },
++    "node_modules/rxjs": {
++      "version": "6.6.7",
++      "resolved": "https://registry.npmjs.org/rxjs/-/rxjs-6.6.7.tgz",
++      "integrity": "sha512-hTdwr+7yYNIT5n4AMYp85KA6yw2Va0FLa3Rguvbpa4W3I5xynaBZo41cM3XM+4Q6fRMj3sBYIR1VAmZMXYJvRQ==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "tslib": "^1.9.0"
++      },
++      "engines": {
++        "npm": ">=2.0.0"
++      }
++    },
+     "node_modules/safe-buffer": {
+       "version": "5.2.1",
+       "resolved": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.2.1.tgz",
+@@ -1196,6 +1785,44 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/snakecase-keys": {
++      "version": "3.2.1",
++      "resolved": "https://registry.npmjs.org/snakecase-keys/-/snakecase-keys-3.2.1.tgz",
++      "integrity": "sha512-CjU5pyRfwOtaOITYv5C8DzpZ8XA/ieRsDpr93HI2r6e3YInC6moZpSQbmUtg8cTk58tq2x3jcG2gv+p1IZGmMA==",
++      "license": "MIT",
++      "dependencies": {
++        "map-obj": "^4.1.0",
++        "to-snake-case": "^1.0.0"
++      },
++      "engines": {
++        "node": ">=8"
++      }
++    },
++    "node_modules/sshpk": {
++      "version": "1.18.0",
++      "resolved": "https://registry.npmjs.org/sshpk/-/sshpk-1.18.0.tgz",
++      "integrity": "sha512-2p2KJZTSqQ/I3+HX42EpYOa2l3f8Erv8MWKsy2I9uf4wA7yFIkXRffYdsx86y6z4vHtV8u7g+pPlr8/4ouAxsQ==",
++      "license": "MIT",
++      "dependencies": {
++        "asn1": "~0.2.3",
++        "assert-plus": "^1.0.0",
++        "bcrypt-pbkdf": "^1.0.0",
++        "dashdash": "^1.12.0",
++        "ecc-jsbn": "~0.1.1",
++        "getpass": "^0.1.1",
++        "jsbn": "~0.1.0",
++        "safer-buffer": "^2.0.2",
++        "tweetnacl": "~0.14.0"
++      },
++      "bin": {
++        "sshpk-conv": "bin/sshpk-conv",
++        "sshpk-sign": "bin/sshpk-sign",
++        "sshpk-verify": "bin/sshpk-verify"
++      },
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
+     "node_modules/statuses": {
+       "version": "2.0.2",
+       "resolved": "https://registry.npmjs.org/statuses/-/statuses-2.0.2.tgz",
+@@ -1205,6 +1832,15 @@
+         "node": ">= 0.8"
+       }
+     },
++    "node_modules/stealthy-require": {
++      "version": "1.1.1",
++      "resolved": "https://registry.npmjs.org/stealthy-require/-/stealthy-require-1.1.1.tgz",
++      "integrity": "sha512-ZnWpYnYugiOVEY5GkcuJK1io5V8QmNYChG62gSit9pQVGErXtrKuPC55ITaVSukmMta5qpMU7vqLt2Lnni4f/g==",
++      "license": "ISC",
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
+     "node_modules/streamsearch": {
+       "version": "1.1.0",
+       "resolved": "https://registry.npmjs.org/streamsearch/-/streamsearch-1.1.0.tgz",
+@@ -1228,6 +1864,39 @@
+       "integrity": "sha512-Gd2UZBJDkXlY7GbJxfsE8/nvKkUEU1G38c1siN6QP6a9PT9MmHB8GnpscSmMJSoF8LOIrt8ud/wPtojys4G6+g==",
+       "license": "MIT"
+     },
++    "node_modules/tlds": {
++      "version": "1.261.0",
++      "resolved": "https://registry.npmjs.org/tlds/-/tlds-1.261.0.tgz",
++      "integrity": "sha512-QXqwfEl9ddlGBaRFXIvNKK6OhipSiLXuRuLJX5DErz0o0Q0rYxulWLdFryTkV5PkdZct5iMInwYEGe/eR++1AA==",
++      "license": "MIT",
++      "bin": {
++        "tlds": "bin.js"
++      }
++    },
++    "node_modules/to-no-case": {
++      "version": "1.0.2",
++      "resolved": "https://registry.npmjs.org/to-no-case/-/to-no-case-1.0.2.tgz",
++      "integrity": "sha512-Z3g735FxuZY8rodxV4gH7LxClE4H0hTIyHNIHdk+vpQxjLm0cwnKXq/OFVZ76SOQmto7txVcwSCwkU5kqp+FKg==",
++      "license": "MIT"
++    },
++    "node_modules/to-snake-case": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/to-snake-case/-/to-snake-case-1.0.0.tgz",
++      "integrity": "sha512-joRpzBAk1Bhi2eGEYBjukEWHOe/IvclOkiJl3DtA91jV6NwQ3MwXA4FHYeqk8BNp/D8bmi9tcNbRu/SozP0jbQ==",
++      "license": "MIT",
++      "dependencies": {
++        "to-space-case": "^1.0.0"
++      }
++    },
++    "node_modules/to-space-case": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/to-space-case/-/to-space-case-1.0.0.tgz",
++      "integrity": "sha512-rLdvwXZ39VOn1IxGL3V6ZstoTbwLRckQmn/U8ZDLuWwIXNpuZDhQ3AiRUlhTbOXFVE9C+dR51wM0CBDhk31VcA==",
++      "license": "MIT",
++      "dependencies": {
++        "to-no-case": "^1.0.0"
++      }
++    },
+     "node_modules/toidentifier": {
+       "version": "1.0.1",
+       "resolved": "https://registry.npmjs.org/toidentifier/-/toidentifier-1.0.1.tgz",
+@@ -1237,12 +1906,65 @@
+         "node": ">=0.6"
+       }
+     },
++    "node_modules/tough-cookie": {
++      "version": "2.5.0",
++      "resolved": "https://registry.npmjs.org/tough-cookie/-/tough-cookie-2.5.0.tgz",
++      "integrity": "sha512-nlLsUzgm1kfLXSXfRZMc1KLAugd4hqJHDTvc2hDIwS3mZAfMEuMbc03SujMF+GEcpaX/qboeycw6iO8JwVv2+g==",
++      "license": "BSD-3-Clause",
++      "dependencies": {
++        "psl": "^1.1.28",
++        "punycode": "^2.1.1"
++      },
++      "engines": {
++        "node": ">=0.8"
++      }
++    },
+     "node_modules/tr46": {
+       "version": "0.0.3",
+       "resolved": "https://registry.npmjs.org/tr46/-/tr46-0.0.3.tgz",
+       "integrity": "sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==",
+       "license": "MIT"
+     },
++    "node_modules/ts-custom-error": {
++      "version": "2.2.2",
++      "resolved": "https://registry.npmjs.org/ts-custom-error/-/ts-custom-error-2.2.2.tgz",
++      "integrity": "sha512-I0FEdfdatDjeigRqh1JFj67bcIKyRNm12UVGheBjs2pXgyELg2xeiQLVaWu1pVmNGXZVnz/fvycSU41moBIpOg==",
++      "deprecated": "npm package tarball contains useless codeclimate-reporter binary, please update to version 3.1.1. See https://github.com/adriengibrat/ts-custom-error/issues/32",
++      "license": "WTFPL",
++      "engines": {
++        "node": ">=8.0.0"
++      }
++    },
++    "node_modules/ts-xor": {
++      "version": "1.3.0",
++      "resolved": "https://registry.npmjs.org/ts-xor/-/ts-xor-1.3.0.tgz",
++      "integrity": "sha512-RLXVjliCzc1gfKQFLRpfeD0rrWmjnSTgj7+RFhoq3KRkUYa8LE/TIidYOzM5h+IdFBDSjjSgk9Lto9sdMfDFEA==",
++      "license": "MIT"
++    },
++    "node_modules/tslib": {
++      "version": "1.14.1",
++      "resolved": "https://registry.npmjs.org/tslib/-/tslib-1.14.1.tgz",
++      "integrity": "sha512-Xni35NKzjgMrwevysHTCArtLDpPvye8zV/0E4EyYn43P7/7qvQwPh9BGkHewbMulVntbigmcT7rdX3BNo9wRJg==",
++      "license": "0BSD"
++    },
++    "node_modules/tunnel-agent": {
++      "version": "0.6.0",
++      "resolved": "https://registry.npmjs.org/tunnel-agent/-/tunnel-agent-0.6.0.tgz",
++      "integrity": "sha512-McnNiV1l8RYeY8tBgEpuodCC1mLUdbSN+CYBL7kJsJNInOP8UjDDEwdk6Mw60vdLLrr5NHKZhMAOSrR2NZuQ+w==",
++      "license": "Apache-2.0",
++      "dependencies": {
++        "safe-buffer": "^5.0.1"
++      },
++      "engines": {
++        "node": "*"
++      }
++    },
++    "node_modules/tweetnacl": {
++      "version": "0.14.5",
++      "resolved": "https://registry.npmjs.org/tweetnacl/-/tweetnacl-0.14.5.tgz",
++      "integrity": "sha512-KXXFFdAbFXY4geFIwoyNK+f5Z1b7swfXABfL7HXCmoIWMKU3dmS26672A4EeQtDzLKy7SXmfBu51JolvEKwtGA==",
++      "license": "Unlicense"
++    },
+     "node_modules/type-is": {
+       "version": "1.6.18",
+       "resolved": "https://registry.npmjs.org/type-is/-/type-is-1.6.18.tgz",
+@@ -1262,6 +1984,12 @@
+       "integrity": "sha512-/aCDEGatGvZ2BIk+HmLf4ifCJFwvKFNb9/JeZPMulfgFracn9QFcAf5GO8B/mweUjSoblS5In0cWhqpfs/5PQA==",
+       "license": "MIT"
+     },
++    "node_modules/undici-types": {
++      "version": "8.3.0",
++      "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-8.3.0.tgz",
++      "integrity": "sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==",
++      "license": "MIT"
++    },
+     "node_modules/unpipe": {
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/unpipe/-/unpipe-1.0.0.tgz",
+@@ -1271,12 +1999,51 @@
+         "node": ">= 0.8"
+       }
+     },
++    "node_modules/uri-js": {
++      "version": "4.4.1",
++      "resolved": "https://registry.npmjs.org/uri-js/-/uri-js-4.4.1.tgz",
++      "integrity": "sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==",
++      "license": "BSD-2-Clause",
++      "dependencies": {
++        "punycode": "^2.1.0"
++      }
++    },
++    "node_modules/url-regex-safe": {
++      "version": "3.0.0",
++      "resolved": "https://registry.npmjs.org/url-regex-safe/-/url-regex-safe-3.0.0.tgz",
++      "integrity": "sha512-+2U40NrcmtWFVjuxXVt9bGRw6c7/MgkGKN9xIfPrT/2RX0LTkkae6CCEDp93xqUN0UKm/rr821QnHd2dHQmN3A==",
++      "license": "MIT",
++      "dependencies": {
++        "ip-regex": "4.3.0",
++        "tlds": "^1.228.0"
++      },
++      "engines": {
++        "node": ">= 10.12.0"
++      },
++      "peerDependencies": {
++        "re2": "^1.17.2"
++      },
++      "peerDependenciesMeta": {
++        "re2": {
++          "optional": true
++        }
++      }
++    },
+     "node_modules/util-deprecate": {
+       "version": "1.0.2",
+       "resolved": "https://registry.npmjs.org/util-deprecate/-/util-deprecate-1.0.2.tgz",
+       "integrity": "sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==",
+       "license": "MIT"
+     },
++    "node_modules/utility-types": {
++      "version": "3.11.0",
++      "resolved": "https://registry.npmjs.org/utility-types/-/utility-types-3.11.0.tgz",
++      "integrity": "sha512-6Z7Ma2aVEWisaL6TvBCy7P8rm2LQoPv6dJ7ecIaIixHcwfbJ0x7mWdbcwlIM5IGQxPZSFYeqRCqlOOeKoJYMkw==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 4"
++      }
++    },
+     "node_modules/utils-merge": {
+       "version": "1.0.1",
+       "resolved": "https://registry.npmjs.org/utils-merge/-/utils-merge-1.0.1.tgz",
+@@ -1286,6 +2053,16 @@
+         "node": ">= 0.4.0"
+       }
+     },
++    "node_modules/uuid": {
++      "version": "3.4.0",
++      "resolved": "https://registry.npmjs.org/uuid/-/uuid-3.4.0.tgz",
++      "integrity": "sha512-HjSDRw6gZE5JMggctHBcjVak08+KEVhSIiDzFnT9S9aegmp85S/bReBVTb4QTFaRNptJ9kuYaNhnbNEOkbKb/A==",
++      "deprecated": "uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).",
++      "license": "MIT",
++      "bin": {
++        "uuid": "bin/uuid"
++      }
++    },
+     "node_modules/vary": {
+       "version": "1.1.2",
+       "resolved": "https://registry.npmjs.org/vary/-/vary-1.1.2.tgz",
+@@ -1295,6 +2072,26 @@
+         "node": ">= 0.8"
+       }
+     },
++    "node_modules/verror": {
++      "version": "1.10.0",
++      "resolved": "https://registry.npmjs.org/verror/-/verror-1.10.0.tgz",
++      "integrity": "sha512-ZZKSmDAEFOijERBLkmYfJ+vmk3w+7hOLYDNkRCuRuMJGEmqYNCNLyBBFwWKVMhfwaEF3WOd0Zlw86U/WC/+nYw==",
++      "engines": [
++        "node >=0.6.0"
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "assert-plus": "^1.0.0",
++        "core-util-is": "1.0.2",
++        "extsprintf": "^1.2.0"
++      }
++    },
++    "node_modules/verror/node_modules/core-util-is": {
++      "version": "1.0.2",
++      "resolved": "https://registry.npmjs.org/core-util-is/-/core-util-is-1.0.2.tgz",
++      "integrity": "sha512-3lqz5YjWTYnW6dlDa5TLaTCcShfar1e40rmcJVwCBJC6mWlFuj0eCHIElmG1g5kyuJ/GD+8Wn4FFCcz4gJPfaQ==",
++      "license": "MIT"
++    },
+     "node_modules/webidl-conversions": {
+       "version": "3.0.1",
+       "resolved": "https://registry.npmjs.org/webidl-conversions/-/webidl-conversions-3.0.1.tgz",
+diff --git a/movie-server/package.json b/movie-server/package.json
+index 6fb0a1e..4426776 100644
+--- a/movie-server/package.json
++++ b/movie-server/package.json
+@@ -8,6 +8,7 @@
+     "dotenv": "^16.4.5",
+     "express": "^4.19.2",
+     "grammy": "^1.23.0",
++    "instagram-private-api": "^1.46.1",
+     "multer": "^1.4.5-lts.1"
+   }
+ }
+diff --git a/server/api.js b/server/api.js
+index 622bd9d..b61a58f 100644
+--- a/server/api.js
++++ b/server/api.js
+@@ -905,6 +905,11 @@ router.get('/system-health', authMiddleware, (req, res) => {
+       uptime: uptimeStr,
+       status: 'healthy'
+     });
++  } catch (err) {
++    res.status(500).json({ error: err.message });
++  }
++});
++
+ // Platform Smart Analytics Endpoint
+ router.get('/platform-analytics', authMiddleware, (req, res) => {
+   try {
+diff --git a/server/bot.js b/server/bot.js
+index 68cc476..a6a56a6 100644
+--- a/server/bot.js
++++ b/server/bot.js
+@@ -986,13 +986,14 @@ function startBot(token) {
+  */
+ function formatDownloadError(err) {
+   const errMsg = err.message || '';
+-  if (errMsg.includes('429') || errMsg.includes('confirm you\'re not a bot') || errMsg.includes('Too Many Requests')) {
+-    return `тЪая╕П <b>YouTube yuklashni chekladi (HTTP 429: Too Many Requests)</b>\n\n` +
+-           `Ushbu muammoni hal qilish uchun:\n` +
+-           `1. VPN o'chiring yoki internetingizni o'chirib-yoqing (yangi IP olish uchun).\n` +
+-           `2. Yoki loyiha papkasiga brauzer kuki faylini (<b>cookies.txt</b>) joylashtiring.`;
++  if (errMsg.includes('429') || errMsg.includes('confirm you\'re not a bot') || errMsg.includes('Too Many Requests') || errMsg.includes('Sign in')) {
++    return `тЪая╕П <b>YouTube / Instagram IP cheklovi (HTTP 429: Bot Detection)</b>\n\n` +
++           `Ushbu havolani yuklashda server IP chekloviga duch kelindi.\n\n` +
++           `ЁЯТб <b>Muammoni hal qilish yo'li:</b>\n` +
++           `тАв Server loyiha papkasiga <code>cookies.txt</code> faylini joylashtiring.\n` +
++           `тАв Yoki bir ozdan so'ng qayta urinib ko'ring.`;
+   }
+-  return `тЭМ <b>Yuklashda xatolik yuz berdi:</b>\n${escapeHTML(errMsg.substring(0, 150))}`;
++  return `тЭМ <b>Yuklashda xatolik yuz berdi:</b>\n${escapeHTML(errMsg.substring(0, 180))}`;
+ }
+ 
+       // Listen for text (links and search queries)
+@@ -1545,8 +1546,11 @@ function formatDownloadError(err) {
+               }
+             }
+           } catch (err) {
+-            console.error(err);
+-            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `тЭМ Musiqa ajratishda xatolik: ${err.message.substring(0, 100)}`);
++            console.error('Audio extraction error:', err.message);
++            const userErrStr = err.message.includes('ovoz') || err.message.includes('audio') || err.message.includes('musiqa')
++              ? err.message
++              : 'Ushbu videoda musiqa (ovoz) treki mavjud emas.';
++            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `тЪая╕П ${userErrStr}`);
+           }
+         }
+ 
+diff --git a/server/db.js b/server/db.js
+index 5c39bd6..361a558 100644
+--- a/server/db.js
++++ b/server/db.js
+@@ -601,22 +601,26 @@ function getPlatformAnalytics() {
+       }
+     });
+ 
+-    const total = (instagram + tiktok + youtube + other) || 3000;
++    const total = instagram + tiktok + youtube + other;
+     const platforms = [
+-      { name: 'Instagram', value: instagram || 1420, percent: Math.round(((instagram || 1420) / total) * 100), color: '#e1306c' },
+-      { name: 'TikTok', value: tiktok || 1100, percent: Math.round(((tiktok || 1100) / total) * 100), color: '#00f2fe' },
+-      { name: 'YouTube', value: youtube || 480, percent: Math.round(((youtube || 480) / total) * 100), color: '#ff0000' },
+-      { name: 'Boshqalar', value: other || 150, percent: Math.round(((other || 150) / total) * 100), color: '#8b5cf6' }
++      { name: 'Instagram', value: instagram, percent: total > 0 ? Math.round((instagram / total) * 100) : 0, color: '#e1306c' },
++      { name: 'TikTok', value: tiktok, percent: total > 0 ? Math.round((tiktok / total) * 100) : 0, color: '#00f2fe' },
++      { name: 'YouTube', value: youtube, percent: total > 0 ? Math.round((youtube / total) * 100) : 0, color: '#ff0000' },
++      { name: 'Boshqalar', value: other, percent: total > 0 ? Math.round((other / total) * 100) : 0, color: '#8b5cf6' }
+     ];
+ 
+-    const topUsers = [...users]
+-      .map(u => ({
+-        id: u.id,
+-        name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Foydalanuvchi',
+-        username: u.username ? '@' + u.username : 'Mavjud emas',
+-        downloads: u.history ? u.history.length : (u.downloadsCount || Math.floor(Math.random() * 40 + 10)),
+-        lastActive: u.lastActive ? u.lastActive.substring(0, 10) : 'Bugun'
+-      }))
++    const topUsers = users
++      .filter(u => u.history && u.history.length > 0)
++      .map(u => {
++        const fullName = `${u.first_name || u.firstName || ''} ${u.last_name || u.lastName || ''}`.trim();
++        return {
++          id: u.id,
++          name: fullName || (u.username ? '@' + u.username.replace(/^@/, '') : 'Foydalanuvchi'),
++          username: u.username ? '@' + u.username.replace(/^@/, '') : 'Mavjud emas',
++          downloads: u.history ? u.history.length : 0,
++          lastActive: u.lastSeen ? u.lastSeen.substring(0, 10) : (u.dateJoined ? u.dateJoined.substring(0, 10) : 'Bugun')
++        };
++      })
+       .sort((a, b) => b.downloads - a.downloads)
+       .slice(0, 10);
+ 
+diff --git a/server/downloader.js b/server/downloader.js
+index 8f3e0ac..399c494 100644
+--- a/server/downloader.js
++++ b/server/downloader.js
+@@ -1,17 +1,30 @@
+ const { execFile } = require('child_process');
+ const path = require('path');
+ const fs = require('fs');
++const axios = require('axios');
+ 
+ const isWindows = process.platform === 'win32';
+ const binDir = path.join(__dirname, 'bin');
+ const localYtDlp = path.join(binDir, isWindows ? 'yt-dlp.exe' : 'yt-dlp');
+-const ytDlpPath = fs.existsSync(localYtDlp) ? localYtDlp : 'yt-dlp';
+ const tempDir = path.join(__dirname, 'temp');
+ 
+-// Build environment variables with the local bin folder in PATH for ffmpeg/ffprobe discovery
++/**
++ * Dynamically gets the best yt-dlp binary path (ensuring executable permissions on Linux)
++ */
++function getYtDlpBin() {
++  if (fs.existsSync(localYtDlp)) {
++    if (!isWindows) {
++      try { fs.chmodSync(localYtDlp, 0o755); } catch (e) {}
++    }
++    return localYtDlp;
++  }
++  return 'yt-dlp';
++}
++
++// Build environment variables with local bin folder in PATH for ffmpeg/ffprobe discovery (append, don't prepend)
+ const env = { ...process.env };
+ const pathKey = isWindows ? 'Path' : 'PATH';
+-env[pathKey] = `${binDir}${path.delimiter}${env[pathKey] || ''}`;
++env[pathKey] = `${env[pathKey] || ''}${path.delimiter}${binDir}`;
+ 
+ if (!fs.existsSync(tempDir)) {
+   fs.mkdirSync(tempDir, { recursive: true });
+@@ -19,59 +32,163 @@ if (!fs.existsSync(tempDir)) {
+ 
+ // Simulated real Chrome browser User-Agent to bypass bot filters
+ const browserHeaders = [
+-  '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
++  '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
++];
++
++/**
++ * Auto-detects cookies.txt location in either project root or server directory
++ */
++function getCookiesArgs() {
++  const rootCookies = path.join(__dirname, '..', 'cookies.txt');
++  const serverCookies = path.join(__dirname, 'cookies.txt');
++  if (fs.existsSync(rootCookies)) {
++    return ['--cookies', rootCookies];
++  } else if (fs.existsSync(serverCookies)) {
++    return ['--cookies', serverCookies];
++  }
++  return [];
++}
++
++// Player client strategies to bypass YouTube/Instagram VPS datacenter IP blocks
++const CLIENT_STRATEGIES = [
++  ['--extractor-args', 'youtube:player_client=ios,android,mweb,web;player_skip=webpage'],
++  ['--extractor-args', 'youtube:player_client=android,ios'],
++  ['--extractor-args', 'youtube:player_client=tv_embedded,mweb'],
++  ['--extractor-args', 'youtube:player_client=mweb']
+ ];
+ 
+-// Network resilience for all yt-dlp calls. Previously used `--retries 0` and
+-// `--socket-timeout 5`, which made any slow/transient response fail instantly.
+-// player_client=default lets yt-dlp pick its recommended YouTube clients.
+-const NET_ARGS = [
++const BASE_NET_ARGS = [
+   '--retries', '10',
+   '--fragment-retries', '10',
+   '--socket-timeout', '30',
+-  '--extractor-args', 'youtube:player_client=default',
++  '--no-check-certificates',
++  '--geo-bypass'
+ ];
+ 
++/**
++ * Fallback download using Cobalt public APIs when yt-dlp is blocked by datacenter IP filters
++ */
++async function fallbackCobaltDownload(url, outputName, isAudio = false, quality = '720') {
++  const cobaltEndpoints = [
++    'https://api.cobalt.tools/api/json',
++    'https://co.wuk.sh/api/json',
++    'https://cobalt-api.kwippy.com/api/json'
++  ];
++
++  for (const endpoint of cobaltEndpoints) {
++    try {
++      const payload = {
++        url: url,
++        downloadMode: isAudio ? 'audio' : 'auto',
++        videoQuality: quality,
++        audioFormat: 'mp3'
++      };
++
++      const res = await axios.post(endpoint, payload, {
++        headers: {
++          'Accept': 'application/json',
++          'Content-Type': 'application/json',
++          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
++        },
++        timeout: 12000
++      });
++
++      const data = res.data;
++      if (data && (data.url || (data.picker && data.picker.length > 0))) {
++        let downloadUrl = data.url;
++        if (!downloadUrl && data.picker && data.picker.length > 0) {
++          downloadUrl = data.picker[0].url;
++        }
++
++        if (downloadUrl) {
++          const ext = isAudio ? '.mp3' : (data.filename ? path.extname(data.filename) || '.mp4' : '.mp4');
++          const destPath = path.join(tempDir, `${outputName}${ext.startsWith('.') ? ext : '.' + ext}`);
++
++          const streamRes = await axios({
++            method: 'GET',
++            url: downloadUrl,
++            responseType: 'stream',
++            timeout: 60000
++          });
++
++          const writer = fs.createWriteStream(destPath);
++          streamRes.data.pipe(writer);
++
++          await new Promise((resolve, reject) => {
++            writer.on('finish', resolve);
++            writer.on('error', reject);
++          });
++
++          if (fs.existsSync(destPath) && fs.statSync(destPath).size > 0) {
++            return destPath;
++          }
++        }
++      }
++    } catch (e) {
++      // Continue to next mirror endpoint
++    }
++  }
++  throw new Error('Fallback download services exhausted.');
++}
++
+ /**
+  * Get video metadata from a URL
+  * @param {string} url 
+  * @returns {Promise<object>}
+  */
+-function getInfo(url) {
+-  return new Promise((resolve, reject) => {
+-    const args = [
+-      '--dump-json', 
+-      '--no-playlist', 
+-      '--no-warnings', 
+-      ...NET_ARGS,
+-      ...browserHeaders
+-    ];
+-    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+-    if (fs.existsSync(cookiesPath)) {
+-      args.push('--cookies', cookiesPath);
+-    }
+-    args.push(url);
++async function getInfo(url) {
++  let lastErr = null;
++  const cookiesArgs = getCookiesArgs();
++  const ytDlpBin = getYtDlpBin();
+ 
+-    execFile(ytDlpPath, args, { maxBuffer: 20 * 1024 * 1024, env }, (err, stdout, stderr) => {
+-      if (err) {
+-        return reject(new Error(stderr || err.message));
+-      }
+-      try {
+-        const metadata = JSON.parse(stdout);
+-        resolve({
+-          title: metadata.title,
+-          duration: metadata.duration,
+-          thumbnail: metadata.thumbnail || (metadata.thumbnails && metadata.thumbnails.length > 0 ? metadata.thumbnails[metadata.thumbnails.length - 1].url : null),
+-          artist: metadata.artist || null,
+-          track: metadata.track || null,
+-          url: url,
+-          extractor: metadata.extractor_key || metadata.extractor
++  for (const strategyArgs of CLIENT_STRATEGIES) {
++    try {
++      const metadata = await new Promise((resolve, reject) => {
++        const args = [
++          '--dump-json',
++          '--no-playlist',
++          '--no-warnings',
++          ...BASE_NET_ARGS,
++          ...strategyArgs,
++          ...cookiesArgs,
++          ...browserHeaders,
++          url
++        ];
++
++        execFile(ytDlpBin, args, { maxBuffer: 20 * 1024 * 1024, env }, (err, stdout, stderr) => {
++          if (err) return reject(new Error(stderr || err.message));
++          try {
++            resolve(JSON.parse(stdout));
++          } catch (pErr) {
++            reject(new Error('JSON parse error: ' + pErr.message));
++          }
+         });
+-      } catch (parseErr) {
+-        reject(new Error('Failed to parse video metadata: ' + parseErr.message));
+-      }
+-    });
+-  });
++      });
++
++      return {
++        title: metadata.title,
++        duration: metadata.duration,
++        thumbnail: metadata.thumbnail || (metadata.thumbnails && metadata.thumbnails.length > 0 ? metadata.thumbnails[metadata.thumbnails.length - 1].url : null),
++        artist: metadata.artist || null,
++        track: metadata.track || null,
++        url: url,
++        extractor: metadata.extractor_key || metadata.extractor
++      };
++    } catch (err) {
++      lastErr = err;
++    }
++  }
++
++  // Basic fallback metadata construct if extractors fail
++  return {
++    title: 'Media Video',
++    duration: 0,
++    thumbnail: null,
++    artist: null,
++    track: null,
++    url: url,
++    extractor: 'generic'
++  };
+ }
+ 
+ /**
+@@ -79,88 +196,109 @@ function getInfo(url) {
+  * @param {string} url 
+  * @param {string} outputName 
+  * @param {'1080' | '720' | '480' | '360'} quality
+- * @returns {Promise<string>} Path to the downloaded video file
++ * @returns {Promise<string|string[]>} Path to the downloaded video file(s)
+  */
+-function downloadVideo(url, outputName, quality = '720') {
+-  return new Promise((resolve, reject) => {
+-    const templatePath = path.join(tempDir, `${outputName}.%(ext)s`);
+-    let formatFilter = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[ext=mp4]/best';
+-
+-    if (quality === '1080') {
+-      formatFilter = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[ext=mp4]/best';
+-    } else if (quality === '480') {
+-      formatFilter = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best[ext=mp4]/best';
+-    } else if (quality === '360') {
+-      formatFilter = 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[ext=mp4]/best';
+-    }
++async function downloadVideo(url, outputName, quality = '720') {
++  const templatePath = path.join(tempDir, `${outputName}.%(ext)s`);
++  let formatFilter = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[ext=mp4]/best';
+ 
+-    const args = [
+-      '-f', formatFilter,
+-      '--merge-output-format', 'mp4',
+-      '--no-playlist',
+-      '--geo-bypass',
+-      ...NET_ARGS,
+-      '-o', templatePath,
+-      ...browserHeaders
+-    ];
+-    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+-    if (fs.existsSync(cookiesPath)) {
+-      args.push('--cookies', cookiesPath);
++  if (quality === '1080') {
++    formatFilter = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[ext=mp4]/best';
++  } else if (quality === '480') {
++    formatFilter = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best[ext=mp4]/best';
++  } else if (quality === '360') {
++    formatFilter = 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best[ext=mp4]/best';
++  }
++
++  const cookiesArgs = getCookiesArgs();
++  const ytDlpBin = getYtDlpBin();
++  let lastErrMsg = '';
++
++  for (const strategyArgs of CLIENT_STRATEGIES) {
++    try {
++      const resPath = await new Promise((resolve, reject) => {
++        const args = [
++          '-f', formatFilter,
++          '--merge-output-format', 'mp4',
++          '--no-playlist',
++          ...BASE_NET_ARGS,
++          ...strategyArgs,
++          ...cookiesArgs,
++          '-o', templatePath,
++          ...browserHeaders,
++          url
++        ];
++
++        execFile(ytDlpBin, args, { env }, (err, stdout, stderr) => {
++          const errMsg = stderr || (err ? err.message : '');
++          if (err) {
++            if (errMsg.includes('No video formats found') || errMsg.includes('Requested format is not available')) {
++              return downloadPhoto(url, outputName).then(resolve).catch(() => reject(new Error(errMsg)));
++            }
++            return reject(new Error(errMsg));
++          }
++
++          try {
++            const files = fs.readdirSync(tempDir);
++            const matched = files.find(f => f.startsWith(outputName));
++            if (matched) {
++              resolve(path.join(tempDir, matched));
++            } else {
++              downloadPhoto(url, outputName).then(resolve).catch(() => reject(new Error('Downloaded media file not found.')));
++            }
++          } catch (e) {
++            reject(e);
++          }
++        });
++      });
++
++      if (resPath) return resPath;
++    } catch (err) {
++      lastErrMsg = err.message || '';
+     }
+-    args.push(url);
+-
+-    execFile(ytDlpPath, args, { env }, (err, stdout, stderr) => {
+-      const errMsg = stderr || (err ? err.message : '');
+-      if (err) {
+-        if (errMsg.includes('No video formats found') || errMsg.includes('Requested format is not available')) {
+-          // Fallback to downloading image/thumbnail
+-          return downloadPhoto(url, outputName).then(resolve).catch(() => reject(new Error(errMsg)));
+-        }
+-        return reject(new Error(errMsg));
+-      }
+-      
+-      // Find the file dynamically because extension is variable
+-      try {
+-        const files = fs.readdirSync(tempDir);
+-        const matched = files.find(f => f.startsWith(outputName));
+-        if (matched) {
+-          resolve(path.join(tempDir, matched));
+-        } else {
+-          // If no video file was saved, try photo fallback
+-          downloadPhoto(url, outputName).then(resolve).catch(() => reject(new Error('Downloaded media file not found.')));
+-        }
+-      } catch (e) {
+-        reject(e);
+-      }
+-    });
+-  });
++  }
++
++  // Try photo extraction before giving up to Cobalt
++  try {
++    const photoResult = await downloadPhoto(url, outputName);
++    if (photoResult) return photoResult;
++  } catch (pErr) {}
++
++  // Fallback to Cobalt API download service if yt-dlp is blocked by IP / bot detection
++  console.log('[Downloader] yt-dlp failed on VPS. Invoking Cobalt API fallback...');
++  try {
++    return await fallbackCobaltDownload(url, outputName, false, quality);
++  } catch (fallbackErr) {
++    throw new Error(lastErrMsg || fallbackErr.message || 'Media download failed.');
++  }
+ }
+ 
+ /**
+  * Download photo/thumbnail when no video format is available
+  * @param {string} url 
+  * @param {string} outputName 
+- * @returns {Promise<string>}
++ * @returns {Promise<string|string[]>}
+  */
+ function downloadPhoto(url, outputName) {
+   return new Promise((resolve, reject) => {
+     const templatePath = path.join(tempDir, `${outputName}_%(autonumber)s.%(ext)s`);
++    const cookiesArgs = getCookiesArgs();
++    const ytDlpBin = getYtDlpBin();
++
+     const args = [
+       '--write-thumbnail',
+       '--convert-thumbnails', 'jpg',
+       '--skip-download',
+       '--ignore-no-formats-error',
+-      ...NET_ARGS,
++      ...BASE_NET_ARGS,
++      ...CLIENT_STRATEGIES[0],
++      ...cookiesArgs,
+       '-o', templatePath,
+-      ...browserHeaders
++      ...browserHeaders,
++      url
+     ];
+-    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+-    if (fs.existsSync(cookiesPath)) {
+-      args.push('--cookies', cookiesPath);
+-    }
+-    args.push(url);
+ 
+-    execFile(ytDlpPath, args, { env }, (err, stdout, stderr) => {
++    execFile(ytDlpBin, args, { env }, (err, stdout, stderr) => {
+       try {
+         const files = fs.readdirSync(tempDir);
+         const matched = files.filter(f => f.startsWith(outputName)).sort().map(f => path.join(tempDir, f));
+@@ -184,37 +322,52 @@ function downloadPhoto(url, outputName) {
+  * @param {string} outputName 
+  * @returns {Promise<string>} Path to the downloaded MP3 file
+  */
+-function downloadAudio(url, outputName) {
+-  return new Promise((resolve, reject) => {
+-    const outputPath = path.join(tempDir, `${outputName}.mp3`);
+-    const args = [
+-      '-f', 'ba/best', 
+-      '-x',
+-      '--audio-format', 'mp3',
+-      '--audio-quality', '5',
+-      '--no-playlist',
+-      '--geo-bypass',
+-      ...NET_ARGS,
+-      '-o', path.join(tempDir, `${outputName}.%(ext)s`),
+-      ...browserHeaders
+-    ];
+-    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+-    if (fs.existsSync(cookiesPath)) {
+-      args.push('--cookies', cookiesPath);
++async function downloadAudio(url, outputName) {
++  const outputPath = path.join(tempDir, `${outputName}.mp3`);
++  const cookiesArgs = getCookiesArgs();
++  const ytDlpBin = getYtDlpBin();
++  let lastErrMsg = '';
++
++  for (const strategyArgs of CLIENT_STRATEGIES) {
++    try {
++      const resPath = await new Promise((resolve, reject) => {
++        const args = [
++          '-f', 'ba/best',
++          '-x',
++          '--audio-format', 'mp3',
++          '--audio-quality', '5',
++          '--no-playlist',
++          ...BASE_NET_ARGS,
++          ...strategyArgs,
++          ...cookiesArgs,
++          '-o', path.join(tempDir, `${outputName}.%(ext)s`),
++          ...browserHeaders,
++          url
++        ];
++
++        execFile(ytDlpBin, args, { env }, (err, stdout, stderr) => {
++          if (err) return reject(new Error(stderr || err.message));
++          if (fs.existsSync(outputPath)) {
++            resolve(outputPath);
++          } else {
++            reject(new Error('Downloaded audio file not found at ' + outputPath));
++          }
++        });
++      });
++
++      if (resPath) return resPath;
++    } catch (err) {
++      lastErrMsg = err.message || '';
+     }
+-    args.push(url);
++  }
+ 
+-    execFile(ytDlpPath, args, { env }, (err, stdout, stderr) => {
+-      if (err) {
+-        return reject(new Error(stderr || err.message));
+-      }
+-      if (fs.existsSync(outputPath)) {
+-        resolve(outputPath);
+-      } else {
+-        reject(new Error('Downloaded audio file not found at ' + outputPath));
+-      }
+-    });
+-  });
++  // Fallback to Cobalt API download for audio
++  console.log('[Downloader] Audio yt-dlp failed on VPS. Invoking Cobalt API fallback...');
++  try {
++    return await fallbackCobaltDownload(url, outputName, true);
++  } catch (fallbackErr) {
++    throw new Error(lastErrMsg || fallbackErr.message || 'Audio download failed.');
++  }
+ }
+ 
+ /**
+@@ -226,27 +379,27 @@ function downloadAudio(url, outputName) {
+ function searchMusic(query, limit = 10) {
+   return new Promise((resolve, reject) => {
+     const searchTarget = `ytsearch${limit}:${query}`;
++    const cookiesArgs = getCookiesArgs();
++    const ytDlpBin = getYtDlpBin();
++
+     const args = [
+       '--flat-playlist',
+       '--dump-json',
+       '--no-playlist',
+-      '--geo-bypass',
+-      ...NET_ARGS,
+-      ...browserHeaders
++      ...BASE_NET_ARGS,
++      ...CLIENT_STRATEGIES[0],
++      ...cookiesArgs,
++      ...browserHeaders,
++      searchTarget
+     ];
+-    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+-    if (fs.existsSync(cookiesPath)) {
+-      args.push('--cookies', cookiesPath);
+-    }
+-    args.push(searchTarget);
+ 
+-    execFile(ytDlpPath, args, { maxBuffer: 15 * 1024 * 1024, env }, (err, stdout, stderr) => {
++    execFile(ytDlpBin, args, { maxBuffer: 15 * 1024 * 1024, env }, (err, stdout, stderr) => {
+       if (err && !stdout) {
+         return reject(new Error(stderr || err.message));
+       }
+ 
+       const results = [];
+-      const lines = stdout.trim().split('\n');
++      const lines = (stdout || '').trim().split('\n');
+       for (const line of lines) {
+         if (!line) continue;
+         try {
+diff --git a/server/processor.js b/server/processor.js
+index c5a0621..6cb7c99 100644
+--- a/server/processor.js
++++ b/server/processor.js
+@@ -1,9 +1,55 @@
+-const { spawn } = require('child_process');
++const { spawn, execSync } = require('child_process');
+ const path = require('path');
+ const fs = require('fs');
+ 
+-const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+-const ffprobePath = require('@ffprobe-installer/ffprobe').path;
++function resolveFFmpegPath() {
++  // 1. Try system ffmpeg (e.g. /usr/bin/ffmpeg)
++  try {
++    execSync('ffmpeg -version', { stdio: 'ignore' });
++    return 'ffmpeg';
++  } catch (e) {}
++
++  // 2. Try local bin folder
++  const isWin = process.platform === 'win32';
++  const binName = isWin ? 'ffmpeg.exe' : 'ffmpeg';
++  const localBinPath = path.join(__dirname, 'bin', binName);
++  if (fs.existsSync(localBinPath)) {
++    return localBinPath;
++  }
++
++  // 3. Try npm installer package
++  try {
++    return require('@ffmpeg-installer/ffmpeg').path;
++  } catch (e) {
++    return 'ffmpeg';
++  }
++}
++
++function resolveFFprobePath() {
++  // 1. Try system ffprobe (e.g. /usr/bin/ffprobe)
++  try {
++    execSync('ffprobe -version', { stdio: 'ignore' });
++    return 'ffprobe';
++  } catch (e) {}
++
++  // 2. Try local bin folder
++  const isWin = process.platform === 'win32';
++  const binName = isWin ? 'ffprobe.exe' : 'ffprobe';
++  const localBinPath = path.join(__dirname, 'bin', binName);
++  if (fs.existsSync(localBinPath)) {
++    return localBinPath;
++  }
++
++  // 3. Try npm installer package
++  try {
++    return require('@ffprobe-installer/ffprobe').path;
++  } catch (e) {
++    return 'ffprobe';
++  }
++}
++
++const ffmpegPath = resolveFFmpegPath();
++const ffprobePath = resolveFFprobePath();
+ const tempDir = path.join(__dirname, 'temp');
+ 
+ if (!fs.existsSync(tempDir)) {
+@@ -34,13 +80,33 @@ function runFFmpeg(args) {
+   });
+ }
+ 
++/**
++ * Checks if media file contains at least one audio stream using ffprobe
++ */
++function hasAudioStream(filePath) {
++  try {
++    const out = execSync(`"${ffprobePath}" -v error -show_entries stream=codec_type -of default=noprint_wrappers=1:nokey=1 "${filePath}"`, { encoding: 'utf8' });
++    return out.includes('audio');
++  } catch (e) {
++    return true;
++  }
++}
++
+ /**
+  * Extracts audio from a video file and encodes it as high-quality MP3
+  * @param {string} inputPath 
+  * @param {string} outputName 
+  * @returns {Promise<string>} Path to output MP3
+  */
+-function extractAudio(inputPath, outputName) {
++async function extractAudio(inputPath, outputName) {
++  if (!fs.existsSync(inputPath)) {
++    throw new Error('Fayl topilmadi.');
++  }
++
++  if (!hasAudioStream(inputPath)) {
++    throw new Error('Ushbu videoda ovoz / musiqa treki mavjud emas.');
++  }
++
+   const outputPath = path.join(tempDir, `${outputName}.mp3`);
+   const args = [
+     '-y',
+@@ -48,10 +114,25 @@ function extractAudio(inputPath, outputName) {
+     '-i', inputPath,
+     '-vn',
+     '-acodec', 'libmp3lame',
+-    '-q:a', '4', // 4 is standard high quality (~160kbps), much faster to encode than 0
++    '-q:a', '4',
+     outputPath
+   ];
+-  return runFFmpeg(args).then(() => outputPath);
++
++  try {
++    await runFFmpeg(args);
++    return outputPath;
++  } catch (err) {
++    // Fallback attempt with generic mp3 codec
++    const fallbackArgs = [
++      '-y',
++      '-i', inputPath,
++      '-vn',
++      '-c:a', 'mp3',
++      outputPath
++    ];
++    await runFFmpeg(fallbackArgs);
++    return outputPath;
++  }
+ }
+ 
+ /**
+diff --git a/server/setup.js b/server/setup.js
+index 4101a7b..34ab919 100644
+--- a/server/setup.js
++++ b/server/setup.js
+@@ -60,35 +60,45 @@ async function ensureBinaries() {
+       }
+     }
+ 
+-    // Copy ffmpeg and ffprobe from npm packages to bin/ for auto-discovery
+-    console.log('Locating and copying FFmpeg/FFprobe binaries...');
++    // Copy ffmpeg and ffprobe from npm packages to bin/ for auto-discovery if system FFmpeg is missing
++    let hasSystemFFmpeg = false;
+     try {
+-      const ffmpegSource = require('@ffmpeg-installer/ffmpeg').path;
+-      const ffprobeSource = require('@ffprobe-installer/ffprobe').path;
+-
+-      const ffmpegDestName = isWindows ? 'ffmpeg.exe' : 'ffmpeg';
+-      const ffprobeDestName = isWindows ? 'ffprobe.exe' : 'ffprobe';
+-
+-      const ffmpegDestPath = path.join(binDir, ffmpegDestName);
+-      const ffprobeDestPath = path.join(binDir, ffprobeDestName);
+-
+-      if (!fs.existsSync(ffmpegDestPath)) {
+-        fs.copyFileSync(ffmpegSource, ffmpegDestPath);
+-        if (!isWindows) {
+-          fs.chmodSync(ffmpegDestPath, 0o755);
++      const { execSync } = require('child_process');
++      execSync('ffmpeg -version', { stdio: 'ignore' });
++      hasSystemFFmpeg = true;
++      console.log('System FFmpeg detected. Skipping copy.');
++    } catch (e) {}
++
++    if (!hasSystemFFmpeg) {
++      console.log('Locating and copying FFmpeg/FFprobe binaries...');
++      try {
++        const ffmpegSource = require('@ffmpeg-installer/ffmpeg').path;
++        const ffprobeSource = require('@ffprobe-installer/ffprobe').path;
++
++        const ffmpegDestName = isWindows ? 'ffmpeg.exe' : 'ffmpeg';
++        const ffprobeDestName = isWindows ? 'ffprobe.exe' : 'ffprobe';
++
++        const ffmpegDestPath = path.join(binDir, ffmpegDestName);
++        const ffprobeDestPath = path.join(binDir, ffprobeDestName);
++
++        if (!fs.existsSync(ffmpegDestPath)) {
++          fs.copyFileSync(ffmpegSource, ffmpegDestPath);
++          if (!isWindows) {
++            fs.chmodSync(ffmpegDestPath, 0o755);
++          }
++          console.log(`FFmpeg copied successfully to ${ffmpegDestName}`);
+         }
+-        console.log(`FFmpeg copied successfully to ${ffmpegDestName}`);
+-      }
+ 
+-      if (!fs.existsSync(ffprobeDestPath)) {
+-        fs.copyFileSync(ffprobeSource, ffprobeDestPath);
+-        if (!isWindows) {
+-          fs.chmodSync(ffprobeDestPath, 0o755);
++        if (!fs.existsSync(ffprobeDestPath)) {
++          fs.copyFileSync(ffprobeSource, ffprobeDestPath);
++          if (!isWindows) {
++            fs.chmodSync(ffprobeDestPath, 0o755);
++          }
++          console.log(`FFprobe copied successfully to ${ffprobeDestName}`);
+         }
+-        console.log(`FFprobe copied successfully to ${ffprobeDestName}`);
++      } catch (copyErr) {
++        console.warn('Could not copy FFmpeg/FFprobe binaries from node_modules:', copyErr.message);
+       }
+-    } catch (copyErr) {
+-      console.warn('Could not copy FFmpeg/FFprobe binaries from node_modules:', copyErr.message);
+     }
+   } catch (err) {
+     console.error('Setup error:', err.message);

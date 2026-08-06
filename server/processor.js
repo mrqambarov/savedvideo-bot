@@ -142,30 +142,34 @@ async function extractAudio(inputPath, outputName) {
  * @param {'circular' | 'square'} style 
  * @returns {Promise<string>} Path to output video
  */
+/**
+ * Crops a video to a 1:1 aspect ratio suitable for Telegram Video Notes
+ * @param {string} inputPath 
+ * @param {string} outputName 
+ * @param {'circular' | 'square'} style 
+ * @returns {Promise<string>} Path to output video
+ */
 function convertToRoundVideo(inputPath, outputName, style = 'circular') {
   const outputPath = path.join(tempDir, `${outputName}.mp4`);
-  let filter = '';
+  const hasAudio = hasAudioStream(inputPath);
+  const filter = "crop=w='min(iw,ih)':h='min(iw,ih)',scale=480:480,format=yuv420p";
 
-  if (style === 'circular') {
-    // 1:1 crop + circular mask blended onto black background using yuv420p format conversion
-    filter = "crop=w='min(iw,ih)':h='min(iw,ih)',scale=480:480,format=yuva420p,geq=lum='p(X,Y)':a='st(1,pow(min(W/2,H/2),2))+st(3,pow(X-(W/2),2)+pow(Y-(H/2),2));if(lte(ld(3),ld(1)),255,0)',format=yuv420p";
-  } else {
-    // Simple square 1:1 crop (ideal for Telegram sendVideoNote API)
-    filter = "crop=w='min(iw,ih)':h='min(iw,ih)',scale=480:480";
+  const args = ['-y', '-threads', '0', '-i', inputPath];
+
+  if (!hasAudio) {
+    args.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100');
   }
 
-  const args = [
-    '-y',
-    '-threads', '0',
-    '-i', inputPath,
+  args.push(
     '-vf', filter,
     '-c:v', 'libx264',
-    '-preset', 'superfast', // speed up encoding massively
+    '-preset', 'superfast',
     '-pix_fmt', 'yuv420p',
     '-c:a', 'aac',
     '-shortest',
     outputPath
-  ];
+  );
+
   return runFFmpeg(args).then(() => outputPath);
 }
 
@@ -333,25 +337,31 @@ function convertAudioToRoundVideo(inputPath, outputName) {
 }
 
 /**
- * Compresses video file to reduce MB size by 50-70%
+ * Compresses video file to reduce MB size while preserving clean video quality
  * @param {string} inputPath 
  * @param {string} outputName 
  * @returns {Promise<string>} Path to compressed MP4 file
  */
 function compressVideo(inputPath, outputName) {
   const outputPath = path.join(tempDir, `${outputName}.mp4`);
-  const args = [
-    '-y',
-    '-threads', '0',
-    '-i', inputPath,
+  const hasAudio = hasAudioStream(inputPath);
+  const args = ['-y', '-threads', '0', '-i', inputPath];
+
+  if (!hasAudio) {
+    args.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100');
+  }
+
+  args.push(
     '-c:v', 'libx264',
-    '-crf', '30',
+    '-crf', '25',
     '-preset', 'superfast',
     '-pix_fmt', 'yuv420p',
     '-c:a', 'aac',
     '-b:a', '96k',
+    '-shortest',
     outputPath
-  ];
+  );
+
   return runFFmpeg(args).then(() => outputPath);
 }
 

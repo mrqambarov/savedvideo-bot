@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, Lock, Moon, Sun } from 'lucide-react';
+import { Lock, Sparkles, Sun, Moon } from 'lucide-react';
 import { login } from '../lib/api.js';
 import { useApp } from '../context/AppContext.jsx';
 
@@ -18,12 +18,12 @@ export default function Login() {
       const ok = await login(pw);
       if (ok) {
         setAuthed(true);
-        toast('Xush kelibsiz!');
+        toast('Tizimga muvaffaqiyatli kirildi!');
       } else {
-        setErr("Parol noto'g'ri");
+        setErr("Kiritilgan parol noto'g'ri");
       }
     } catch {
-      setErr('Serverga ulanib bo\'lmadi');
+      setErr("Server bilan aloqa o'rnatib bo'lmadi");
     } finally {
       setBusy(false);
     }
@@ -31,16 +31,20 @@ export default function Login() {
 
   return (
     <div className="login-screen">
-      <button className="icon-btn" style={{ position: 'fixed', top: 20, right: 20 }} onClick={toggleTheme}>
+      <button className="icon-btn" style={{ position: 'fixed', top: 24, right: 24 }} onClick={toggleTheme} title="Mavzuni o'zgartirish">
         {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
       </button>
       <form className="login-card" onSubmit={submit}>
-        <div className="login-logo"><Sparkles size={28} /></div>
-        <h2>Boshqaruv Paneli</h2>
-        <div className="sub">Davom etish uchun tizimga kiring</div>
+        <div className="login-logo">
+          <Sparkles size={24} color="#ffffff" />
+        </div>
+        <h2>Boshqaruv Markazi</h2>
+        <div className="sub">Tizimga kirish uchun maxfiy parolni kiriting</div>
+        
         {err && <div className="login-err">{err}</div>}
-        <div className="field">
-          <label>Admin parol</label>
+        
+        <div className="field" style={{ textAlign: 'left' }}>
+          <label>Admin paroli</label>
           <div className="input-icon">
             <Lock size={16} />
             <input
@@ -53,8 +57,9 @@ export default function Login() {
             />
           </div>
         </div>
-        <button className="btn btn-primary btn-block" disabled={busy || !pw}>
-          {busy ? <span className="spinner" /> : 'Kirish'}
+        
+        <button className="btn btn-primary btn-block" disabled={busy || !pw} style={{ marginTop: 8 }}>
+          {busy ? <span className="spinner" /> : 'Tizimga kirish'}
         </button>
       </form>
     </div>

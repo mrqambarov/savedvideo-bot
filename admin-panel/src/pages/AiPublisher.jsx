@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Send, Copy, Check, Film, Share2, Rocket, Instagram, MessageSquare, Key, Lock, UserCheck } from 'lucide-react';
+import { Sparkles, Send, Copy, Check, Film, Share2, Rocket, AtSign, MessageSquare, Key, Lock, UserCheck } from 'lucide-react';
 import { movieApi, safe } from '../lib/api.js';
 
 export default function AiPublisher() {
@@ -135,7 +135,7 @@ export default function AiPublisher() {
       {/* Instagram Credential Card */}
       <div className="card mb" style={{ border: '1px solid var(--border-strong)', background: 'var(--surface)' }}>
         <div className="card-head" style={{ justifyContent: 'space-between' }}>
-          <h3><Instagram size={20} color="#e1306c" style={{ verticalAlign: -3, marginRight: 8 }} />Instagram Direct Auto-Poster Sozlamalari</h3>
+          <h3><AtSign size={20} color="#e1306c" style={{ verticalAlign: -3, marginRight: 8 }} />Instagram Direct Auto-Poster Sozlamalari</h3>
           <span className={`badge ${hasPassword ? 'badge-success' : 'badge-warning'}`}>
             <span className={`dot ${hasPassword ? 'live' : 'off'}`} />
             {hasPassword ? '● INSTAGRAM ULANGAN' : 'ULANMAGAN'}
@@ -266,7 +266,7 @@ export default function AiPublisher() {
           {/* Instagram / TikTok Reels Copy Card */}
           <div className="card">
             <div className="card-head" style={{ justifyContent: 'space-between' }}>
-              <h3><Instagram size={18} color="#e1306c" style={{ verticalAlign: -3, marginRight: 6 }} />Instagram Reels / TikTok Matni</h3>
+              <h3><AtSign size={18} color="#e1306c" style={{ verticalAlign: -3, marginRight: 6 }} />Instagram Reels / TikTok Matni</h3>
               <button className="btn btn-ghost btn-sm" onClick={handleCopyInstagram}>
                 {copiedInsta ? <Check size={14} color="#10b981" /> : <Copy size={14} />} {copiedInsta ? 'Nusxalandi' : 'Nusxalash'}
               </button>

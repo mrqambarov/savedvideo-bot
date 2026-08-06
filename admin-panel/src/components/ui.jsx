@@ -20,8 +20,8 @@ export function StatCard({ icon: Icon, label, value, color = 'var(--accent)', de
       {(delta !== undefined || deltaLabel) && (
         <div className={`stat-delta ${up ? 'up' : 'down'}`}>
           {typeof delta === 'number' && (up ? <TrendingUp size={14} /> : <TrendingDown size={14} />)}
-          {typeof delta === 'number' && <span>+{shortNum(Math.abs(delta))}</span>}
-          {deltaLabel && <span className="muted">{deltaLabel}</span>}
+          {typeof delta === 'number' && <span>{up ? '+' : '-'}{shortNum(Math.abs(delta))}</span>}
+          {deltaLabel && <span className="muted" style={{ marginLeft: 4 }}>{deltaLabel}</span>}
         </div>
       )}
     </div>
@@ -50,7 +50,9 @@ export function Modal({ open, title, onClose, children, footer, width }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
+  
   if (!open) return null;
+  
   return createPortal(
     <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
       <div className="modal" style={width ? { maxWidth: width } : undefined}>
@@ -71,6 +73,7 @@ export function Modal({ open, title, onClose, children, footer, width }) {
 export function ToastHost() {
   const { toasts } = useApp();
   const icons = { success: CheckCircle2, error: AlertCircle, info: Info };
+  
   return createPortal(
     <div className="toast-wrap">
       {toasts.map((t) => {
