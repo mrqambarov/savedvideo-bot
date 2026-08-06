@@ -576,4 +576,40 @@ router.delete('/requests/:id', (req, res) => {
   }
 });
 
+// 🚀 Git Deploy — VPS yangilash (git pull + build + pm2 restart)
+router.post('/deploy', (req, res) => {
+  const { exec } = require('child_process');
+  const rootDir = path.join(__dirname, '..');
+  res.json({ success: true, message: 'Deploy boshlandi...' });
+
+  exec('git pull origin main', { cwd: rootDir }, (err, stdout, stderr) => {
+    if (err) {
+      console.error('[Deploy] git pull xatolik:', err.message);
+      return;
+    }
+    console.log('[Deploy] git pull OK:', stdout);
+
+    // Admin panel build
+    const adminDir = path.join(rootDir, 'admin-panel');
+    exec('npm run build', { cwd: adminDir }, (err2, out2) => {
+      if (err2) {
+        console.error('[Deploy] npm build xatolik:', err2.message);
+      } else {
+        console.log('[Deploy] Admin panel build OK:', out2);
+      }
+
+      // PM2 restart all
+      setTimeout(() => {
+        exec('pm2 restart all', (err3, out3) => {
+          if (err3) {
+            console.error('[Deploy] pm2 restart xatolik:', err3.message);
+          } else {
+            console.log('[Deploy] pm2 restart OK:', out3);
+          }
+        });
+      }, 1000);
+    });
+  });
+});
+
 module.exports = router;
