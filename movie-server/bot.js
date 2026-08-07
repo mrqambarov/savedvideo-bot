@@ -27,6 +27,7 @@ function escapeHTML(str) {
   if (!str) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+const escapeHtml = escapeHTML;
 
 function getActiveSponsorChannel() {
   try {
@@ -2035,7 +2036,16 @@ async function sendMovie(ctx, movie) {
             parse_mode: 'HTML',
             reply_markup: keyboard
           });
-        } catch (e3) {}
+        } catch (e3) {
+          // 4. Try sending Photo (if fileId was a photo)
+          try {
+            return await ctx.replyWithPhoto(movie.fileId, {
+              caption: captionText,
+              parse_mode: 'HTML',
+              reply_markup: keyboard
+            });
+          } catch (e4) {}
+        }
       }
     }
   }
