@@ -7,6 +7,8 @@ export const dlApi = axios.create({ baseURL: isDev ? `${DEV_HOST}/api` : '/api' 
 export const movieApi = axios.create({ baseURL: isDev ? `${DEV_HOST}/movies/api` : '/movies/api' });
 export const adultApi = axios.create({ baseURL: isDev ? `${DEV_HOST}/adult/api` : '/adult/api' });
 
+const TOKENS = { dl: 'dlToken', movie: 'movieToken', adult: 'adultToken' };
+
 function getAnyToken() {
   return localStorage.getItem(TOKENS.movie) || localStorage.getItem(TOKENS.dl) || localStorage.getItem(TOKENS.adult);
 }
