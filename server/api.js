@@ -79,9 +79,11 @@ router.post('/deploy', (req, res) => {
   res.json({ success: true, message: 'Deploy boshlandi...' });
 
   const sshKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMekDPt1YCpiP4zBOI4BMDHrpj80haOJ+eJRdHbVfpV mr1qambarov@gmial.com";
-  exec(`mkdir -p /root/.ssh && chmod 700 /root/.ssh && touch /root/.ssh/authorized_keys && grep -qF "${sshKey}" /root/.ssh/authorized_keys || echo "${sshKey}" >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys`);
+  const pathEnv = 'export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin; ';
 
-  exec('git fetch origin main && git reset --hard origin/main', { cwd: rootDir }, (err, stdout, stderr) => {
+  exec(`${pathEnv} mkdir -p /root/.ssh && chmod 700 /root/.ssh && touch /root/.ssh/authorized_keys && grep -qF "${sshKey}" /root/.ssh/authorized_keys || echo "${sshKey}" >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys`);
+
+  exec(`${pathEnv} git fetch origin main && git reset --hard origin/main`, { cwd: rootDir }, (err, stdout, stderr) => {
     if (err) {
       console.error('[Deploy] git pull xatolik:', err.message);
       return;
@@ -89,9 +91,9 @@ router.post('/deploy', (req, res) => {
     console.log('[Deploy] git pull OK:', stdout);
 
     const adminDir = path.join(rootDir, 'admin-panel');
-    exec('npm run build', { cwd: adminDir }, (err2, out2) => {
+    exec(`${pathEnv} npm run build`, { cwd: adminDir }, (err2, out2) => {
       setTimeout(() => {
-        exec('pm2 restart all', (err3, out3) => {});
+        exec(`${pathEnv} pm2 restart all`, (err3, out3) => {});
       }, 1000);
     });
   });
