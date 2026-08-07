@@ -1003,6 +1003,9 @@ function formatDownloadError(err) {
       botInstance.on('message:text', async (ctx) => {
         const text = ctx.message.text.trim();
 
+        // Ignore numeric movie codes so Movie Bot handles them without conflict
+        if (/^\d{1,6}$/.test(text)) return;
+
         if (text.includes('Do\'stlarni taklif qilish') || text.includes('Referal')) {
           return await sendReferralInfo(ctx);
         }

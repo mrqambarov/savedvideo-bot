@@ -1921,151 +1921,163 @@ function escapeHtml(text) {
 
 async function sendMovie(ctx, movie) {
   try {
-    const serverDb = require(path.resolve(__dirname, '../server/db'));
-    const isUserAdmin = ctx.from && isAdmin(ctx.from.id);
-    serverDb.logActivity({
-      bot: 'Kino Bot',
-      type: isUserAdmin ? 'admin' : 'user',
-      actor: isUserAdmin ? '👑 Admin' : '👤 Foydalanuvchi',
-      icon: isUserAdmin ? '👑' : '🎬',
-      text: isUserAdmin
-        ? `👑 Admin '${movie.title}' filmini ko'rib chiqdi (Kod: ${movie.code})`
-        : `👤 Foydalanuvchi '${movie.title}' filmini tomosha qildi (Kod: ${movie.code})`,
-      color: '#d946ef'
-    });
-  } catch (e) {}
-
-  if (ctx.from) {
     try {
-      const q = db.qualifyReferral(ctx.from.id);
-      if (q && q.qualified && q.referrerId) {
-        const tier = db.claimTierFor(q.referrerId, q.refCount);
-        if (tier) {
-          await ctx.api.sendMessage(q.referrerId,
-            `🎉 <b>Tabriklaymiz!</b> Siz <b>${tier.count} ta</b> do'st taklif qildingiz va mukofotga ega bo'ldingiz:\n\n🎁 ${escapeHtml(tier.reward)}`,
-            { parse_mode: 'HTML' }).catch(() => {});
-        }
-      }
+      const serverDb = require(path.resolve(__dirname, '../server/db'));
+      const isUserAdmin = ctx.from && isAdmin(ctx.from.id);
+      serverDb.logActivity({
+        bot: 'Kino Bot',
+        type: isUserAdmin ? 'admin' : 'user',
+        actor: isUserAdmin ? '👑 Admin' : '👤 Foydalanuvchi',
+        icon: isUserAdmin ? '👑' : '🎬',
+        text: isUserAdmin
+          ? `👑 Admin '${movie.title}' filmini ko'rib chiqdi (Kod: ${movie.code})`
+          : `👤 Foydalanuvchi '${movie.title}' filmini tomosha qildi (Kod: ${movie.code})`,
+        color: '#d946ef'
+      });
     } catch (e) {}
-  }
 
-  const likesCount = movie.likes ? movie.likes.length : 0;
-  const dislikesCount = movie.dislikes ? movie.dislikes.length : 0;
-  const downloaderBotUsername = process.env.DOWNLOADER_BOT_USERNAME || 'savemedia_music_bot';
-  const botUsername = ctx.me ? ctx.me.username : 'xitfilm_bot';
+    if (ctx.from) {
+      try {
+        const q = db.qualifyReferral(ctx.from.id);
+        if (q && q.qualified && q.referrerId) {
+          const tier = db.claimTierFor(q.referrerId, q.refCount);
+          if (tier) {
+            await ctx.api.sendMessage(q.referrerId,
+              `🎉 <b>Tabriklaymiz!</b> Siz <b>${tier.count} ta</b> do'st taklif qildingiz va mukofotga ega bo'ldingiz:\n\n🎁 ${escapeHtml(tier.reward)}`,
+              { parse_mode: 'HTML' }).catch(() => {});
+          }
+        }
+      } catch (e) {}
+    }
 
-  const cleanTitle = escapeHtml(movie.title || 'Noma\'lum film');
-  const cleanDesc = escapeHtml(movie.description || 'Tavsif berilmagan');
-  const cleanGenre = escapeHtml(movie.genre ? movie.genre.replace(/\s+/g, '_') : 'Tarjima_kino');
-  const cleanCode = escapeHtml(movie.code);
-  const viewsCount = movie.views || 0;
-  const fav = ctx.from ? db.isFavorite(ctx.from.id, movie.code) : false;
+    const likesCount = movie.likes ? movie.likes.length : 0;
+    const dislikesCount = movie.dislikes ? movie.dislikes.length : 0;
+    const downloaderBotUsername = process.env.DOWNLOADER_BOT_USERNAME || 'savemedia_music_bot';
+    const botUsername = ctx.me ? ctx.me.username : 'xitfilm_bot';
 
-  if (movie.isSerial) {
-    const captionText = `🎬 <b>${cleanTitle}</b> (Serial)\n\n` +
+    const cleanTitle = escapeHtml(movie.title || 'Noma\'lum film');
+    const cleanDesc = escapeHtml(movie.description || 'Tavsif berilmagan');
+    const cleanGenre = escapeHtml(movie.genre ? movie.genre.replace(/\s+/g, '_') : 'Tarjima_kino');
+    const cleanCode = escapeHtml(movie.code);
+    const viewsCount = movie.views || 0;
+    const fav = ctx.from ? db.isFavorite(ctx.from.id, movie.code) : false;
+
+    if (movie.isSerial) {
+      const captionText = `🎬 <b>${cleanTitle}</b> (Serial)\n\n` +
+        `🗂 Janr: #${cleanGenre}\n` +
+        `🔑 Kod: <code>${cleanCode}</code>\n` +
+        `👁 Ko'rishlar: <b>${viewsCount}</b> marta\n\n` +
+        `📝 <i>${cleanDesc}</i>\n\n` +
+        `🍿 <b>Qismlar ro'yxati (Tomosha qilish uchun kerakli qismni tanlang):</b>`;
+
+      const keyboard = new InlineKeyboard();
+      if (movie.episodes && movie.episodes.length > 0) {
+        movie.episodes.forEach((ep, idx) => {
+          keyboard.text(`${ep.episode}-qism`, `ep:${movie.code}:${ep.episode}`);
+          if (idx % 4 === 3) keyboard.row();
+        });
+        keyboard.row()
+          .text(`👍 🔥 ${likesCount}`, `like:${movie.code}`)
+          .text(`👎 ❄️ ${dislikesCount}`, `dislike:${movie.code}`)
+          .row()
+          .text(fav ? '⭐ ⚡️ Sevimlilarda saqlangan' : '☆ ✨ Sevimlilarga qo\'shish', `fav:${movie.code}`);
+      } else {
+        keyboard.text(`Hozircha qismlar yo'q`, `noop`);
+        keyboard.row()
+          .text(`👍 🔥 ${likesCount}`, `like:${movie.code}`)
+          .text(`👎 ❄️ ${dislikesCount}`, `dislike:${movie.code}`)
+          .row()
+          .text(fav ? '⭐ ⚡️ Sevimlilarda saqlangan' : '☆ ✨ Sevimlilarga qo\'shish', `fav:${movie.code}`);
+      }
+
+      if (movie.poster) {
+        try {
+          return await ctx.replyWithPhoto(movie.poster, { caption: captionText, parse_mode: 'HTML', reply_markup: keyboard });
+        } catch (e) {}
+      }
+
+      return await ctx.reply(captionText, { parse_mode: 'HTML', reply_markup: keyboard });
+    }
+
+    const captionText = `🎬 <b>${cleanTitle}</b>\n\n` +
       `🗂 Janr: #${cleanGenre}\n` +
       `🔑 Kod: <code>${cleanCode}</code>\n` +
       `👁 Ko'rishlar: <b>${viewsCount}</b> marta\n\n` +
       `📝 <i>${cleanDesc}</i>\n\n` +
-      `🍿 <b>Qismlar ro'yxati (Tomosha qilish uchun kerakli qismni tanlang):</b>`;
+      `❤️ <b>Kino Boti:</b> @${botUsername}\n` +
+      `📹 <b>Media & MP3 Yuklovchi:</b> @${downloaderBotUsername}`;
 
-    const keyboard = new InlineKeyboard();
-    if (movie.episodes && movie.episodes.length > 0) {
-      movie.episodes.forEach((ep, idx) => {
-        keyboard.text(`${ep.episode}-qism`, `ep:${movie.code}:${ep.episode}`);
-        if (idx % 4 === 3) keyboard.row();
-      });
-      keyboard.row()
-        .text(`👍 🔥 ${likesCount}`, `like:${movie.code}`)
-        .text(`👎 ❄️ ${dislikesCount}`, `dislike:${movie.code}`)
-        .row()
-        .text(fav ? '⭐ ⚡️ Sevimlilarda saqlangan' : '☆ ✨ Sevimlilarga qo\'shish', `fav:${movie.code}`);
-    } else {
-      keyboard.text(`Hozircha qismlar yo'q`, `noop`);
-      keyboard.row()
-        .text(`👍 🔥 ${likesCount}`, `like:${movie.code}`)
-        .text(`👎 ❄️ ${dislikesCount}`, `dislike:${movie.code}`)
-        .row()
-        .text(fav ? '⭐ ⚡️ Sevimlilarda saqlangan' : '☆ ✨ Sevimlilarga qo\'shish', `fav:${movie.code}`);
-    }
+    const keyboard = new InlineKeyboard()
+      .text(`👍 🔥 ${likesCount}`, `like:${movie.code}`)
+      .text(`👎 ❄️ ${dislikesCount}`, `dislike:${movie.code}`)
+      .row()
+      .text(fav ? '⭐ ⚡️ Sevimlilarda saqlangan' : '☆ ✨ Sevimlilarga qo\'shish', `fav:${movie.code}`);
 
-    if (movie.poster) {
+    // 1. Try sending Video
+    if (movie.fileId) {
       try {
-        return await ctx.replyWithPhoto(movie.poster, { caption: captionText, parse_mode: 'HTML', reply_markup: keyboard });
-      } catch (e) {}
-    }
-
-    return await ctx.reply(captionText, { parse_mode: 'HTML', reply_markup: keyboard });
-  }
-
-  const captionText = `🎬 <b>${cleanTitle}</b>\n\n` +
-    `🗂 Janr: #${cleanGenre}\n` +
-    `🔑 Kod: <code>${cleanCode}</code>\n` +
-    `👁 Ko'rishlar: <b>${viewsCount}</b> marta\n\n` +
-    `📝 <i>${cleanDesc}</i>\n\n` +
-    `❤️ <b>Kino Boti:</b> @${botUsername}\n` +
-    `📹 <b>Media & MP3 Yuklovchi:</b> @${downloaderBotUsername}`;
-
-  const keyboard = new InlineKeyboard()
-    .text(`👍 🔥 ${likesCount}`, `like:${movie.code}`)
-    .text(`👎 ❄️ ${dislikesCount}`, `dislike:${movie.code}`)
-    .row()
-    .text(fav ? '⭐ ⚡️ Sevimlilarda saqlangan' : '☆ ✨ Sevimlilarga qo\'shish', `fav:${movie.code}`);
-
-  // 1. Try sending Video
-  if (movie.fileId) {
-    try {
-      return await ctx.replyWithVideo(movie.fileId, {
-        caption: captionText,
-        parse_mode: 'HTML',
-        reply_markup: keyboard
-      });
-    } catch (e1) {
-      // 2. Try sending Document (if fileId was uploaded as file)
-      try {
-        return await ctx.replyWithDocument(movie.fileId, {
+        return await ctx.replyWithVideo(movie.fileId, {
           caption: captionText,
           parse_mode: 'HTML',
           reply_markup: keyboard
         });
-      } catch (e2) {
-        // 3. Try sending Animation (GIF)
+      } catch (e1) {
+        // 2. Try sending Document (if fileId was uploaded as file)
         try {
-          return await ctx.replyWithAnimation(movie.fileId, {
+          return await ctx.replyWithDocument(movie.fileId, {
             caption: captionText,
             parse_mode: 'HTML',
             reply_markup: keyboard
           });
-        } catch (e3) {
-          // 4. Try sending Photo (if fileId was a photo)
+        } catch (e2) {
+          // 3. Try sending Animation (GIF)
           try {
-            return await ctx.replyWithPhoto(movie.fileId, {
+            return await ctx.replyWithAnimation(movie.fileId, {
               caption: captionText,
               parse_mode: 'HTML',
               reply_markup: keyboard
             });
-          } catch (e4) {}
+          } catch (e3) {
+            // 4. Try sending Photo (if fileId was a photo)
+            try {
+              return await ctx.replyWithPhoto(movie.fileId, {
+                caption: captionText,
+                parse_mode: 'HTML',
+                reply_markup: keyboard
+              });
+            } catch (e4) {}
+          }
         }
       }
     }
-  }
 
-  // 4. Try sending Poster Photo
-  if (movie.poster) {
+    // 4. Try sending Poster Photo
+    if (movie.poster) {
+      try {
+        return await ctx.replyWithPhoto(movie.poster, {
+          caption: captionText,
+          parse_mode: 'HTML',
+          reply_markup: keyboard
+        });
+      } catch (e4) {}
+    }
+
+    // 5. Guaranteed fallback: Send clean HTML text card
+    return await ctx.reply(captionText, {
+      parse_mode: 'HTML',
+      reply_markup: keyboard
+    });
+  } catch (outerErr) {
+    console.error('sendMovie outer error:', outerErr);
     try {
-      return await ctx.replyWithPhoto(movie.poster, {
-        caption: captionText,
-        parse_mode: 'HTML',
-        reply_markup: keyboard
-      });
-    } catch (e4) {}
+      const cleanTitle = escapeHtml(movie.title || 'Kino');
+      const cleanCode = escapeHtml(movie.code);
+      return await ctx.reply(
+        `🎬 <b>${cleanTitle}</b>\n🔑 Kod: <code>${cleanCode}</code>\n\n🍿 Kino kodi bazada saqlangan!`,
+        { parse_mode: 'HTML' }
+      );
+    } catch (e) {}
   }
-
-  // 5. Guaranteed fallback: Send clean HTML text card
-  return await ctx.reply(captionText, {
-    parse_mode: 'HTML',
-    reply_markup: keyboard
-  });
 }
 
 async function stopBot() {
