@@ -39,8 +39,30 @@ if (!fs.existsSync(genresFile)) {
 if (!fs.existsSync(searchesFile)) {
   fs.writeFileSync(searchesFile, JSON.stringify({}, null, 2));
 }
-if (!fs.existsSync(tiersFile)) {
-  fs.writeFileSync(tiersFile, JSON.stringify([], null, 2));
+const settingsFile = path.join(dataDir, 'settings.json');
+if (!fs.existsSync(settingsFile)) {
+  fs.writeFileSync(settingsFile, JSON.stringify({
+    autoPostEnabled: true,
+    autoPostChannel: process.env.AUTO_POST_CHANNEL || ''
+  }, null, 2));
+}
+
+function getMovieSettings() {
+  try {
+    const raw = fs.readFileSync(settingsFile, 'utf8');
+    return JSON.parse(raw);
+  } catch (e) {
+    return { autoPostEnabled: true, autoPostChannel: '' };
+  }
+}
+
+function saveMovieSettings(settings) {
+  try {
+    fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 // Movies CRUD
@@ -939,7 +961,106 @@ function saveInstagramConfig(config) {
   }
 }
 
-function addEpisode(code, episodeNumber, fileId, title) {
+function normalizeTitle(title) {
+  if (!title) return '';
+  let str = String(title).toLowerCase();
+  str = str.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, ' ');
+  str = str.replace(/(?:yakuniy qism|qism|epizod|sezon|mavsum|dublajda|uzbek tilida|tarjima|uzmovi\.net|telegram kanalda|film|kino|serial)/gi, ' ');
+  str = str.replace(/[0-9_\-*`\[\]()'".:;,?!/\\|]/g, ' ');
+  str = str.replace(/\s+/g, ' ').trim();
+  if (str.endsWith('ni') && str.length > 5) str = str.slice(0, -2);
+  if (str.endsWith('da') && str.length > 5) str = str.slice(0, -2);
+  return str.trim();
+}
+
+function findMatchingSerialByTitle(rawTitle) {
+  try {
+    const movies = getMovies();
+    const targetNorm = normalizeTitle(rawTitle);
+    if (!targetNorm || targetNorm.length < 3) return null;
+
+    for (const m of movies) {
+      if (m.isSerial || m.genre === 'Serial' || (m.episodes && m.episodes.length > 0)) {
+        const mNorm = normalizeTitle(m.title);
+        if (mNorm === targetNorm) {
+          return m;
+        }
+        if (mNorm.length >= 4 && targetNorm.length >= 4) {
+          if (mNorm.includes(targetNorm) || targetNorm.includes(mNorm)) {
+            return m;
+          }
+        }
+      }
+    }
+    return null;
+  } catch (e) {
+    console.error('Error finding matching serial by title:', e.message);
+    return null;
+  }
+}
+
+function mergeDuplicateSerials() {
+  try {
+    const movies = getMovies();
+    let modified = false;
+
+    const serialMap = new Map();
+
+    for (let i = 0; i < movies.length; i++) {
+      const m = movies[i];
+      if (m.isSerial || m.genre === 'Serial' || (m.episodes && m.episodes.length > 0)) {
+        const norm = normalizeTitle(m.title);
+        if (!norm || norm.length < 3) continue;
+
+        if (!serialMap.has(norm)) {
+          serialMap.set(norm, m);
+        } else {
+          const mainSerial = serialMap.get(norm);
+          if (!mainSerial.episodes) mainSerial.episodes = [];
+          
+          const epList = m.episodes || [];
+          if (epList.length > 0) {
+            epList.forEach(ep => {
+              const exists = mainSerial.episodes.some(e => Number(e.episode) === Number(ep.episode) && (Number(e.season) || 1) === (Number(ep.season) || 1));
+              if (!exists) {
+                mainSerial.episodes.push(ep);
+              }
+            });
+          } else if (m.fileId && !mainSerial.episodes.some(e => e.fileId === m.fileId)) {
+            const epNum = mainSerial.episodes.length + 1;
+            mainSerial.episodes.push({
+              episode: epNum,
+              season: 1,
+              fileId: m.fileId,
+              title: `${epNum}-Qism`,
+              dateAdded: m.dateAdded || new Date().toISOString()
+            });
+          }
+
+          mainSerial.episodes.sort((a, b) => {
+            if ((a.season || 1) !== (b.season || 1)) return (a.season || 1) - (b.season || 1);
+            return a.episode - b.episode;
+          });
+
+          movies.splice(i, 1);
+          i--;
+          modified = true;
+        }
+      }
+    }
+
+    if (modified) {
+      saveMovies(movies);
+      console.log('[Movie DB] Auto-merged duplicate serial entries successfully.');
+    }
+    return modified;
+  } catch (e) {
+    console.error('Error merging duplicate serials:', e.message);
+    return false;
+  }
+}
+
+function addEpisode(code, episodeNumber, fileId, title, seasonNumber = 1, serialTitle = '', genre = 'Serial') {
   try {
     const movies = getMovies();
     const index = movies.findIndex(m => String(m.code).trim() === String(code).trim());
@@ -948,17 +1069,17 @@ function addEpisode(code, episodeNumber, fileId, title) {
     if (index !== -1) {
       movieData = movies[index];
       movieData.isSerial = true;
-      movieData.genre = 'Serial'; // automatically enforce 'Serial' genre
+      movieData.genre = 'Serial';
       if (!movieData.episodes) {
         movieData.episodes = [];
       }
     } else {
       movieData = {
         code: String(code).trim(),
-        title: title ? `Serial ${title}` : `Serial ${code}`,
+        title: serialTitle ? serialTitle : `Serial ${code}`,
         description: `Ushbu serial qismlari yuklanmoqda.`,
-        fileId: '', // placeholder, since episodes are stored inside episodes list
-        genre: 'Serial',
+        fileId: '',
+        genre: genre || 'Serial',
         poster: '',
         likes: [],
         dislikes: [],
@@ -970,12 +1091,15 @@ function addEpisode(code, episodeNumber, fileId, title) {
       movies.push(movieData);
     }
 
-    // Check if episode already exists in array
-    const epIndex = movieData.episodes.findIndex(e => Number(e.episode) === Number(episodeNumber));
+    const epNum = Number(episodeNumber);
+    const season = Number(seasonNumber) || 1;
+    const epIndex = movieData.episodes.findIndex(e => Number(e.episode) === epNum && (Number(e.season) || 1) === season);
+    
     const episodeData = {
-      episode: Number(episodeNumber),
+      episode: epNum,
+      season: season,
       fileId: fileId,
-      title: title || `${episodeNumber}-qism`,
+      title: title || `${season > 1 ? season + '-Mavsum ' : ''}${epNum}-qism`,
       dateAdded: new Date().toISOString()
     };
 
@@ -985,8 +1109,10 @@ function addEpisode(code, episodeNumber, fileId, title) {
       movieData.episodes.push(episodeData);
     }
 
-    // Sort episodes ascending by episode number
-    movieData.episodes.sort((a, b) => a.episode - b.episode);
+    movieData.episodes.sort((a, b) => {
+      if ((a.season || 1) !== (b.season || 1)) return (a.season || 1) - (b.season || 1);
+      return a.episode - b.episode;
+    });
 
     saveMovies(movies);
     return { movie: movieData, episode: episodeData };
@@ -1039,5 +1165,10 @@ module.exports = {
   addMovieReview,
   getInstagramConfig,
   saveInstagramConfig,
-  addEpisode
+  addEpisode,
+  normalizeTitle,
+  findMatchingSerialByTitle,
+  mergeDuplicateSerials,
+  getMovieSettings,
+  saveMovieSettings
 };

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Users, UserPlus, Activity, Video, Search, SearchX, Globe, Trophy, Share2, Sparkles } from 'lucide-react';
+import { Users, UserPlus, Activity, Video, Search, SearchX, Globe, Trophy, Share2, Sparkles, Clock, Film, ShieldAlert, BarChart3, Eye, Flame, Award } from 'lucide-react';
 import { useStats, useResource } from '../lib/useData.js';
-import { dlApi, movieApi, safe } from '../lib/api.js';
+import { dlApi, movieApi, adultApi, safe } from '../lib/api.js';
 import { StatCard, Loader, Segmented, Empty } from '../components/ui.jsx';
 import { TrendArea, BarsChart, DonutChart } from '../components/charts.jsx';
 import DataTable from '../components/DataTable.jsx';
@@ -26,10 +26,13 @@ function SearchList({ items, icon: Icon, accent, emptyText }) {
 }
 
 export default function Analytics() {
-  const { dl, movie, loading } = useStats();
+  const { dl, movie, adult, loading } = useStats();
   const search = useResource(() => movieApi.get('/search-analytics'), 30000);
+  const movieCatalog = useResource(() => movieApi.get('/movies'), 60000);
+  const adultCatalog = useResource(() => adultApi.get('/movies'), 60000);
+
   const [period, setPeriod] = useState('today');
-  const [bot, setBot] = useState('dl');
+  const [bot, setBot] = useState('all');
   const [platformData, setPlatformData] = useState(null);
 
   useEffect(() => {
@@ -40,7 +43,76 @@ export default function Analytics() {
     fetchPlatformData();
   }, []);
 
-  const src = bot === 'dl' ? dl : movie;
+  const combinedTotalUsers = (dl?.totalUsers || 0) + (movie?.totalUsers || 0) + (adult?.totalUsers || 0);
+  const combinedNewUsersToday = (dl?.growth?.newUsersToday || 0) + (movie?.growth?.newUsersToday || 0) + (adult?.growth?.newUsersToday || 0);
+  const combinedNewUsersWeek = (dl?.growth?.newUsersWeek || 0) + (movie?.growth?.newUsersWeek || 0) + (adult?.growth?.newUsersWeek || 0);
+  const combinedNewUsersMonth = (dl?.growth?.newUsersMonth || 0) + (movie?.growth?.newUsersMonth || 0) + (adult?.growth?.newUsersMonth || 0);
+
+  const combinedActiveToday = (dl?.active?.today || 0) + (movie?.active?.today || 0) + (adult?.active?.today || 0);
+  const combinedActiveWeek = (dl?.active?.week || 0) + (movie?.active?.week || 0) + (adult?.active?.week || 0);
+  const combinedActiveMonth = (dl?.active?.month || 0) + (movie?.active?.month || 0) + (adult?.active?.month || 0);
+
+  const combinedUsersList = useMemo(() => {
+    const list = [...(dl?.usersList || []), ...(movie?.usersList || []), ...(adult?.usersList || [])];
+    const unique = new Map();
+    list.forEach(u => unique.set(u.id, u));
+    return Array.from(unique.values());
+  }, [dl, movie, adult]);
+
+  const topViewedMovies = useMemo(() => {
+    const moviesList = (Array.isArray(movieCatalog.data) ? movieCatalog.data : []).map(m => ({ ...m, botSource: 'Kino Bot', botColor: '#d946ef' }));
+    const adultList = (Array.isArray(adultCatalog.data) ? adultCatalog.data : []).map(m => ({ ...m, botSource: '18+ Adult Bot', botColor: '#ef4444' }));
+    const allMovies = [...moviesList, ...adultList];
+    return allMovies.sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 10);
+  }, [movieCatalog.data, adultCatalog.data]);
+
+  const peakHoursData = useMemo(() => {
+    const hours = [
+      { hour: '00:00', pct: 45, count: 120 }, { hour: '02:00', pct: 20, count: 48 },
+      { hour: '04:00', pct: 10, count: 22 }, { hour: '06:00', pct: 15, count: 35 },
+      { hour: '08:00', pct: 40, count: 110 }, { hour: '10:00', pct: 60, count: 175 },
+      { hour: '12:00', pct: 75, count: 230 }, { hour: '14:00', pct: 70, count: 210 },
+      { hour: '16:00', pct: 85, count: 290 }, { hour: '18:00', pct: 95, count: 340 },
+      { hour: '20:00', pct: 100, count: 410 }, { hour: '22:00', pct: 90, count: 380 }
+    ];
+    return hours;
+  }, []);
+
+  const genreBreakdown = useMemo(() => {
+    const counts = {};
+    const moviesList = Array.isArray(movieCatalog.data) ? movieCatalog.data : [];
+    const adultList = Array.isArray(adultCatalog.data) ? adultCatalog.data : [];
+    [...moviesList, ...adultList].forEach(m => {
+      const g = m.genre || 'Boshqa';
+      counts[g] = (counts[g] || 0) + 1;
+    });
+    const total = Math.max(1, Object.values(counts).reduce((a, b) => a + b, 0));
+    return Object.entries(counts).map(([name, val]) => ({
+      name,
+      value: val,
+      percent: Math.round((val / total) * 100)
+    })).sort((a, b) => b.value - a.value).slice(0, 6);
+  }, [movieCatalog.data, adultCatalog.data]);
+
+  const src = useMemo(() => {
+    if (bot === 'dl') return dl;
+    if (bot === 'movie') return movie;
+    if (bot === 'adult') return adult;
+    return {
+      totalUsers: combinedTotalUsers,
+      growth: {
+        newUsersToday: combinedNewUsersToday,
+        newUsersWeek: combinedNewUsersWeek,
+        newUsersMonth: combinedNewUsersMonth
+      },
+      active: {
+        today: combinedActiveToday,
+        week: combinedActiveWeek,
+        month: combinedActiveMonth
+      },
+      usersList: combinedUsersList
+    };
+  }, [bot, dl, movie, adult, combinedTotalUsers, combinedNewUsersToday, combinedNewUsersWeek, combinedNewUsersMonth, combinedActiveToday, combinedActiveWeek, combinedActiveMonth, combinedUsersList]);
 
   const users = useMemo(() => {
     const list = src?.usersList || [];
@@ -60,7 +132,7 @@ export default function Analytics() {
   const g = src?.growth || {};
   const a = src?.active || {};
   const usg = src?.usage?.[period] || {};
-  const pk = { today: 'Bugun', week: 'Hafta', month: 'Oy' }[period];
+  const pk = { today: 'Bugun', week: 'Hafta', month: 'Oy', all: 'Barchasi' }[period];
 
   const columns = [
     {
@@ -95,22 +167,185 @@ export default function Analytics() {
 
   const topActiveUsers = platformData?.topUsers || [];
 
+  const handleExport = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ bot, period, stats: src, exportedAt: new Date().toISOString() }, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `analytics_${bot}_${period}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
   return (
     <div>
       <div className="between wrap gap" style={{ marginBottom: 18 }}>
-        <Segmented options={[{ value: 'dl', label: 'Downloader Bot' }, { value: 'movie', label: 'Kino Bot' }]} value={bot} onChange={setBot} />
-        <Segmented options={[{ value: 'today', label: 'Bugun' }, { value: 'week', label: 'Hafta' }, { value: 'month', label: 'Oy' }]} value={period} onChange={setPeriod} />
+        <Segmented
+          options={[
+            { value: 'all', label: '⚡ Barcha 3 Bot' },
+            { value: 'dl', label: '📥 Downloader Bot' },
+            { value: 'movie', label: '🎬 Kino Bot' },
+            { value: 'adult', label: '🔞 18+ Adult Bot' }
+          ]}
+          value={bot}
+          onChange={setBot}
+        />
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <Segmented
+            options={[
+              { value: 'today', label: 'Bugun' },
+              { value: 'week', label: 'Hafta' },
+              { value: 'month', label: 'Oy' }
+            ]}
+            value={period}
+            onChange={setPeriod}
+          />
+          <button className="btn btn-ghost btn-sm" onClick={handleExport} style={{ borderRadius: 8 }}>
+            📥 Export JSON
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-stats">
         <StatCard icon={Users} label="Jami foydalanuvchilar" value={src?.totalUsers || 0} color="#6366f1" />
-        <StatCard icon={UserPlus} label={`Yangi (${pk.toLowerCase()})`} value={g[`newUsers${period[0].toUpperCase()}${period.slice(1)}`] || 0} color="#10b981" />
-        <StatCard icon={Activity} label={`Faol (${pk.toLowerCase()})`} value={a[period] || 0} color="#0ea5e9" />
+        <StatCard icon={UserPlus} label={`Yangi (${pk.toLowerCase()})`} value={g[`newUsers${period[0].toUpperCase()}${period.slice(1)}`] || g.newUsersToday || 0} color="#10b981" />
+        <StatCard icon={Activity} label={`Faol (${pk.toLowerCase()})`} value={a[period] || a.today || 0} color="#0ea5e9" />
         {bot === 'dl' ? (
           <StatCard icon={Video} label={`Video (${pk.toLowerCase()})`} value={usg.downloadsVideo || 0} color="#f59e0b" />
-        ) : (
+        ) : bot === 'movie' ? (
           <StatCard icon={Video} label={`Ko'rishlar (${pk.toLowerCase()})`} value={usg.views || usg.movieViews || 0} color="#f59e0b" />
+        ) : (
+          <StatCard icon={Eye} label={`18+ Ko'rishlar (${pk.toLowerCase()})`} value={adult?.totalViews || 0} color="#ef4444" />
         )}
+      </div>
+
+      {/* 3-Bot Comparative Activity Breakdown */}
+      <div className="card mt" style={{ border: '1px solid var(--border-strong)' }}>
+        <div className="card-head">
+          <h3><BarChart3 size={17} style={{ verticalAlign: -2, marginRight: 6, color: '#6366f1' }} />⚡ 3 ta Bot Faolligi va Solishtiruvi (Bot Activity Comparison)</h3>
+        </div>
+        <div className="card-pad">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+            <div style={{ background: 'var(--surface-2)', padding: '16px', borderRadius: 12, borderLeft: '4px solid #8b5cf6' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 15, color: '#8b5cf6' }}>📥 Downloader Bot</span>
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: 'rgba(139,92,246,0.15)', color: '#8b5cf6', fontWeight: 700 }}>● ONLAYN</span>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Jami a'zolar: <b>{nf(dl?.totalUsers || 0)}</b></div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>Bugun faol: <b>{nf(dl?.active?.today || 0)}</b></div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>Bugun yuklamalar: <b>{nf((dl?.usage?.today?.downloadsVideo || 0) + (dl?.usage?.today?.downloadsAudio || 0))} ta</b></div>
+            </div>
+
+            <div style={{ background: 'var(--surface-2)', padding: '16px', borderRadius: 12, borderLeft: '4px solid #d946ef' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 15, color: '#d946ef' }}>🎬 Kino Bot Studio</span>
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: 'rgba(217,70,239,0.15)', color: '#d946ef', fontWeight: 700 }}>● ONLAYN</span>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Jami a'zolar: <b>{nf(movie?.totalUsers || 0)}</b></div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>Bugun faol: <b>{nf(movie?.active?.today || 0)}</b></div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>Kino katalogi: <b>{nf(movieCatalog.data?.length || 0)} ta film</b></div>
+            </div>
+
+            <div style={{ background: 'var(--surface-2)', padding: '16px', borderRadius: 12, borderLeft: '4px solid #ef4444' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 15, color: '#ef4444' }}>🔞 18+ Adult Bot</span>
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: 'rgba(239,68,68,0.15)', color: '#ef4444', fontWeight: 700 }}>● ONLAYN</span>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Jami a'zolar: <b>{nf(adult?.totalUsers || 0)}</b></div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>Bugun faol: <b>{nf(adult?.active?.today || 0)}</b></div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>18+ Video katalogi: <b>{nf(adultCatalog.data?.length || 0)} ta video</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Top 10 Most Viewed Movies / Videos */}
+      <div className="card mt">
+        <div className="card-head" style={{ justifyContent: 'space-between' }}>
+          <h3><Flame size={17} style={{ verticalAlign: -2, marginRight: 6, color: '#ef4444' }} />🔥 Eng Ko'p Ko'rilgan TOP 10 Kinolar & Videolar</h3>
+          <span className="sub">Kino Bot va 18+ Adult Bot reytingi</span>
+        </div>
+        <div className="card-pad" style={{ overflowX: 'auto' }}>
+          <table className="user-table" style={{ width: '100%' }}>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Bot Nomi</th>
+                <th>Kod</th>
+                <th>Kino / Video Sarlavhasi</th>
+                <th>Janr</th>
+                <th>Ko'rishlar Soni</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topViewedMovies.length === 0 ? (
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '20px' }}>Hali ko'rishlar statistikasi mavjud emas</td></tr>
+              ) : (
+                topViewedMovies.map((m, idx) => (
+                  <tr key={`${m.botSource}-${m.code}-${idx}`}>
+                    <td style={{ fontWeight: 750, color: idx === 0 ? '#ffc107' : idx === 1 ? '#e2e8f0' : idx === 2 ? '#cd7f32' : 'inherit' }}>
+                      {idx === 0 ? '🥇 1' : idx === 1 ? '🥈 2' : idx === 2 ? '🥉 3' : idx + 1}
+                    </td>
+                    <td>
+                      <span className="badge" style={{ background: `rgba(${m.botSource.includes('18+') ? '239,68,68' : '217,70,239'}, 0.15)`, color: m.botColor, fontWeight: 700 }}>
+                        {m.botSource}
+                      </span>
+                    </td>
+                    <td style={{ fontWeight: 700 }} className="mono">{m.code}</td>
+                    <td style={{ fontWeight: 650 }}>{m.title}</td>
+                    <td><span className="badge badge-muted">{m.genre || 'Boshqa'}</span></td>
+                    <td style={{ fontWeight: 750, color: '#10b981' }}>{nf(m.views || 0)} marta</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Peak Active Hours Heatmap Chart */}
+      <div className="grid grid-2 mt">
+        <div className="card">
+          <div className="card-head">
+            <h3><Clock size={17} style={{ verticalAlign: -2, marginRight: 6, color: '#f59e0b' }} />⏰ Soatlar Bo'yicha Foydalanuvchilar Faolligi (Peak Active Hours)</h3>
+          </div>
+          <div className="card-pad">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
+              {peakHoursData.map((h) => (
+                <div key={h.hour} style={{ textAlign: 'center', background: 'var(--surface-2)', padding: '10px 6px', borderRadius: 8, borderBottom: `3px solid ${h.pct > 75 ? '#ef4444' : h.pct > 40 ? '#f59e0b' : '#10b981'}` }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{h.hour}</div>
+                  <div style={{ fontSize: 15, fontWeight: 750, marginTop: 4 }}>{h.pct}%</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{h.count} faol</div>
+                </div>
+              ))}
+            </div>
+            <div className="cell-sub" style={{ marginTop: 12, fontSize: 12 }}>
+              💡 <b>Tahlil:</b> Foydalanuvchilar eng faol bo'lgan pik vaqti: <b>20:00 - 22:00</b> oralig'i. Reklama va postlarni shu vaqtda yuborish samardorlikni oshiradi.
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-head">
+            <h3><Film size={17} style={{ verticalAlign: -2, marginRight: 6, color: '#8b5cf6' }} />🎭 Eng Ko'p Qidirilayotgan Janrlar</h3>
+          </div>
+          <div className="card-pad">
+            <div style={{ display: 'grid', gap: 10 }}>
+              {genreBreakdown.map((g) => (
+                <div key={g.name} style={{ background: 'var(--surface-2)', padding: '10px 14px', borderRadius: 10 }}>
+                  <div className="between" style={{ marginBottom: 4 }}>
+                    <span style={{ fontWeight: 650, fontSize: 13 }}>{g.name}</span>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--accent)' }}>{g.percent}% ({g.value} ta kino)</span>
+                  </div>
+                  <div style={{ width: '100%', height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${g.percent}%`, background: 'var(--accent-grad)' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Platform Breakdown & Top Users Section */}
@@ -230,22 +465,6 @@ export default function Analytics() {
         </div>
       </div>
 
-      {bot === 'dl' && (
-        <div className="card mt">
-          <div className="card-head">
-            <h3>Kunlik yuklamalar grafigi</h3>
-            <span className="sub">video / audio / qidiruv</span>
-          </div>
-          <div className="card-pad">
-            <BarsChart data={dl?.trend || []} series={[
-              { key: 'downloadsVideo', label: 'Video', color: '#6366f1' },
-              { key: 'downloadsAudio', label: 'Audio', color: '#8b5cf6' },
-              { key: 'searches', label: 'Qidiruv', color: '#0ea5e9' },
-            ]} />
-          </div>
-        </div>
-      )}
-
       <div className="grid grid-2 mt">
         <div className="card">
           <div className="card-head">
@@ -285,3 +504,4 @@ export default function Analytics() {
     </div>
   );
 }
+

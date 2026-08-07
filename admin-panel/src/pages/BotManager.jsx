@@ -58,7 +58,7 @@ export default function BotManagerCard() {
 
       <div className="card-pad">
         {/* Target Selector Tabs */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
           <button
             type="button"
             className={`btn ${target === 'downloader' ? 'btn-primary' : 'btn-ghost'}`}
@@ -76,6 +76,15 @@ export default function BotManagerCard() {
           >
             <Film size={16} /> Kino Bot (Film Search)
           </button>
+
+          <button
+            type="button"
+            className={`btn ${target === 'music' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => { setTarget('music'); setMsg(null); }}
+            style={{ borderRadius: 10, padding: '9px 16px' }}
+          >
+            <Sparkles size={16} /> 🔞 18+ Adult Bot
+          </button>
         </div>
 
         {/* Feedback Alert */}
@@ -91,9 +100,12 @@ export default function BotManagerCard() {
           <div>
             <div className="cell-sub" style={{ fontSize: 12 }}>Tanlangan Bot turi</div>
             <div style={{ fontWeight: 700, fontSize: 15, marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
-              {target === 'downloader' ? <><Bot size={18} color="var(--accent)" /> Downloader Bot</> : <><Film size={18} color="#ec4899" /> Kino Bot</>}
+              {target === 'downloader' && <><Bot size={18} color="var(--accent)" /> Downloader Bot</>}
+              {target === 'movie' && <><Film size={18} color="#ec4899" /> Kino Bot</>}
+              {target === 'music' && <><Sparkles size={18} color="#ef4444" /> 🔞 18+ Adult Bot</>}
             </div>
           </div>
+
 
           <div>
             <div className="cell-sub" style={{ fontSize: 12 }}>Hozirgi Telegram Username</div>
@@ -150,6 +162,40 @@ export default function BotManagerCard() {
             )}
           </button>
         </form>
+
+        {/* 🛡 Multi-Bot Anti-Ban Cluster Section */}
+        <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div>
+              <h4 style={{ fontSize: 16, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ShieldAlert size={18} color="#10b981" /> 🛡 Anti-Ban Multi-Bot Klaster (Zaxira Botlar Ro'yxati)
+              </h4>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
+                Asosiy bot bloklanganda barcha foydalanuvchilar zudlik bilan ushbu zaxira botlarga avto-yo'naltiriladi.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
+            <div style={{ padding: 16, background: 'var(--surface-2)', borderRadius: 12, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)' }}>1-Zaxira Bot</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)', marginTop: 4 }}>@xitfilm_backup1_bot</div>
+              <div style={{ fontSize: 11, color: '#10b981', fontWeight: 700, marginTop: 4 }}>● TAYYOR (READY STANDBY)</div>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={async () => {
+                  if (confirm("Rostdan ham barcha foydalanuvchilarni zaxira bot @xitfilm_backup1_bot ga ko'chirmoqchimisiz?")) {
+                    const { data } = await safe(dlApi.post('/multi-bot/migrate', { targetUsername: '@xitfilm_backup1_bot' }));
+                    alert(data?.message || "Avto-ko'chirish boshlandi!");
+                  }
+                }}
+                style={{ marginTop: 12, width: '100%', background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', fontWeight: 700 }}
+              >
+                🚨 1-Bosishda Avto-Ko'chirish
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

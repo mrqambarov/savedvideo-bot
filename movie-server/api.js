@@ -455,64 +455,104 @@ router.get('/broadcast', (req, res) => {
 });
 
 router.post('/broadcast', async (req, res) => {
-  const { message, buttonText, buttonUrl } = req.body;
-  if (!message) {
-    return res.status(400).json({ error: 'Xabar matni kiritilishi shart.' });
-  }
-  if (currentBroadcast.status === 'running') {
-    return res.status(400).json({ error: 'Hozirda boshqa reklama tarqatilmoqda.' });
-  }
+  try {
+    const { message, mediaType, mediaUrl, buttons, buttonText, buttonUrl, targetSegment } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Xabar matni kiritilishi shart.' });
+    }
 
-  const users = db.getUsers();
-  if (users.length === 0) {
-    return res.status(400).json({ error: 'Botda a\'zolar topilmadi.' });
-  }
+    if (currentBroadcast.status === 'running') {
+      return res.status(400).json({ error: 'Hozirda boshqa reklama tarqatilmoqda.' });
+    }
 
-  currentBroadcast = {
-    total: users.length,
-    sent: 0,
-    failed: 0,
-    status: 'running',
-    logs: [`Reklama tarqatish boshlandi: ${new Date().toLocaleTimeString()}`]
-  };
+    let users = db.getUsers();
+    if (!users || users.length === 0) {
+      return res.status(400).json({ error: 'Botda a\'zolar topilmadi.' });
+    }
 
-  res.json({ success: true, message: 'Broadcasting started.', progress: currentBroadcast });
+    if (targetSegment === 'active') {
+      const threeDaysAgo = Date.now() - (3 * 24 * 60 * 60 * 1000);
+      users = users.filter(u => u.lastActive && new Date(u.lastActive).getTime() >= threeDaysAgo);
+    } else if (targetSegment === 'inactive') {
+      const threeDaysAgo = Date.now() - (3 * 24 * 60 * 60 * 1000);
+      users = users.filter(u => !u.lastActive || new Date(u.lastActive).getTime() < threeDaysAgo);
+    }
 
-  const botStatus = bot.getBotStatus();
-  if (!botStatus.running || !bot.getBotInstance()) {
-    currentBroadcast.status = 'failed';
-    currentBroadcast.logs.push('Xatolik: Telegram bot faol emas.');
-    return;
-  }
+    if (users.length === 0) {
+      return res.status(400).json({ error: 'Tanlangan segment bo\'yicha foydalanuvchilar topilmadi.' });
+    }
 
-  const telegramBot = bot.getBotInstance();
-  let index = 0;
-  const interval = setInterval(async () => {
-    if (index >= users.length) {
-      clearInterval(interval);
-      currentBroadcast.status = 'completed';
-      currentBroadcast.logs.push(`Reklama tugatildi: ${new Date().toLocaleTimeString()}. Muvaffaqiyatli: ${currentBroadcast.sent}, Xato: ${currentBroadcast.failed}`);
+    currentBroadcast = {
+      total: users.length,
+      sent: 0,
+      failed: 0,
+      status: 'running',
+      logs: [`Kino Bot reklama tarqatish boshlandi (${users.length} ta foydalanuvchi): ${new Date().toLocaleTimeString()}`]
+    };
+
+    res.json({ success: true, message: 'Broadcasting started.', progress: currentBroadcast });
+
+    const telegramBot = bot.getBotInstance();
+    if (!telegramBot) {
+      currentBroadcast.status = 'failed';
+      currentBroadcast.logs.push('Xatolik: Telegram bot faol emas.');
       return;
     }
 
-    const user = users[index];
-    index++;
-
-    try {
-      const options = {};
-      if (buttonText && buttonUrl) {
-        options.reply_markup = new InlineKeyboard().url(buttonText, buttonUrl);
-      }
-      await telegramBot.api.sendMessage(user.id, message, {
-        parse_mode: 'HTML',
-        ...options
+    let replyMarkup = null;
+    if (Array.isArray(buttons) && buttons.length > 0) {
+      const kb = new InlineKeyboard();
+      let added = 0;
+      buttons.forEach((b) => {
+        if (b.label && b.url) {
+          kb.url(b.label.trim(), b.url.trim());
+          added++;
+          if (added % 2 === 0) kb.row();
+        }
       });
-      currentBroadcast.sent++;
-    } catch (err) {
-      currentBroadcast.failed++;
-      currentBroadcast.logs.push(`Foydalanuvchi ${user.id}: ${err.message}`);
+      if (added > 0) replyMarkup = kb;
+    } else if (buttonText && buttonUrl) {
+      replyMarkup = new InlineKeyboard().url(buttonText.trim(), buttonUrl.trim());
     }
-  }, 40);
+
+    let index = 0;
+    const interval = setInterval(async () => {
+      if (index >= users.length) {
+        clearInterval(interval);
+        currentBroadcast.status = 'completed';
+        currentBroadcast.logs.push(`Reklama tugatildi: ${new Date().toLocaleTimeString()}. Muvaffaqiyatli: ${currentBroadcast.sent}, Xato: ${currentBroadcast.failed}`);
+        return;
+      }
+
+      const user = users[index];
+      index++;
+
+      const opts = {};
+      if (replyMarkup) opts.reply_markup = replyMarkup;
+
+      try {
+        if (mediaType === 'photo' && mediaUrl) {
+          await telegramBot.api.sendPhoto(user.id, mediaUrl, { caption: message, parse_mode: 'HTML', ...opts })
+            .catch(() => telegramBot.api.sendPhoto(user.id, mediaUrl, { caption: message, ...opts }));
+        } else if (mediaType === 'video' && mediaUrl) {
+          await telegramBot.api.sendVideo(user.id, mediaUrl, { caption: message, parse_mode: 'HTML', ...opts })
+            .catch(() => telegramBot.api.sendVideo(user.id, mediaUrl, { caption: message, ...opts }));
+        } else {
+          await telegramBot.api.sendMessage(user.id, message, { parse_mode: 'HTML', ...opts })
+            .catch(() => telegramBot.api.sendMessage(user.id, message, { ...opts }));
+        }
+        currentBroadcast.sent++;
+      } catch (err) {
+        currentBroadcast.failed++;
+        currentBroadcast.logs.push(`Foydalanuvchi ${user.id}: ${err.message}`);
+      }
+    }, 35);
+  } catch (err) {
+    console.error('Error in /broadcast endpoint:', err.message);
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    }
+  }
 });
 
 // 6. Request Endpoints
@@ -610,6 +650,28 @@ router.post('/deploy', (req, res) => {
       }, 1000);
     });
   });
+});
+
+router.get('/settings', authMiddleware, (req, res) => {
+  try {
+    res.json(db.getMovieSettings());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/settings', authMiddleware, (req, res) => {
+  try {
+    const { autoPostEnabled, autoPostChannel } = req.body;
+    const current = db.getMovieSettings();
+    if (typeof autoPostEnabled === 'boolean') current.autoPostEnabled = autoPostEnabled;
+    if (typeof autoPostChannel === 'string') current.autoPostChannel = autoPostChannel.trim();
+
+    db.saveMovieSettings(current);
+    res.json({ success: true, settings: current });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;

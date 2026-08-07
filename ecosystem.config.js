@@ -27,7 +27,22 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '1G'
+    },
+    {
+      name: 'adult-bot',
+      script: './server/index.js',
+      cwd: __dirname,
+      exec_mode: 'fork',
+      instances: 1,
+      env: {
+        NODE_ENV: 'production',
+        ADULT_PORT: 5002
+      },
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '1G'
     }
   ]
 };
+
 

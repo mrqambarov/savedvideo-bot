@@ -23,6 +23,198 @@ if (!fs.existsSync(statsFile)) {
   }, null, 2));
 }
 
+const activitiesFile = path.join(dataDir, 'activities.json');
+if (!fs.existsSync(activitiesFile)) {
+  fs.writeFileSync(activitiesFile, JSON.stringify([], null, 2));
+}
+
+function getActivities() {
+  try {
+    const raw = fs.readFileSync(activitiesFile, 'utf8');
+    return JSON.parse(raw);
+  } catch (e) {
+    return [];
+  }
+}
+
+const scheduledBroadcastsFile = path.join(dataDir, 'scheduled_broadcasts.json');
+if (!fs.existsSync(scheduledBroadcastsFile)) {
+  fs.writeFileSync(scheduledBroadcastsFile, JSON.stringify([], null, 2));
+}
+
+const backupBotsFile = path.join(dataDir, 'backup_bots.json');
+if (!fs.existsSync(backupBotsFile)) {
+  fs.writeFileSync(backupBotsFile, JSON.stringify([
+    { id: 'b_1', name: 'Zaxira Kino Bot #1', username: '@xitfilm_backup1_bot', token: '', status: 'active', createdAt: new Date().toISOString() }
+  ], null, 2));
+}
+
+function getBackupBots() {
+  try {
+    const raw = fs.readFileSync(backupBotsFile, 'utf8');
+    return JSON.parse(raw);
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveBackupBots(items) {
+  try {
+    fs.writeFileSync(backupBotsFile, JSON.stringify(items, null, 2));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function addBackupBot(item) {
+  try {
+    const list = getBackupBots();
+    const newItem = {
+      id: 'bot_' + Date.now() + Math.random().toString(36).substring(2, 5),
+      name: item.name || 'Zaxira Bot',
+      username: item.username ? (item.username.startsWith('@') ? item.username : '@' + item.username) : '@backup_bot',
+      token: item.token || '',
+      status: 'active',
+      createdAt: new Date().toISOString()
+    };
+    list.push(newItem);
+    saveBackupBots(list);
+    return newItem;
+  } catch (e) {
+    return null;
+  }
+}
+
+function deleteBackupBot(id) {
+  try {
+    let list = getBackupBots();
+    list = list.filter(b => b.id !== id);
+    saveBackupBots(list);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function getScheduledBroadcasts() {
+  try {
+    const raw = fs.readFileSync(scheduledBroadcastsFile, 'utf8');
+    return JSON.parse(raw);
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveScheduledBroadcasts(items) {
+  try {
+    fs.writeFileSync(scheduledBroadcastsFile, JSON.stringify(items, null, 2));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function addScheduledBroadcast(item) {
+  try {
+    const list = getScheduledBroadcasts();
+    const newItem = {
+      id: 'sc_' + Date.now() + Math.random().toString(36).substring(2, 5),
+      title: item.title || 'Rejalashtirilgan reklama',
+      message: item.message || '',
+      scheduledAt: item.scheduledAt,
+      targetBot: item.targetBot || 'all',
+      status: 'pending',
+      pin: !!item.pin,
+      createdAt: new Date().toISOString(),
+      sentStats: null
+    };
+    list.push(newItem);
+    saveScheduledBroadcasts(list);
+    return newItem;
+  } catch (e) {
+    return null;
+  }
+}
+
+function deleteScheduledBroadcast(id) {
+  try {
+    let list = getScheduledBroadcasts();
+    list = list.filter(b => b.id !== id);
+    saveScheduledBroadcasts(list);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function createSystemBackupData() {
+  try {
+    const backup = {
+      timestamp: new Date().toISOString(),
+      version: '1.0.0',
+      downloaderUsers: [],
+      downloaderStats: {},
+      movieUsers: [],
+      movies: [],
+      movieStats: {},
+      movieRequests: [],
+      adultMovies: [],
+      adultUsers: [],
+      channels: [],
+      activities: []
+    };
+
+    const readJson = (p) => {
+      try {
+        if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+      } catch (e) {}
+      return null;
+    };
+
+    backup.downloaderUsers = readJson(path.join(__dirname, 'data', 'users.json')) || [];
+    backup.downloaderStats = readJson(path.join(__dirname, 'data', 'stats.json')) || {};
+    backup.activities = readJson(path.join(__dirname, 'data', 'activities.json')) || [];
+    
+    backup.movies = readJson(path.join(__dirname, '..', 'movie-server', 'data', 'movies.json')) || [];
+    backup.movieUsers = readJson(path.join(__dirname, '..', 'movie-server', 'data', 'users.json')) || [];
+    backup.movieStats = readJson(path.join(__dirname, '..', 'movie-server', 'data', 'stats.json')) || {};
+    backup.movieRequests = readJson(path.join(__dirname, '..', 'movie-server', 'data', 'requests.json')) || [];
+
+    backup.adultMovies = readJson(path.join(__dirname, '..', 'adult-server', 'data', 'movies.json')) || [];
+    backup.adultUsers = readJson(path.join(__dirname, '..', 'adult-server', 'data', 'users.json')) || [];
+    
+    backup.channels = readJson(path.join(__dirname, '..', 'channels.json')) || [];
+
+    return backup;
+  } catch (e) {
+    console.error('Error creating system backup data:', e.message);
+    return null;
+  }
+}
+
+function logActivity(act) {
+  try {
+    const list = getActivities();
+    const now = new Date();
+    const item = {
+      id: String(Date.now()) + Math.random().toString(36).substr(2, 4),
+      bot: act.bot || 'Downloader Bot',
+      icon: act.icon || '⚡',
+      text: act.text || 'Tizim amali bajarildi',
+      color: act.color || '#6366f1',
+      timestamp: now.toISOString(),
+      time: 'Hozirgina'
+    };
+    list.unshift(item);
+    if (list.length > 50) list.pop();
+    fs.writeFileSync(activitiesFile, JSON.stringify(list, null, 2));
+    return item;
+  } catch (e) {
+    console.error('Error logging activity:', e.message);
+  }
+}
+
 function getUsers() {
   try {
     const raw = fs.readFileSync(usersFile, 'utf8');
@@ -83,6 +275,13 @@ function upsertUser(user, referredBy = null) {
 
     users.push(newUser);
     saveUsers(users);
+
+    logActivity({
+      bot: 'Downloader Bot',
+      icon: '👤',
+      text: `Yangi foydalanuvchi ${newUser.first_name || ''} (@${newUser.username || newUser.id}) Downloader Botga qo'shildi`,
+      color: '#6366f1'
+    });
 
     // Track daily new users
     const stats = getStats();
@@ -630,6 +829,40 @@ function getPlatformAnalytics() {
   }
 }
 
+function getMusicStats() {
+  try {
+    const stats = getStats();
+    const users = getUsers();
+    const advanced = getAdvancedStats();
+    
+    const totalSearches = (stats.totalSearchQueries || 0) + (stats.totalDownloadsAudio || 0);
+
+    return {
+      totalUsers: Math.max(1, Math.round(users.length * 0.85)),
+      totalMusicSearches: totalSearches,
+      growth: advanced.growth || { newUsersToday: 0, newUsersYesterday: 0, newUsersWeek: 0, newUsersMonth: 0 },
+      active: advanced.active || { today: 0, yesterday: 0, week: 0, month: 0 },
+      usage: {
+        today: { searches: stats.dailyUsage?.[new Date().toISOString().split('T')[0]]?.searchQueries || 0, audioDownloads: stats.dailyUsage?.[new Date().toISOString().split('T')[0]]?.audioDownloads || 0 },
+        week: advanced.usage?.week || {},
+        month: advanced.usage?.month || {}
+      },
+      trend: advanced.trend || [],
+      usersList: users
+    };
+  } catch (e) {
+    return {
+      totalUsers: 0,
+      totalMusicSearches: 0,
+      growth: { newUsersToday: 0, newUsersYesterday: 0, newUsersWeek: 0, newUsersMonth: 0 },
+      active: { today: 0, yesterday: 0, week: 0, month: 0 },
+      usage: { today: {}, week: {}, month: {} },
+      trend: [],
+      usersList: []
+    };
+  }
+}
+
 module.exports = {
   getUsers,
   addUser,
@@ -656,5 +889,18 @@ module.exports = {
   revokeSession,
   revokeOtherSessions,
   getUsersSegment,
-  getPlatformAnalytics
+  getPlatformAnalytics,
+  getMusicStats,
+  getActivities,
+  logActivity,
+  getScheduledBroadcasts,
+  saveScheduledBroadcasts,
+  addScheduledBroadcast,
+  deleteScheduledBroadcast,
+  createSystemBackupData,
+  getBackupBots,
+  saveBackupBots,
+  addBackupBot,
+  deleteBackupBot
 };
+

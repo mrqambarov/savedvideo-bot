@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Moon, Sun, LogOut, Palette, Info, ShieldCheck, RefreshCw, Trash2, Download, Key, Server, Bot, Film, Laptop, Smartphone, Globe, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Moon, Sun, LogOut, Palette, Info, ShieldCheck, RefreshCw, Trash2, Download, Key, Server, Bot, Film, Laptop, Smartphone, Globe, AlertTriangle, CheckCircle2, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
 import { dlApi, safe } from '../lib/api.js';
 import BotManagerCard from './BotManager.jsx';
@@ -90,10 +90,27 @@ export default function SettingsPage() {
     }
   };
 
-  const handleDownloadBackup = () => {
-    const token = localStorage.getItem('dlToken');
-    const url = `/api/backup-data?token=${token}`;
-    window.open(url, '_blank');
+  const handleDownloadBackup = async () => {
+    try {
+      setMsg(null);
+      const { data, error } = await safe(dlApi.get('/backup/download'));
+      if (error) {
+        return setMsg({ type: 'error', text: 'Zaxirani yuklashda xatolik: ' + error });
+      }
+      const jsonStr = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `system_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      setMsg({ type: 'success', text: 'Tizim zaxirasi muvaffaqiyatli yuklab olindi!' });
+    } catch (e) {
+      setMsg({ type: 'error', text: 'Zaxira yuklab olishda xatolik: ' + e.message });
+    }
   };
 
   return (
@@ -223,9 +240,9 @@ export default function SettingsPage() {
 
       {/* Bot Controls & Server Tools Tiles Grid */}
       <div className="card" style={{ gridColumn: '1 / -1' }}>
-        <div className="card-head"><h3><Server size={17} style={{ verticalAlign: -3, marginRight: 8, color: 'var(--accent)' }} />Botlarni va Serverni Boshqarish</h3></div>
+        <div className="card-head"><h3><Server size={17} style={{ verticalAlign: -3, marginRight: 8, color: 'var(--accent)' }} />Botlarni va Serverni Boshqarish (3 Bot Studio Control)</h3></div>
         <div className="card-pad">
-          <div className="action-grid">
+          <div className="action-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
             <button className="action-tile" onClick={() => handleRestartBot('downloader')} disabled={actionLoading === 'downloader'}>
               <div className="action-tile-icon" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' }}>
                 <Bot size={22} className={actionLoading === 'downloader' ? 'spin' : ''} />
@@ -246,6 +263,26 @@ export default function SettingsPage() {
               </div>
             </button>
 
+            <button className="action-tile" onClick={() => handleRestartBot('music')} disabled={actionLoading === 'music'}>
+              <div className="action-tile-icon" style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' }}>
+                <Sparkles size={22} className={actionLoading === 'music' ? 'spin' : ''} />
+              </div>
+              <div>
+                <div className="action-tile-title">🔞 18+ Adult Bot</div>
+                <div className="action-tile-sub">{actionLoading === 'music' ? 'Qayta yuklanmoqda...' : '18+ Adult botni qayta ishga tushirish'}</div>
+              </div>
+            </button>
+
+            <button className="action-tile" onClick={() => handleRestartBot('all')} disabled={actionLoading === 'all'}>
+              <div className="action-tile-icon" style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' }}>
+                <RefreshCw size={22} className={actionLoading === 'all' ? 'spin' : ''} />
+              </div>
+              <div>
+                <div className="action-tile-title">Barcha 3 Botni Qayta Yoqish</div>
+                <div className="action-tile-sub">{actionLoading === 'all' ? 'Barcha botlar qayta yuklanmoqda...' : '3 ta botni bir vaqtda qayta ishga tushirish'}</div>
+              </div>
+            </button>
+
             <button className="action-tile" onClick={handleCleanTemp} disabled={actionLoading === 'clean'}>
               <div className="action-tile-icon" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}>
                 <Trash2 size={22} />
@@ -257,7 +294,7 @@ export default function SettingsPage() {
             </button>
 
             <button className="action-tile" onClick={handleDownloadBackup}>
-              <div className="action-tile-icon" style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>
+              <div className="action-tile-icon" style={{ background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)' }}>
                 <Download size={22} />
               </div>
               <div>
@@ -274,8 +311,8 @@ export default function SettingsPage() {
         <div className="card-head"><h3><Info size={17} style={{ verticalAlign: -3, marginRight: 8, color: 'var(--accent)' }} />Panel Haqida</h3></div>
         <div className="card-pad">
           <div className="grid grid-stats" style={{ gap: 16 }}>
-            <div><div className="cell-sub">Versiya</div><div style={{ fontWeight: 700, fontSize: 15 }}>1.4.0 (Pro Studio)</div></div>
-            <div><div className="cell-sub">Boshqariladigan botlar</div><div style={{ fontWeight: 700, fontSize: 15 }}>VibeConvert · Kino Bot</div></div>
+            <div><div className="cell-sub">Versiya</div><div style={{ fontWeight: 700, fontSize: 15 }}>1.5.0 (3-Bot Studio Pro)</div></div>
+            <div><div className="cell-sub">Boshqariladigan botlar</div><div style={{ fontWeight: 700, fontSize: 15 }}>Downloader · Kino Bot · 🔞 18+ Adult Bot</div></div>
             <div><div className="cell-sub">Server IP</div><div style={{ fontWeight: 700, fontSize: 15 }} className="mono">94.237.103.133</div></div>
             <div><div className="cell-sub">Avto-Backup</div><div style={{ fontWeight: 700, fontSize: 15, color: '#10b981' }}>● Yoqilgan (Har 24 soat)</div></div>
           </div>
@@ -284,3 +321,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

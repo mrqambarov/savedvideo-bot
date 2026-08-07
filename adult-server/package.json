@@ -1,0 +1,14 @@
+{
+  "name": "adult-server",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "axios": "^1.7.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "grammy": "^1.23.0",
+    "localtunnel": "^2.0.2",
+    "multer": "^1.4.5-lts.1"
+  }
+}

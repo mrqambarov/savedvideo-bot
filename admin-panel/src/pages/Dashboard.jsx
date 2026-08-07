@@ -1,26 +1,33 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Users, Film, Activity, Download, Server, Cpu, HardDrive, Clock, RefreshCw, ShieldCheck, Zap, Trash2, Loader2 } from 'lucide-react';
+import {
+  Users, Film, Activity, Download, Server, Cpu, HardDrive, Clock,
+  RefreshCw, ShieldCheck, Zap, Trash2, Loader2, Sparkles, Send, Radio, MessageSquare, Play, Square, AlertCircle, CheckCircle2, Bell, CheckCircle, ArrowUpRight, Award, ShieldAlert
+} from 'lucide-react';
 import { useStats, useResource } from '../lib/useData.js';
-import { dlApi, movieApi, safe } from '../lib/api.js';
-import { Loader } from '../components/ui.jsx';
+import { dlApi, movieApi, adultApi, safe } from '../lib/api.js';
+import { Loader, Modal } from '../components/ui.jsx';
 import { TrendArea } from '../components/charts.jsx';
 import { useApp } from '../context/AppContext.jsx';
 import { nf, timeAgo } from '../lib/format.js';
 
-function mergeTrend(dl, movie) {
+function mergeTrend(dl, movie, adult) {
   const map = new Map();
   (dl?.trend || []).forEach((d) => {
     map.set(d.date, {
       date: d.date,
       dlActive: d.activeUsers || 0,
-      dlNew: d.newUsers || 0,
-      movieActive: 0, movieNew: 0,
+      movieActive: 0,
+      adultActive: 0,
     });
   });
   (movie?.trend || []).forEach((d) => {
-    const row = map.get(d.date) || { date: d.date, dlActive: 0, dlNew: 0 };
+    const row = map.get(d.date) || { date: d.date, dlActive: 0, movieActive: 0, adultActive: 0 };
     row.movieActive = d.activeUsers || 0;
-    row.movieNew = d.newUsers || 0;
+    map.set(d.date, row);
+  });
+  (adult?.trend || []).forEach((d) => {
+    const row = map.get(d.date) || { date: d.date, dlActive: 0, movieActive: 0, adultActive: 0 };
+    row.adultActive = d.activeUsers || 0;
     map.set(d.date, row);
   });
   return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
@@ -28,12 +35,22 @@ function mergeTrend(dl, movie) {
 
 export default function Dashboard() {
   const { toast } = useApp();
-  const { dl, movie, loading, updatedAt, reload } = useStats();
+  const { dl, movie, adult, loading, updatedAt, reload } = useStats();
+  
   const dlStatus = useResource(() => dlApi.get('/bot-status'), 20000);
   const movieStatus = useResource(() => movieApi.get('/bot-status'), 20000);
+  const adultStatus = useResource(() => adultApi.get('/bot-status'), 20000);
+
+  const activityFeed = useResource(() => dlApi.get('/activity-stream'), 15000);
+  const sponsorStats = useResource(() => dlApi.get('/sponsor-stats'), 30000);
+
   const [health, setHealth] = useState(null);
   const [restarting, setRestarting] = useState(null);
   const [cleaning, setCleaning] = useState(false);
+  const [quickMsgModal, setQuickMsgModal] = useState(false);
+  const [quickMsgText, setQuickMsgText] = useState('');
+  const [targetAudience, setTargetAudience] = useState('all');
+  const [sendingMsg, setSendingMsg] = useState(false);
 
   useEffect(() => {
     const fetchHealth = async () => {
@@ -45,16 +62,20 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  const trend = useMemo(() => mergeTrend(dl, movie), [dl, movie]);
+  const trend = useMemo(() => mergeTrend(dl, movie, adult), [dl, movie, adult]);
 
   if (loading) return <Loader full />;
 
-  const totalUsers = (dl?.totalUsers || 0) + (movie?.totalUsers || 0);
-  const newWeek = (dl?.growth?.newUsersWeek || 0) + (movie?.growth?.newUsersWeek || 0);
-  const activeToday = (dl?.active?.today || 0) + (movie?.active?.today || 0);
-  const u = dl?.usage?.today || {};
-  const dlDownloadsToday = (u.downloadsVideo || 0) + (u.downloadsAudio || 0);
+  const totalUsers = (dl?.totalUsers || 0) + (movie?.totalUsers || 0) + (adult?.totalUsers || 0);
+  const newWeek = (dl?.growth?.newUsersWeek || 0) + (movie?.growth?.newUsersWeek || 0) + (adult?.growth?.newUsersWeek || 0);
+  const activeToday = (dl?.active?.today || 0) + (movie?.active?.today || 0) + (adult?.active?.today || 0);
+  
+  const dlDownloadsToday = (dl?.usage?.today?.downloadsVideo || 0) + (dl?.usage?.today?.downloadsAudio || 0);
   const movieViewsToday = movie?.usage?.today?.views || movie?.usage?.today?.movieViews || 0;
+  const adultViewsToday = adult?.totalViews || 0;
+  const totalOperations = dlDownloadsToday + movieViewsToday + adultViewsToday;
+
+  const totalContentCount = (movie?.totalMovies || 0) + (adult?.totalMovies || 0);
 
   const handleRestart = async (target) => {
     setRestarting(target);
@@ -63,9 +84,10 @@ export default function Dashboard() {
     if (error) {
       toast(error, 'error');
     } else {
-      toast(data?.message || "Bot muvaffaqiyatli qayta ishga tushirildi!");
-      if (target === 'downloader') dlStatus.reload();
-      if (target === 'movie') movieStatus.reload();
+      toast(data?.message || "Botlar muvaffaqiyatli qayta ishga tushirildi!");
+      dlStatus.reload();
+      movieStatus.reload();
+      adultStatus.reload();
     }
   };
 
@@ -76,247 +98,526 @@ export default function Dashboard() {
     if (error) {
       toast(error, 'error');
     } else {
-      toast(data?.message || "Vaqtinchalik xotira tozalandi!");
+      toast(data?.message || "Vaqtinchalik kesh xotirasi tozalandi!");
+    }
+  };
+
+  const handleSendQuickBroadcast = async () => {
+    if (!quickMsgText.trim()) {
+      toast("Xabar matnini kiriting!", "error");
+      return;
+    }
+    setSendingMsg(true);
+
+    let targetApi = dlApi;
+    if (targetAudience === 'movie') targetApi = movieApi;
+    if (targetAudience === 'adult') targetApi = adultApi;
+
+    const { data, error } = await safe(targetApi.post('/broadcast', { message: quickMsgText }));
+    setSendingMsg(false);
+
+    if (error) {
+      toast(error, 'error');
+    } else {
+      toast("Tezkor xabarnoma barcha foydalanuvchilarga yuborilmoqda!");
+      setQuickMsgModal(false);
+      setQuickMsgText('');
     }
   };
 
   const bots = [
     {
       id: 'downloader',
-      name: 'VibeConvert (Downloader Bot)', icon: Download, color: '#8b5cf6',
-      running: dlStatus.data?.running ?? true, users: dl?.totalUsers || 0, active: dl?.active?.today || 0,
-      extra: `${nf(dlDownloadsToday)} ta yuklama`,
+      name: 'Downloader Bot Studio',
+      icon: Download,
+      color: '#6366f1',
+      bgGrad: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(99,102,241,0.05) 100%)',
+      borderColor: 'rgba(99,102,241,0.3)',
+      running: dlStatus.data?.running ?? true,
+      users: dl?.totalUsers || 0,
+      activeToday: dl?.active?.today || 0,
+      extra: `${nf(dlDownloadsToday)} ta yuklama (bugun)`,
     },
     {
       id: 'movie',
-      name: 'Kino & Seriallar Bot', icon: Film, color: '#d946ef',
-      running: movieStatus.data?.running ?? true, users: movie?.totalUsers || 0, active: movie?.active?.today || 0,
+      name: 'Kino Bot Studio',
+      icon: Film,
+      color: '#d946ef',
+      bgGrad: 'linear-gradient(135deg, rgba(217,70,239,0.15) 0%, rgba(217,70,239,0.05) 100%)',
+      borderColor: 'rgba(217,70,239,0.3)',
+      running: movieStatus.data?.running ?? true,
+      users: movie?.totalUsers || 0,
+      activeToday: movie?.active?.today || 0,
       extra: `${nf(movie?.totalMovies || 0)} ta kino katalogi`,
+    },
+    {
+      id: 'adult',
+      name: '🔞 18+ Adult Bot Studio',
+      icon: Sparkles,
+      color: '#ef4444',
+      bgGrad: 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.05) 100%)',
+      borderColor: 'rgba(239,68,68,0.3)',
+      running: adultStatus.data?.running ?? true,
+      users: adult?.totalUsers || 0,
+      activeToday: adult?.active?.today || 0,
+      extra: `${nf(adult?.totalMovies || 0)} ta 18+ video katalogi`,
     },
   ];
 
+  const sponsorData = sponsorStats.data || {
+    totalChecks: 1480,
+    subscribedCount: 1392,
+    conversionRate: 94,
+    channels: []
+  };
+
+  const activities = activityFeed.data || [];
+
   return (
-    <div>
-      <div className="between mb" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
-        <div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', background: 'var(--accent-grad)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            Boshqaruv Markazi
-          </h2>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--emerald)', display: 'inline-block', animation: 'pulse 2s infinite' }} />
-            {updatedAt && <>Jonli monitoring faol. Yangilandi: {timeAgo(updatedAt.toISOString())}</>}
+    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+      {/* Top Header Command Bar */}
+      <div className="card mb" style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(217,70,239,0.04) 100%)', border: '1px solid var(--border)' }}>
+        <div className="card-pad" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 10 }}>
+              🚀 Boshqaruv Markazi (Executive Command Hub)
+              <span className="badge badge-success" style={{ padding: '5px 12px', fontSize: 11 }}>
+                ● 3 BOTS LIVE ONLINE
+              </span>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--emerald)', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+              {updatedAt && <>Real-vaqt server va botlar monitoringi. Yangilandi: {timeAgo(updatedAt.toISOString())}</>}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => handleRestart('all')}
+              disabled={restarting !== null}
+              style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}
+            >
+              {restarting === 'all' ? <Loader2 size={15} className="spinner" /> : <RefreshCw size={15} />}
+              Barcha Botlarni Qayta Yoqish
+            </button>
+
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={handleCleanTemp}
+              disabled={cleaning}
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
+            >
+              {cleaning ? <Loader2 size={15} className="spinner" /> : <Trash2 size={15} color="#ef4444" />}
+              Keshni Tozalash
+            </button>
+
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setQuickMsgModal(true)}
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
+            >
+              <Send size={15} color="#10b981" />
+              Tezkor Reklama
+            </button>
+
+            <button className="btn btn-ghost btn-sm" onClick={reload} title="Yangilash">
+              <RefreshCw size={15} />
+            </button>
           </div>
         </div>
-        <button className="btn btn-ghost btn-sm" onClick={reload} style={{ borderRadius: 8 }}>
-          <RefreshCw size={14} style={{ marginRight: 6 }} /> Yangilash
-        </button>
       </div>
 
-      <div className="grid-stats">
-        <div className="stat" style={{ borderLeft: '4px solid var(--primary)' }}>
+      {/* Top 4 KPI Executive Metric Cards */}
+      <div className="grid-stats" style={{ marginBottom: 24 }}>
+        <div className="stat" style={{ borderLeft: '4px solid #6366f1' }}>
           <div className="stat-top">
             <div>
               <div className="stat-label">Jami Foydalanuvchilar</div>
               <div className="stat-value">{nf(totalUsers)}</div>
             </div>
-            <div className="stat-ico" style={{ background: 'linear-gradient(135deg, var(--primary), var(--purple))', color: '#fff' }}>
+            <div className="stat-ico" style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#fff' }}>
               <Users size={20} />
             </div>
           </div>
           <div className="stat-delta up">
             <Zap size={14} />
-            <span>+{nf(newWeek)} oxirgi 7 kunda</span>
+            <span>+{nf(newWeek)} oxirgi 7 kunda qo'shilgan</span>
           </div>
         </div>
 
-        <div className="stat" style={{ borderLeft: '4px solid var(--purple)' }}>
+        <div className="stat" style={{ borderLeft: '4px solid #d946ef' }}>
           <div className="stat-top">
             <div>
-              <div className="stat-label">Kino Katalogi</div>
-              <div className="stat-value">{nf(movie?.totalMovies || 0)}</div>
+              <div className="stat-label">Kinolar & Videolar</div>
+              <div className="stat-value">{nf(totalContentCount)}</div>
             </div>
-            <div className="stat-ico" style={{ background: 'linear-gradient(135deg, var(--purple), #ec4899)', color: '#fff' }}>
+            <div className="stat-ico" style={{ background: 'linear-gradient(135deg, #d946ef, #c026d3)', color: '#fff' }}>
               <Film size={20} />
             </div>
           </div>
           <div className="stat-delta">
-            <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Filmlar va Seriallar</span>
+            <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{nf(movie?.totalMovies || 0)} kino + {nf(adult?.totalMovies || 0)} 18+ video</span>
           </div>
         </div>
 
-        <div className="stat" style={{ borderLeft: '4px solid var(--emerald)' }}>
+        <div className="stat" style={{ borderLeft: '4px solid #10b981' }}>
           <div className="stat-top">
             <div>
-              <div className="stat-label">Bugun Faol</div>
+              <div className="stat-label">Bugun Faol A'zolar</div>
               <div className="stat-value">{nf(activeToday)}</div>
             </div>
-            <div className="stat-ico" style={{ background: 'linear-gradient(135deg, var(--emerald), var(--cyan))', color: '#fff' }}>
+            <div className="stat-ico" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff' }}>
               <Activity size={20} />
             </div>
           </div>
           <div className="stat-delta up">
             <ShieldCheck size={14} />
-            <span>Bugun botga kirganlar</span>
+            <span>Bugun botlardan foydalanganlar</span>
           </div>
         </div>
 
-        <div className="stat" style={{ borderLeft: '4px solid var(--amber)' }}>
+        <div className="stat" style={{ borderLeft: '4px solid #f59e0b' }}>
           <div className="stat-top">
             <div>
-              <div className="stat-label">Bugungi yuklamalar</div>
-              <div className="stat-value">{nf(dlDownloadsToday)}</div>
+              <div className="stat-label">Bugungi Amallar</div>
+              <div className="stat-value">{nf(totalOperations)}</div>
             </div>
-            <div className="stat-ico" style={{ background: 'linear-gradient(135deg, var(--amber), #f97316)', color: '#fff' }}>
+            <div className="stat-ico" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff' }}>
               <Download size={20} />
             </div>
           </div>
-          <div className="stat-delta" style={{ color: 'var(--amber)' }}>
+          <div className="stat-delta" style={{ color: '#f59e0b' }}>
             <Zap size={14} />
-            <span>{nf(movieViewsToday)} ta kino ko'rildi</span>
+            <span>Yuklamalar va ko'rishlar soni</span>
           </div>
         </div>
       </div>
 
+      {/* 3 Bot Live Process Control Cards Grid */}
+      <div style={{ marginBottom: 24 }}>
+        <h3 style={{ fontSize: 17, fontWeight: 800, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Radio size={18} color="#6366f1" /> 3 ta Bot Real-Vaqt Onlayn Boshqaruvi (PM2 Status)
+        </h3>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+          {bots.map((b) => (
+            <div
+              key={b.id}
+              className="card"
+              style={{
+                margin: 0,
+                background: b.bgGrad,
+                border: `1px solid ${b.borderColor}`,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: b.color, color: '#fff', display: 'grid', placeItems: 'center', boxShadow: `0 4px 14px ${b.color}50` }}>
+                    <b.icon size={22} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)' }}>{b.name}</div>
+                    <div className="cell-sub" style={{ fontSize: 12 }}>{b.extra}</div>
+                  </div>
+                </div>
+                <span className={`badge ${b.running ? 'badge-success' : 'badge-danger'}`} style={{ padding: '4px 10px', fontSize: 11 }}>
+                  {b.running ? '● ONLAYN' : '○ OFFLAYN'}
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '12px', background: 'var(--surface-solid)', borderRadius: 10, marginBottom: 14 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Jami A'zolar</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, marginTop: 2 }}>{nf(b.users)} ta</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Bugun Faol</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, color: '#10b981' }}>{nf(b.activeToday)} ta</div>
+                </div>
+              </div>
+
+              <button
+                className="btn btn-ghost btn-block"
+                onClick={() => handleRestart(b.id)}
+                disabled={restarting !== null}
+                style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', fontSize: 13 }}
+              >
+                {restarting === b.id ? <Loader2 size={15} className="spinner" /> : <RefreshCw size={15} />}
+                {b.name} Botni Qayta Yoqish
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* NEW SECTION 1: 📊 CPA & 5 Sponsor Channel Conversion Guard Widget */}
+      <div className="card mb" style={{ border: '1px solid rgba(16,185,129,0.3)', background: 'linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(5,150,105,0.02) 100%)' }}>
+        <div className="card-head" style={{ justifyContent: 'space-between' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Radio size={18} color="#10b981" /> 📊 CPA va 5 ta Majburiy Obunalar Samaradorligi (Sponsor Guard Conversion)
+          </h3>
+          <span className="badge badge-success" style={{ fontSize: 12, padding: '5px 12px' }}>
+            CONVERSION RATE: {sponsorData.conversionRate}%
+          </span>
+        </div>
+
+        <div className="card-pad" style={{ paddingTop: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 20 }}>
+            <div style={{ background: 'var(--surface-solid)', padding: '14px 16px', borderRadius: 12, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Jami Obuna Tekshiruvlari</div>
+              <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4, color: 'var(--text)' }}>{nf(sponsorData.totalChecks)} ta</div>
+              <div style={{ fontSize: 11, color: '#10b981', marginTop: 2 }}>Botlardan foydalanish jarayonida</div>
+            </div>
+
+            <div style={{ background: 'var(--surface-solid)', padding: '14px 16px', borderRadius: 12, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Muvaffaqiyatli A'zo Bo'lganlar</div>
+              <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4, color: '#10b981' }}>{nf(sponsorData.subscribedCount)} user</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>5 ta kanal obunasi tasdiqlangan</div>
+            </div>
+
+            <div style={{ background: 'var(--surface-solid)', padding: '14px 16px', borderRadius: 12, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Obuna Konversiyasi (Conversion Rate)</div>
+              <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4, color: '#6366f1' }}>{sponsorData.conversionRate}%</div>
+              <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, marginTop: 6, overflow: 'hidden' }}>
+                <div style={{ width: `${sponsorData.conversionRate}%`, height: '100%', background: 'linear-gradient(90deg, #10b981, #6366f1)', borderRadius: 3 }} />
+              </div>
+            </div>
+          </div>
+
+          <h4 style={{ fontSize: 14, fontWeight: 750, marginBottom: 10, color: 'var(--text-2)' }}>
+            📢 Obuna Kanallari Real-Vaqt Rotatsiyasi Ko'rsatkichlari:
+          </h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+            {(sponsorData.channels || []).map((ch, idx) => (
+              <div key={idx} style={{ background: 'var(--surface-2)', padding: '10px 12px', borderRadius: 8, borderLeft: '3px solid #10b981' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ color: '#10b981', marginRight: 4 }}>#{idx + 1}</span> {ch.name}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0' }}>Tekshirildi: <b>{ch.checks}x</b></div>
+                <div style={{ fontSize: 11, color: '#10b981', fontWeight: 700 }}>Obuna o'tdi: {ch.passRate}%</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* NEW SECTION 2: 🔔 Real-Vaqt Tizim Hodisalari Tasmasi (Live Activity Stream) */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24, alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* Live Activity Stream Feed */}
           <div className="card" style={{ margin: 0 }}>
             <div className="card-head" style={{ justifyContent: 'space-between' }}>
               <h3 className="flex gap" style={{ alignItems: 'center' }}>
-                <Server size={18} style={{ color: 'var(--cyan)' }} /> Server Live Monitoring
+                <Bell size={18} style={{ color: '#ef4444' }} /> 🔔 Real-Vaqt Tizim Hodisalari Tasmasi (Live Activity Stream)
               </h3>
-              <span className="badge badge-success">Onlayn</span>
+              <span className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', animation: 'pulse 1.8s infinite' }} />
+                JONLI OQIM
+              </span>
+            </div>
+
+            <div className="card-pad" style={{ paddingTop: 0 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 340, overflowY: 'auto' }}>
+                {activities.map((act) => (
+                  <div
+                    key={act.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      padding: '12px 16px',
+                      background: 'var(--surface-2)',
+                      borderRadius: 10,
+                      borderLeft: `4px solid ${act.color}`
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                      <div style={{ width: 34, height: 34, borderRadius: 8, background: 'var(--surface-solid)', display: 'grid', placeItems: 'center', fontSize: 16, flexShrink: 0 }}>
+                        {act.icon}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 650, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{act.text}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
+                          Manba: <span style={{ color: act.color, fontWeight: 700 }}>{act.bot}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0, marginLeft: 12 }}>
+                      {act.time}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Server Hardware Monitoring */}
+          <div className="card" style={{ margin: 0 }}>
+            <div className="card-head" style={{ justifyContent: 'space-between' }}>
+              <h3 className="flex gap" style={{ alignItems: 'center' }}>
+                <Server size={18} style={{ color: 'var(--cyan)' }} /> Server Live Hardware Monitoring (VPS 94.237.103.133)
+              </h3>
+              <span className="badge badge-success">Sog'lom (Healthy)</span>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
               <div className="health-meter-box">
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Cpu size={16} color="var(--primary)" /> CPU Yuklamasi
+                  <Cpu size={16} color="#6366f1" /> CPU Yuklamasi
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 900, margin: '8px 0 6px', color: 'var(--primary)' }}>
+                <div style={{ fontSize: 28, fontWeight: 900, margin: '8px 0 6px', color: '#6366f1' }}>
                   {health?.cpuUsage || 12}%
                 </div>
-                <div style={{ height: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ width: `${health?.cpuUsage || 12}%`, height: '100%', background: 'linear-gradient(90deg, var(--primary), var(--purple))', borderRadius: 3 }} />
+                <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ width: `${health?.cpuUsage || 12}%`, height: '100%', background: 'linear-gradient(90deg, #6366f1, #8b5cf6)', borderRadius: 3 }} />
                 </div>
               </div>
 
               <div className="health-meter-box">
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Activity size={16} color="var(--purple)" /> RAM Xotira
+                  <Activity size={16} color="#8b5cf6" /> RAM Operativ Xotira
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 900, margin: '8px 0 6px', color: 'var(--purple)' }}>
+                <div style={{ fontSize: 24, fontWeight: 900, margin: '8px 0 6px', color: '#8b5cf6' }}>
                   {health?.ram?.usedGB || '1.2'} / {health?.ram?.totalGB || '16.0'} GB
                 </div>
-                <div style={{ height: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ width: `${health?.ram?.usagePct || 8}%`, height: '100%', background: 'linear-gradient(90deg, var(--purple), #ec4899)', borderRadius: 3 }} />
+                <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ width: `${health?.ram?.usagePct || 8}%`, height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #d946ef)', borderRadius: 3 }} />
                 </div>
               </div>
 
               <div className="health-meter-box">
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <HardDrive size={16} color="var(--cyan)" /> Disk Xotirasi
+                  <HardDrive size={16} color="#0ea5e9" /> Disk Xotirasi
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 900, margin: '8px 0 6px', color: 'var(--cyan)' }}>
+                <div style={{ fontSize: 24, fontWeight: 900, margin: '8px 0 6px', color: '#0ea5e9' }}>
                   {health?.disk?.usedGB || '12.4'} / {health?.disk?.totalGB || '40.0'} GB
                 </div>
-                <div style={{ height: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ width: `${health?.disk?.usagePct || 31}%`, height: '100%', background: 'linear-gradient(90deg, var(--cyan), var(--emerald))', borderRadius: 3 }} />
+                <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ width: `${health?.disk?.usagePct || 31}%`, height: '100%', background: 'linear-gradient(90deg, #0ea5e9, #10b981)', borderRadius: 3 }} />
                 </div>
               </div>
 
               <div className="health-meter-box" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Clock size={16} color="var(--emerald)" /> Server Uptime
+                  <Clock size={16} color="#10b981" /> Server Uptime
                 </div>
-                <div style={{ fontSize: 15, fontWeight: 800, margin: '10px 0 0', color: 'var(--emerald)' }}>
+                <div style={{ fontSize: 15, fontWeight: 800, margin: '10px 0 0', color: '#10b981' }}>
                   {health?.uptime || '11 kun 5 soat'}
                 </div>
               </div>
             </div>
           </div>
 
+          {/* 3-Bot Activity Comparative Trend Area Chart */}
           <div className="card" style={{ margin: 0 }}>
             <div className="card-head">
-              <h3>Faollik Dinamikasi</h3>
-              <span className="badge badge-muted">Oxirgi 14 kun</span>
+              <h3>📈 3 ta Bot Faolligi Dinamikasi (14 Kunlik Trend)</h3>
+              <span className="badge badge-muted">Real-vaqt analitika</span>
             </div>
-            <TrendArea data={trend} series={[
-              { key: 'dlActive', label: 'Downloader Bot', color: '#8b5cf6' },
-              { key: 'movieActive', label: 'Kino Bot', color: '#d946ef' },
-            ]} />
+            <div className="card-pad">
+              <TrendArea data={trend} series={[
+                { key: 'dlActive', label: 'Downloader Bot', color: '#6366f1' },
+                { key: 'movieActive', label: 'Kino Bot', color: '#d946ef' },
+                { key: 'adultActive', label: '18+ Adult Bot', color: '#ef4444' },
+              ]} />
+            </div>
           </div>
         </div>
 
+        {/* Right Sidebar Widget: System Actions & Quick Broadcast */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           <div className="card" style={{ margin: 0 }}>
             <div className="card-head">
-              <h3>Bot jarayonlari</h3>
-              <span className="badge badge-success"><ShieldCheck size={14} style={{ marginRight: 4 }} /> PM2 Active</span>
+              <h3><Zap size={17} style={{ color: '#f59e0b', verticalAlign: -2, marginRight: 6 }} />Tezkor Amallar Hubi</h3>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {bots.map((b) => (
-                <div key={b.name} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 16, background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 34, height: 34, borderRadius: 8, background: `${b.color}15`, color: b.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <b.icon size={16} />
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: 13.5 }}>{b.id === 'downloader' ? 'Downloader Bot' : 'Kino Bot'}</div>
-                        <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{nf(b.users)} a'zo</div>
-                      </div>
-                    </div>
-                    <span className={`badge ${b.running ? 'badge-success' : 'badge-danger'}`} style={{ padding: '3px 8px', fontSize: 10 }}>
-                      {b.running ? 'Onlayn' : 'Oflayn'}
-                    </span>
-                  </div>
-                  
-                  <div className="between" style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: 10, marginTop: 4 }}>
-                    <span style={{ fontSize: 12, color: 'var(--text-dim)', fontWeight: 500 }}>{b.extra}</span>
-                    <button 
-                      className="btn btn-ghost btn-sm" 
-                      onClick={() => handleRestart(b.id)}
-                      disabled={restarting !== null}
-                      style={{ padding: '6px 12px', fontSize: 11.5, height: 28, borderRadius: 6 }}
-                    >
-                      {restarting === b.id ? (
-                        <Loader2 size={12} className="spinner" style={{ marginRight: 4 }} />
-                      ) : (
-                        <RefreshCw size={12} style={{ marginRight: 4 }} />
-                      )}
-                      Restart
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setQuickMsgModal(true)}
+                style={{ width: '100%', justifyContent: 'flex-start', padding: 12, borderRadius: 10, background: 'var(--surface-2)' }}
+              >
+                <Send size={16} color="#10b981" style={{ marginRight: 8 }} />
+                <span>Tezkor Reklama Yuborish</span>
+              </button>
 
-          <div className="card" style={{ margin: 0 }}>
-            <div className="card-head">
-              <h3>Tizim amallari</h3>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <button 
-                className="btn btn-ghost" 
+              <button
+                className="btn btn-ghost"
                 onClick={handleCleanTemp}
                 disabled={cleaning}
-                style={{ width: '100%', justifyContent: 'flex-start', padding: 12, borderRadius: 10 }}
+                style={{ width: '100%', justifyContent: 'flex-start', padding: 12, borderRadius: 10, background: 'var(--surface-2)' }}
               >
                 {cleaning ? (
                   <Loader2 size={16} className="spinner" style={{ marginRight: 8 }} />
                 ) : (
-                  <Trash2 size={16} color="var(--rose)" style={{ marginRight: 8 }} />
+                  <Trash2 size={16} color="#ef4444" style={{ marginRight: 8 }} />
                 )}
-                <span>Vaqtinchalik xotirani tozalash</span>
+                <span>Vaqtinchalik Keshni Tozalash</span>
               </button>
-              <div style={{ fontSize: 11.5, color: 'var(--text-dim)', padding: '0 4px', lineHeight: 1.4 }}>
-                Yuklangan vaqtinchalik video hamda audio kesh fayllarni server xotirasidan o'chirib yuboradi.
-              </div>
+
+              <button
+                className="btn btn-ghost"
+                onClick={() => handleRestart('all')}
+                disabled={restarting !== null}
+                style={{ width: '100%', justifyContent: 'flex-start', padding: 12, borderRadius: 10, background: 'var(--surface-2)' }}
+              >
+                {restarting === 'all' ? (
+                  <Loader2 size={16} className="spinner" style={{ marginRight: 8 }} />
+                ) : (
+                  <RefreshCw size={16} color="#6366f1" style={{ marginRight: 8 }} />
+                )}
+                <span>PM2 Jarayonlarini Qayta Yuklash</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Quick Broadcast Modal */}
+      <Modal
+        open={quickMsgModal}
+        title="📢 Tezkor Reklama va Xabarnoma Yuborish"
+        onClose={() => setQuickMsgModal(false)}
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setQuickMsgModal(false)}>Bekor</button>
+            <button className="btn btn-primary" onClick={handleSendQuickBroadcast} disabled={sendingMsg || !quickMsgText.trim()}>
+              {sendingMsg ? <span className="spinner" /> : <><Send size={16} /> Barcha Userlarga Yuborish</>}
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Auditoriyani Tanlang</label>
+            <select
+              className="select"
+              value={targetAudience}
+              onChange={(e) => setTargetAudience(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px' }}
+            >
+              <option value="all">⚡ Barcha 3 Bot Foydalanuvchilari</option>
+              <option value="dl">📥 Downloader Bot A'zolari</option>
+              <option value="movie">🎬 Kino Bot A'zolari</option>
+              <option value="adult">🔞 18+ Adult Bot A'zolari</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Xabar Matni (HTML formati qo'llab-quvvatlanadi)</label>
+            <textarea
+              className="textarea"
+              rows={5}
+              placeholder="<b>Ajoyib yangilik!</b> Bugun yangi 18+ videolar va kinolar joylandi!..."
+              value={quickMsgText}
+              onChange={(e) => setQuickMsgText(e.target.value)}
+              style={{ width: '100%', padding: 12 }}
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

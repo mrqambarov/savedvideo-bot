@@ -1,25 +1,23 @@
-import { useState, useEffect, useRef } from 'react';
-import { Download, Play, Square, RefreshCw, Key, Radio, CheckCircle2, AlertCircle, Save, Video, Users, Eye, Plus, Trash2, Cookie, Upload } from 'lucide-react';
-import { dlApi, safe } from '../lib/api.js';
+import { useState, useEffect } from 'react';
+import { ShieldAlert, Play, Square, RefreshCw, Key, Radio, Globe, CheckCircle2, AlertCircle, Save, Video, Users, Eye, Plus, Trash2 } from 'lucide-react';
+import { adultApi, safe } from '../lib/api.js';
 import { useStats } from '../lib/useData.js';
 import { useApp } from '../context/AppContext.jsx';
 import { Loader } from '../components/ui.jsx';
 import { nf } from '../lib/format.js';
 
-export default function Downloader() {
+export default function AdultBotPage() {
   const { toast } = useApp();
-  const { dl } = useStats();
+  const { adult } = useStats();
   const [status, setStatus] = useState(null);
   const [config, setConfig] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef(null);
 
   const loadData = async () => {
     const [sRes, cRes] = await Promise.all([
-      safe(dlApi.get('/bot-status')),
-      safe(dlApi.get('/config'))
+      safe(adultApi.get('/bot-status')),
+      safe(adultApi.get('/config'))
     ]);
     if (sRes.data) setStatus(sRes.data);
     if (cRes.data) {
@@ -41,12 +39,12 @@ export default function Downloader() {
 
   const toggleBot = async (action) => {
     setBusy(true);
-    const { data, error } = await safe(dlApi.post('/bot-status', { action }));
+    const { data, error } = await safe(adultApi.post('/bot-status', { action }));
     setBusy(false);
     if (error) {
       toast(error, 'error');
     } else {
-      toast(action === 'start' ? 'Downloader Bot ishga tushirildi' : 'Downloader Bot to\'xtatildi');
+      toast(action === 'start' ? '18+ Bot ishga tushirildi' : '18+ Bot to\'xtatildi');
       if (data?.status) setStatus(data.status);
     }
   };
@@ -78,43 +76,29 @@ export default function Downloader() {
     setConfig({ ...config, sponsorChannels: updated });
   };
 
-  const uploadCookies = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const fd = new FormData();
-    fd.append('cookies', file);
-    setUploading(true);
-    const { error } = await safe(dlApi.post('/upload-cookies', fd, { headers: { 'Content-Type': 'multipart/form-data' } }));
-    setUploading(false);
-    if (fileRef.current) fileRef.current.value = '';
-    if (error) return toast(error, 'error');
-    toast('cookies.txt yangilandi! YouTube yuklamalari tiklandi');
-  };
-
   const saveConfig = async (e) => {
     e.preventDefault();
     setBusy(true);
     setMsg(null);
 
+    // Save channels to API
     const channelsToSave = (config.sponsorChannels || []).slice(0, 5);
     const firstChan = channelsToSave[0] || {};
-
+    
     const payload = {
       ...config,
-      shazamKey: config.shazamKey && config.shazamKey.includes('...') ? undefined : config.shazamKey,
-      botToken: config.botToken && config.botToken.includes('...') ? undefined : config.botToken,
       sponsorUsername: firstChan.username || '',
       sponsorLink: firstChan.link || '',
       sponsorChannels: channelsToSave
     };
 
-    const { data, error } = await safe(dlApi.post('/config', payload));
+    const { data, error } = await safe(adultApi.post('/config', payload));
     setBusy(false);
     if (error) {
       setMsg({ type: 'error', text: error });
       toast(error, 'error');
     } else {
-      setMsg({ type: 'success', text: "Downloader Bot va 5 ta majburiy obuna kanallari muvaffaqiyatli saqlandi!" });
+      setMsg({ type: 'success', text: data?.message || "18+ Bot va 5 ta majburiy obuna kanallari muvaffaqiyatli saqlandi!" });
       toast("Sozlamalar saqlandi");
       loadData();
     }
@@ -135,21 +119,21 @@ export default function Downloader() {
       )}
 
       {/* Header Banner */}
-      <div className="card" style={{ gridColumn: '1 / -1', background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(79,70,229,0.05) 100%)', border: '1px solid rgba(99,102,241,0.3)' }}>
+      <div className="card" style={{ gridColumn: '1 / -1', background: 'linear-gradient(135deg, rgba(239,68,68,0.1) 0%, rgba(185,28,28,0.05) 100%)', border: '1px solid rgba(239,68,68,0.3)' }}>
         <div className="card-pad" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', display: 'grid', placeItems: 'center', color: '#fff', fontSize: 24, boxShadow: '0 6px 20px rgba(99,102,241,0.4)' }}>
-              📥
+            <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)', display: 'grid', placeItems: 'center', color: '#fff', fontSize: 24, boxShadow: '0 6px 20px rgba(239,68,68,0.4)' }}>
+              🔞
             </div>
             <div>
               <div style={{ fontSize: 20, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 10 }}>
-                📥 Downloader Bot Studio
+                🔞 18+ Adult Bot Studio
                 <span className={`badge ${isRunning ? 'badge-success' : 'badge-danger'}`} style={{ padding: '4px 10px', fontSize: 11 }}>
                   {isRunning ? '● ONLAYN' : '○ OFFLAYN'}
                 </span>
               </div>
               <div className="cell-sub" style={{ fontSize: 13, marginTop: 4 }}>
-                Video, audio va dumaloq video yuklovchi bot sozlamalari, cookies.txt va 5 ta majburiy obuna kanallarini boshqarish
+                18+ Video bot sozlamalari, Telegram Bot tokeni va 5 ta majburiy obuna kanallarini boshqarish
               </div>
             </div>
           </div>
@@ -173,14 +157,14 @@ export default function Downloader() {
 
       {/* Quick Metrics */}
       <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-        <div className="stat" style={{ borderLeft: '4px solid #6366f1' }}>
+        <div className="stat" style={{ borderLeft: '4px solid #ef4444' }}>
           <div className="stat-top">
             <div>
-              <div className="stat-label">Yuklamalar Soni</div>
-              <div className="stat-value">{nf((dl?.usage?.today?.downloadsVideo || 0) + (dl?.usage?.today?.downloadsAudio || 0))}</div>
+              <div className="stat-label">18+ Videolar</div>
+              <div className="stat-value">{nf(adult?.totalMovies || 0)}</div>
             </div>
-            <div className="stat-ico" style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#fff' }}>
-              <Download size={20} />
+            <div className="stat-ico" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: '#fff' }}>
+              <Video size={20} />
             </div>
           </div>
         </div>
@@ -189,7 +173,7 @@ export default function Downloader() {
           <div className="stat-top">
             <div>
               <div className="stat-label">Foydalanuvchilar</div>
-              <div className="stat-value">{nf(dl?.totalUsers || 0)}</div>
+              <div className="stat-value">{nf(adult?.totalUsers || 0)}</div>
             </div>
             <div className="stat-ico" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', color: '#fff' }}>
               <Users size={20} />
@@ -197,35 +181,15 @@ export default function Downloader() {
           </div>
         </div>
 
-        <div className="stat" style={{ borderLeft: '4px solid #10b981' }}>
+        <div className="stat" style={{ borderLeft: '4px solid #f59e0b' }}>
           <div className="stat-top">
             <div>
-              <div className="stat-label">Bugun Faollar</div>
-              <div className="stat-value">{nf(dl?.active?.today || 0)}</div>
+              <div className="stat-label">Jami Ko'rishlar</div>
+              <div className="stat-value">{nf(adult?.totalViews || 0)}</div>
             </div>
-            <div className="stat-ico" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff' }}>
+            <div className="stat-ico" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff' }}>
               <Eye size={20} />
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* YouTube Cookies Card */}
-      <div className="card" style={{ gridColumn: '1 / -1', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.2)' }}>
-        <div className="card-pad" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-          <div>
-            <div style={{ fontWeight: 750, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text)' }}>
-              <Cookie size={18} color="#6366f1" /> YouTube Cookies.txt Boshqaruvi
-            </div>
-            <div className="cell-sub" style={{ marginTop: 2 }}>
-              YouTube blokirovkasi hamda "Sign in to confirm you're not a bot" xatosini tuzatish uchun yangi cookies.txt faylini yuklang
-            </div>
-          </div>
-          <div>
-            <input ref={fileRef} type="file" accept=".txt" hidden onChange={uploadCookies} />
-            <button className="btn btn-ghost" onClick={() => fileRef.current?.click()} disabled={uploading} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-              {uploading ? <span className="spinner" /> : <><Upload size={16} /> cookies.txt Faylini Yuklash</>}
-            </button>
           </div>
         </div>
       </div>
@@ -233,7 +197,7 @@ export default function Downloader() {
       {/* Configuration Form */}
       <div className="card" style={{ gridColumn: '1 / -1' }}>
         <div className="card-head">
-          <h3><Key size={17} style={{ verticalAlign: -3, marginRight: 8, color: '#6366f1' }} />Downloader Bot Sozlamalari</h3>
+          <h3><Key size={17} style={{ verticalAlign: -3, marginRight: 8, color: '#ef4444' }} />18+ Adult Bot Sozlamalari</h3>
         </div>
         <div className="card-pad">
           <form onSubmit={saveConfig}>
@@ -245,30 +209,30 @@ export default function Downloader() {
                 <input
                   type="text"
                   className="input mono"
-                  placeholder="789012...XYZ"
+                  placeholder="8997677307:AAHxyz..."
                   value={config.botToken || ''}
                   onChange={(e) => setConfig({ ...config, botToken: e.target.value })}
                   style={{ width: '100%', padding: '11px 14px' }}
                 />
                 <div className="cell-sub" style={{ marginTop: 4 }}>
-                  Downloader bot uchun Telegram API tokeni
+                  18+ Video bot uchun Telegram API tokeni
                 </div>
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 700, marginBottom: 8, color: 'var(--text)' }}>
-                  Shazam RapidAPI Kaliti (Musiqani anlash)
+                  Admin ID lar (Vergul bilan)
                 </label>
                 <input
                   type="text"
                   className="input mono"
-                  placeholder="rapidapi-key..."
-                  value={config.shazamKey || ''}
-                  onChange={(e) => setConfig({ ...config, shazamKey: e.target.value })}
+                  placeholder="6263659922, 12345678"
+                  value={config.adminIds || ''}
+                  onChange={(e) => setConfig({ ...config, adminIds: e.target.value })}
                   style={{ width: '100%', padding: '11px 14px' }}
                 />
                 <div className="cell-sub" style={{ marginTop: 4 }}>
-                  Audio/musiqalarni avtomatik aniqlash kaliti
+                  Xabarnoma va so'rovlarni oluvchi admin Telegram ID lari
                 </div>
               </div>
 
@@ -277,10 +241,10 @@ export default function Downloader() {
                 <div className="between" style={{ marginBottom: 16 }}>
                   <div>
                     <h4 style={{ fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Radio size={18} color="#6366f1" /> 5 ta Majburiy Obuna Homiy Kanallari (Sponsor Guard)
+                      <Radio size={18} color="#ef4444" /> 5 ta Majburiy Obuna Homiy Kanallari (Sponsor Guard)
                     </h4>
                     <div className="cell-sub" style={{ marginTop: 2 }}>
-                      Foydalanuvchi botdan yuklash bajarishdan oldin obuna bo'lishi shart bo'lgan kanallar (Maksimal 5 ta)
+                      Foydalanuvchi botdan foydalanishi uchun obuna bo'lishi shart bo'lgan kanallar (Maksimal 5 ta)
                     </div>
                   </div>
                   <button
@@ -288,7 +252,7 @@ export default function Downloader() {
                     className="btn btn-ghost btn-sm"
                     onClick={addChannel}
                     disabled={channels.length >= 5}
-                    style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.3)' }}
+                    style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}
                   >
                     <Plus size={15} /> Kanal Qo'shish ({channels.length}/5)
                   </button>
@@ -300,7 +264,7 @@ export default function Downloader() {
                       type="checkbox"
                       checked={config.sponsorEnabled || false}
                       onChange={(e) => setConfig({ ...config, sponsorEnabled: e.target.checked })}
-                      style={{ width: 18, height: 18, accentColor: '#6366f1' }}
+                      style={{ width: 18, height: 18, accentColor: '#ef4444' }}
                     />
                     Majburiy obunani faollashtirish (Sponsor Channel Guard Check)
                   </label>
@@ -322,7 +286,7 @@ export default function Downloader() {
                           alignItems: 'center'
                         }}
                       >
-                        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(99,102,241,0.15)', color: '#6366f1', fontWeight: 800, display: 'grid', placeItems: 'center', fontSize: 13 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(239,68,68,0.15)', color: '#ef4444', fontWeight: 800, display: 'grid', placeItems: 'center', fontSize: 13 }}>
                           #{idx + 1}
                         </div>
 
@@ -374,9 +338,9 @@ export default function Downloader() {
                 type="submit"
                 className="btn btn-primary"
                 disabled={busy}
-                style={{ padding: '12px 28px', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', boxShadow: '0 4px 16px rgba(99,102,241,0.35)' }}
+                style={{ padding: '12px 28px', background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', boxShadow: '0 4px 16px rgba(239,68,68,0.35)' }}
               >
-                <Save size={16} /> {busy ? 'Saqlanmoqda...' : 'Downloader Bot Sozlamalarini Saqlash'}
+                <Save size={16} /> {busy ? 'Saqlanmoqda...' : '18+ Bot Sozlamalarini Saqlash'}
               </button>
             </div>
           </form>

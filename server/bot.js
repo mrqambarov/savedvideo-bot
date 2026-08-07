@@ -1398,8 +1398,8 @@ function formatDownloadError(err) {
             const pending = userPendingActions.get(ctx.from.id);
             if (pending) {
               userPendingActions.delete(ctx.from.id);
-              ctx.message = pending.message;
-              return await next();
+              await ctx.reply('✅ Obunangiz tasdiqlandi! Havolani qayta yuboring.');
+              return;
             }
           }
           return;

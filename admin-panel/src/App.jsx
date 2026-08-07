@@ -16,6 +16,7 @@ import Downloader from './pages/Downloader.jsx';
 import MovieBot from './pages/MovieBot.jsx';
 import SettingsPage from './pages/Settings.jsx';
 import AiPublisher from './pages/AiPublisher.jsx';
+import AdultBotPage from './pages/AdultBot.jsx';
 
 export default function App() {
   const { authed } = useApp();
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/referrals" element={<Referrals />} />
           <Route path="/downloader" element={<Downloader />} />
           <Route path="/movie-bot" element={<MovieBot />} />
+          <Route path="/adult-bot" element={<AdultBotPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

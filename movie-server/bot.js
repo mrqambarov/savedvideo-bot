@@ -10,6 +10,7 @@ let isBotRunning = false;
 let botUsername = '';
 const userSession = new Map(); // userId -> state
 const userPendingActions = new Map(); // userId -> pending message context
+const activeSerialSessions = new Map(); // adminId -> { code, title, season, nextEpisode }
 
 // getChatMember fails on every message when the bot is not an admin of the
 // sponsor channel ("member list is inaccessible"). Throttle that log to once
@@ -83,6 +84,9 @@ function startBot(token) {
 
     try {
       botInstance = new Bot(token);
+
+      // Auto-merge any existing duplicate serial entries in DB
+      try { db.mergeDuplicateSerials(); } catch (e) {}
 
       botInstance.catch((err) => {
         console.error('Movie Bot Error:', err.message);
@@ -165,11 +169,14 @@ function startBot(token) {
 
       // Start Command
       botInstance.command('start', async (ctx) => {
-        const match = ctx.match;
+        const match = ctx.match ? String(ctx.match).trim() : '';
         if (match) {
-          const movie = db.getMovieByCode(match);
+          let code = match;
+          if (code.startsWith('mv_')) code = code.substring(3);
+
+          const movie = db.getMovieByCode(code);
           if (movie) {
-            db.trackMovieView(match);
+            db.trackMovieView(code);
             return await sendMovie(ctx, movie);
           }
         }
@@ -548,6 +555,39 @@ function startBot(token) {
         });
       });
 
+      // Admin System Backup Command (/backup)
+      botInstance.command('backup', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return;
+        await ctx.reply('⏳ **TIZIM MA\'LUMOTLARI ZAXIRASI TAYYORLANMOQDA...**', { parse_mode: 'Markdown' });
+
+        try {
+          const serverDb = require(path.resolve(__dirname, '../server/db'));
+          const backupData = serverDb.createSystemBackupData();
+          if (!backupData) {
+            return await ctx.reply('❌ Zaxira yaratishda xatolik yuz berdi.');
+          }
+
+          const tmpPath = path.join(__dirname, 'data', `backup_${Date.now()}.json`);
+          fs.writeFileSync(tmpPath, JSON.stringify(backupData, null, 2));
+
+          const { InputFile } = require('grammy');
+          await ctx.replyWithDocument(new InputFile(tmpPath, `system_backup_${new Date().toISOString().split('T')[0]}.json`), {
+            caption: `🛡 **TIZIM MA'LUMOTLARI ZAXIRASI (AUTO-BACKUP)**\n\n` +
+              `📅 Sana: \`${new Date().toLocaleString()}\`\n` +
+              `👥 Kinobot Userlar: **${backupData.movieUsers.length}** ta\n` +
+              `🎬 Kinolar kodi: **${backupData.movies.length}** ta\n` +
+              `🔞 18+ Videolar: **${backupData.adultMovies.length}** ta\n` +
+              `⚡️ Downloader Userlar: **${backupData.downloaderUsers.length}** ta`,
+            parse_mode: 'Markdown'
+          });
+
+          setTimeout(() => { try { fs.unlinkSync(tmpPath); } catch (e) {} }, 5000);
+        } catch (err) {
+          console.error('Backup command error:', err.message);
+          await ctx.reply(`❌ Zaxira yuborishda xatolik: ${err.message}`);
+        }
+      });
+
       /**
        * Cleans ad text, Telegram usernames (@channel), external links, and promo filler
        */
@@ -690,7 +730,7 @@ function startBot(token) {
       }
 
       /**
-       * Extracts movie details (code, title, genre, description, fileId) from a Telegram message/post
+       * Extracts movie or serial details (code, title, genre, description, fileId, isEpisode, season, episode) from a Telegram message/post
        */
       function parseMovieFromPost(msg) {
         const video = msg.video || (msg.document && msg.document.mime_type && msg.document.mime_type.startsWith('video/') ? msg.document : null);
@@ -699,45 +739,95 @@ function startBot(token) {
         const fileId = video.file_id;
         const rawCaption = (msg.caption || msg.text || '').trim();
 
-        // 1. Always auto-generate clean numeric code (1001, 1002...)
-        const code = getNextAutoCode();
+        // 1. Check if caption contains explicit Serial Code
+        const codeMatch = rawCaption.match(/(?:kodi|kod|code|kino kodi)[\s:-]*0*(\d+)/i);
+        const explicitCode = codeMatch ? codeMatch[1] : null;
 
-        // 2. Extract and clean Title
+        // 2. Check for Season and Episode indicators
+        let seasonNum = 1;
+        let epNum = null;
+
+        const sMatch = rawCaption.match(/(?:sezon|mavsum|season|s)[\s:-]*0*(\d+)/i);
+        if (sMatch) seasonNum = parseInt(sMatch[1], 10) || 1;
+
+        const eMatch = rawCaption.match(/(?:qism|epizod|ep|episode|e)[\s:-]*0*(\d+)/i);
+        if (eMatch) epNum = parseInt(eMatch[1], 10);
+
+        if (!epNum) {
+          const qMatch = rawCaption.match(/0*(\d+)[\s-]*qism/i) || rawCaption.match(/qism[\s-]*0*(\d+)/i);
+          if (qMatch) epNum = parseInt(qMatch[1], 10);
+        }
+
+        // 3. Extract and clean Title
         let rawTitle = '';
-        const titleMatch = rawCaption.match(/(?:nomi|title|kino nomi|kino)[\s:-]*([^\n]+)/i);
+        const titleMatch = rawCaption.match(/(?:nomi|title|kino nomi|serial|kino)[\s:-]*([^\n]+)/i);
         if (titleMatch && titleMatch[1]) {
           rawTitle = titleMatch[1].trim();
         } else {
           const lines = rawCaption.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
           if (lines.length > 0) {
-            rawTitle = lines[0].replace(/(?:kino|film|kodi|kod|nomi)[\s:-]*/gi, '').trim();
+            rawTitle = lines[0].replace(/(?:kino|film|serial|kodi|kod|nomi)[\s:-]*/gi, '').trim();
           }
         }
 
         let title = cleanAdText(rawTitle);
-        if (!title || title.length < 2) {
-          title = `Kino #${code}`;
+
+        // Smart Serial Title & Code Matching:
+        let finalCode = explicitCode;
+        let finalTitle = title;
+
+        if (epNum) {
+          // If explicit code given, check if serial with that code exists
+          if (explicitCode) {
+            const existingByCode = db.getMovieByCode(explicitCode);
+            if (existingByCode) {
+              finalTitle = existingByCode.title;
+            }
+          }
+          
+          // If code not matched yet, search by title!
+          if (!finalCode) {
+            const matchedSerial = db.findMatchingSerialByTitle(title);
+            if (matchedSerial) {
+              finalCode = matchedSerial.code;
+              finalTitle = matchedSerial.title;
+            }
+          }
+
+          if (!finalCode) {
+            finalCode = getNextAutoCode();
+          }
+        } else {
+          if (!finalCode) finalCode = getNextAutoCode();
         }
 
-        // 3. Extract and detect Genre
-        let genre = detectGenre(rawCaption);
+        if (!finalTitle || finalTitle.length < 2) {
+          finalTitle = `Serial #${finalCode}`;
+        }
 
-        // 4. Clean Description
+        // 4. Extract and detect Genre
+        let genre = detectGenre(rawCaption);
+        if (epNum) genre = 'Serial';
+
+        // 5. Clean Description
         let description = cleanAdText(rawCaption);
-        if (!description || description.length < 5 || description === title) {
-          description = `${title} - uzbek tilida tarjima kino.`;
+        if (!description || description.length < 5 || description === finalTitle) {
+          description = `${finalTitle} - uzbek tilida tarjima kino.`;
         }
 
         return {
-          code,
-          title,
+          code: finalCode,
+          title: finalTitle,
           genre,
           description,
-          fileId
+          fileId,
+          isEpisode: !!epNum,
+          seasonNumber: seasonNum,
+          episodeNumber: epNum
         };
       }
 
-      // Auto-Parse Movies from Channel Posts when bot is Admin in target channel
+      // Auto-Parse Movies / Serials from Channel Posts when bot is Admin in target channel
       botInstance.on('channel_post', async (ctx) => {
         try {
           const msg = ctx.channelPost;
@@ -745,9 +835,17 @@ function startBot(token) {
 
           const movieData = parseMovieFromPost(msg);
           if (movieData && movieData.fileId) {
-            const result = db.addMovie(movieData);
-            if (result) {
-              console.log(`[Auto-Channel-Parser] Added movie: "${result.title}" (Code: ${result.code}) from channel post.`);
+            if (movieData.isEpisode && movieData.episodeNumber) {
+              const epTitle = `${movieData.seasonNumber > 1 ? movieData.seasonNumber + '-Mavsum ' : ''}${movieData.episodeNumber}-Qism`;
+              const result = db.addEpisode(movieData.code, movieData.episodeNumber, movieData.fileId, epTitle, movieData.seasonNumber, movieData.title, movieData.genre);
+              if (result) {
+                console.log(`[Auto-Channel-Parser] Added episode: "${result.movie.title}" (Code: ${result.movie.code}, Season: ${movieData.seasonNumber}, Ep: ${movieData.episodeNumber}) from channel post.`);
+              }
+            } else {
+              const result = db.addMovie(movieData);
+              if (result) {
+                console.log(`[Auto-Channel-Parser] Added movie: "${result.title}" (Code: ${result.code}) from channel post.`);
+              }
             }
           }
         } catch (err) {
@@ -755,24 +853,80 @@ function startBot(token) {
         }
       });
 
-      // Auto-Parse Movies forwarded or sent directly to bot by Admin
+      // Auto-Parse Movies / Serials forwarded or sent directly to bot by Admin
       botInstance.on(['message:video', 'message:document'], async (ctx) => {
         try {
           if (!ctx.from || !isAdmin(ctx.from.id)) return;
 
-          const movieData = parseMovieFromPost(ctx.message);
-          if (movieData && movieData.fileId) {
-            const result = db.addMovie(movieData);
+          const userId = ctx.from.id;
+          const video = ctx.message.video || (ctx.message.document && ctx.message.document.mime_type && ctx.message.document.mime_type.startsWith('video/') ? ctx.message.document : null);
+          if (!video) return;
+
+          const fileId = video.file_id;
+          const rawCaption = (ctx.message.caption || ctx.message.text || '').trim();
+
+          // 🌟 PRIORITY: CHECK IF SERIAL MODE IS ACTIVE FOR THIS ADMIN!
+          if (activeSerialSessions.has(userId)) {
+            const sess = activeSerialSessions.get(userId);
+            const epNum = sess.nextEpisode;
+            const seasonNum = sess.season || 1;
+            
+            let epTitle = cleanAdText(rawCaption);
+            if (!epTitle || epTitle.length < 2 || epTitle.includes(sess.title)) {
+              epTitle = `${seasonNum > 1 ? seasonNum + '-Mavsum ' : ''}${epNum}-Qism`;
+            }
+
+            const result = db.addEpisode(sess.code, epNum, fileId, epTitle, seasonNum, sess.title, 'Serial');
+            
+            // Advance next episode!
+            sess.nextEpisode++;
+
             if (result) {
               await ctx.reply(
-                `⚡️ **AVTO-PARSER: Kino bazaga muvaffaqiyatli qo'shildi!**\n\n` +
-                `🔑 **Kino kodi:** \`${result.code}\`\n` +
-                `🎬 **Nomi:** *${result.title}*\n` +
-                `🗂 **Janri:** _${result.genre}_\n` +
-                `📁 **File ID:** \`${result.fileId.substring(0, 20)}...\`\n\n` +
-                `💡 *Foydalanuvchilar botda \`${result.code}\` kodini kiritib tomosha qilishlari mumkin!*`,
+                `⚡️ **[SERIAL REJIMI AKTIV] ${epNum}-Qism saqlandi!**\n\n` +
+                `🔑 **Serial kodi:** \`${sess.code}\`\n` +
+                `🎬 **Serial nomi:** *${result.movie.title}*\n` +
+                `🍿 **Qism:** *${seasonNum}-Mavsum, ${epNum}-Qism*\n` +
+                `➡️ **Navbatdagi video:** *${sess.nextEpisode}-Qism* bo'lib saqlanadi\n\n` +
+                `🔴 Rejimni to'xtatish uchun: \`/stop\``,
                 { parse_mode: 'Markdown' }
               );
+            }
+            return;
+          }
+
+          const movieData = parseMovieFromPost(ctx.message);
+          if (movieData && movieData.fileId) {
+            if (movieData.isEpisode && movieData.episodeNumber) {
+              const epTitle = `${movieData.seasonNumber > 1 ? movieData.seasonNumber + '-Mavsum ' : ''}${movieData.episodeNumber}-Qism`;
+              const result = db.addEpisode(movieData.code, movieData.episodeNumber, movieData.fileId, epTitle, movieData.seasonNumber, movieData.title, movieData.genre);
+              if (result) {
+                await ctx.reply(
+                  `⚡️ **AVTO-PARSER: Serial qismi muvaffaqiyatli saqlandi!**\n\n` +
+                  `🔑 **Serial kodi:** \`${result.movie.code}\`\n` +
+                  `🎬 **Serial nomi:** *${result.movie.title}*\n` +
+                  `📺 **Epizod:** *${movieData.seasonNumber}-Mavsum, ${movieData.episodeNumber}-Qism*\n` +
+                  `📁 **File ID:** \`${result.episode.fileId.substring(0, 20)}...\`\n\n` +
+                  `💡 *Foydalanuvchilar botga \`${result.movie.code}\` kodini kiritib barcha qismlarni ko'rishlari mumkin!*`,
+                  { parse_mode: 'Markdown' }
+                );
+              }
+            } else {
+              const result = db.addMovie(movieData);
+              if (result) {
+                await ctx.reply(
+                  `⚡️ **AVTO-PARSER: Kino bazaga muvaffaqiyatli qo'shildi!**\n\n` +
+                  `🔑 **Kino kodi:** \`${result.code}\`\n` +
+                  `🎬 **Nomi:** *${result.title}*\n` +
+                  `🗂 **Janri:** _${result.genre}_\n` +
+                  `📁 **File ID:** \`${result.fileId.substring(0, 20)}...\`\n\n` +
+                  `💡 *Foydalanuvchilar botda \`${result.code}\` kodini kiritib tomosha qilishlari mumkin!*`,
+                  { parse_mode: 'Markdown' }
+                );
+
+                // Auto-Post to Telegram Channel!
+                publishAutoPost(result);
+              }
             }
           }
         } catch (err) {
@@ -780,9 +934,73 @@ function startBot(token) {
         }
       });
 
+      // Admin Manual Channel Post Command (/post)
+      botInstance.command('post', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return;
+        const code = ctx.match ? ctx.match.trim() : '';
+        if (!code) {
+          return await ctx.reply('⚠️ **Formati:** `/post [kino_kodi]`', { parse_mode: 'Markdown' });
+        }
+
+        const movie = db.getMovieByCode(code);
+        if (!movie) {
+          return await ctx.reply(`❌ **Xatolik:** Kod \`${code}\` bo'yicha kino topilmadi.`, { parse_mode: 'Markdown' });
+        }
+
+        await ctx.reply('⏳ **Kanalga avto-post yuborilmoqda...**', { parse_mode: 'Markdown' });
+        const ok = await publishAutoPost(movie);
+        if (ok) {
+          await ctx.reply(`✅ **"${movie.title}" avto-posti Telegram kanalga muvaffaqiyatli joylandi!**`, { parse_mode: 'Markdown' });
+        } else {
+          await ctx.reply(`❌ **Avto-post yuborishda xatolik:** Auto-post kanali sozlanmagan yoki bot kanalda admin emas.`, { parse_mode: 'Markdown' });
+        }
+      });
+
       botInstance.on('message:text', async (ctx) => {
         const text = ctx.message.text.trim();
         const userId = ctx.from.id;
+
+        // 👥 FEATURE 2: TELEGRAM GROUP BOT INTEGRATION
+        const isGroup = ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup');
+        if (isGroup) {
+          let searchCode = '';
+          if (text.startsWith('/kino ') || text.startsWith('/find ')) {
+            searchCode = text.replace(/^\/(kino|find)\s+/i, '').trim();
+          } else if (/^\d{1,6}$/.test(text)) {
+            searchCode = text;
+          }
+
+          if (searchCode) {
+            let movie = db.getMovieByCode(searchCode);
+            if (!movie) {
+              const matches = db.searchMovies(searchCode);
+              if (matches && matches.length > 0) movie = matches[0];
+            }
+
+            if (movie) {
+              db.trackMovieView(movie.code);
+              const botUsername = ctx.me ? ctx.me.username : 'xitfilm_bot';
+              const cleanTitle = movie.title.replace(/[_*`\[\]()]/g, ' ');
+              const cleanDesc = (movie.description || 'Tavsif berilmagan').replace(/[_*`\[\]()]/g, ' ').substring(0, 140);
+
+              const groupMsg =
+                `🎬 **[XIT FILM BOT] ${cleanTitle}**\n\n` +
+                `🗂 **Janri:** _${movie.genre || 'Kino'}_\n` +
+                `🔑 **Kino kodi:** \`${movie.code}\`\n` +
+                `📝 _${cleanDesc}...\_\n\n` +
+                `👇 **Ushbu kinoni ko'rish uchun pastdagi tugmani bosing:**`;
+
+              const webAppUrl = process.env.MOVIE_MINI_APP_URL || 'https://movie-client.vercel.app';
+              const kb = new InlineKeyboard()
+                .url('📥 Shaxsiy chatda ko\'rish (Bot)', `https://t.me/${botUsername}?start=mv_${movie.code}`)
+                .row()
+                .webApp('🍿 Mini Appda tomosha qilish', webAppUrl);
+
+              return await ctx.reply(groupMsg, { parse_mode: 'Markdown', reply_markup: kb });
+            }
+          }
+          return; // Ignore general group chit-chat
+        }
 
         // Check if user is in a state
         const state = userSession.get(userId);
@@ -945,13 +1163,72 @@ function startBot(token) {
           );
         }
 
-        // /serial [kod] — serial qismlarini ko'rsatish
+        // /serial_stop or /stop command to deactivate Serial Mode
+        if ((text === '/serial_stop' || text === '/stop') && isAdmin(userId)) {
+          if (activeSerialSessions.has(userId)) {
+            const sess = activeSerialSessions.get(userId);
+            activeSerialSessions.delete(userId);
+            return await ctx.reply(
+              `🛑 **SERIAL REJIMI TO'XTATILDI!**\n\n` +
+              `🔑 Serial kodi: \`${sess.code}\`\n` +
+              `🎬 Serial: *${sess.title}*\n` +
+              `🍿 Saqlangan jami qismlar: **${sess.nextEpisode - 1} ta**\n\n` +
+              `💡 *Endi yuklangan videolar oddiy yagona kino deb saqlanadi.*`,
+              { parse_mode: 'Markdown' }
+            );
+          } else {
+            return await ctx.reply('⚠️ Hozirda faol serial rejimi yo\'q.', { parse_mode: 'Markdown' });
+          }
+        }
+
+        // /serial [kod] [nomi] — Activate Serial Mode for Admin, or lookup Serial for User
         if (text.startsWith('/serial')) {
           const parts = text.trim().split(/\s+/);
           const serialCode = parts[1];
-          if (!serialCode) {
-            return await ctx.reply('⚠️ Format: `/serial [kod]` — masalan: `/serial 200`', { parse_mode: 'Markdown' });
+
+          if (isAdmin(userId) && serialCode) {
+            const customTitle = parts.slice(2).join(' ').trim();
+            const existingSerial = db.getMovieByCode(serialCode);
+            let title = customTitle || (existingSerial ? existingSerial.title : `Serial ${serialCode}`);
+            
+            let nextEpisode = 1;
+            if (existingSerial && existingSerial.episodes && existingSerial.episodes.length > 0) {
+              const maxEp = Math.max(...existingSerial.episodes.map(e => Number(e.episode) || 0));
+              nextEpisode = maxEp + 1;
+            }
+
+            activeSerialSessions.set(userId, {
+              code: String(serialCode).trim(),
+              title: title,
+              season: 1,
+              nextEpisode: nextEpisode
+            });
+
+            return await ctx.reply(
+              `🚀 **SERIAL REJIMI AKTIVLASHTIRILDI!**\n\n` +
+              `🔑 **Serial kodi:** \`${serialCode}\`\n` +
+              `🎬 **Serial nomi:** *${title}*\n` +
+              `🍿 **Navbatdagi epizod:** *${nextEpisode}-Qism*\n\n` +
+              `⚡️ **ENDI SIZ BOTGA YUBORGAN YOKI FORWARD QILGAN BARCHA VIDEOLAR AVTOMATIK \`${serialCode}\` KODIGA QISM BO'LIB SAQLANADI!**\n\n` +
+              `🔴 Rejimni to'xtatish uchun: \`/stop\` yoki \`/serial_stop\``,
+              { parse_mode: 'Markdown' }
+            );
           }
+
+          if (!serialCode) {
+            if (isAdmin(userId) && activeSerialSessions.has(userId)) {
+              const sess = activeSerialSessions.get(userId);
+              return await ctx.reply(
+                `🟢 **SERIAL REJIMI FAOL!**\n\n` +
+                `🔑 Kod: \`${sess.code}\` | 🎬 *${sess.title}*\n` +
+                `🍿 Navbatdagi epizod: **${sess.nextEpisode}-Qism**\n\n` +
+                `🔴 To'xtatish: \`/stop\``,
+                { parse_mode: 'Markdown' }
+              );
+            }
+            return await ctx.reply('⚠️ Format: `/serial [kod]` — masalan: `/serial 2802`', { parse_mode: 'Markdown' });
+          }
+
           const serialMovie = db.getMovieByCode(serialCode);
           if (!serialMovie) {
             return await ctx.reply(`❌ \`${serialCode}\` kodli serial topilmadi. Kodni to'g'ri yozdingizmi?`, { parse_mode: 'Markdown' });
@@ -962,7 +1239,7 @@ function startBot(token) {
 
         // Handle slash commands in message:text handler
         if (text.startsWith('/')) {
-          if ((!text.startsWith('/add ') && !text.startsWith('/add_episode ')) || !isAdmin(ctx.from.id)) {
+          if ((!text.startsWith('/add ') && !text.startsWith('/add_episode ') && !text.startsWith('/stop') && !text.startsWith('/serial_stop')) || !isAdmin(ctx.from.id)) {
             return;
           }
         }
@@ -983,28 +1260,38 @@ function startBot(token) {
           }
 
           const fileId = video.file_id;
-          const params = text.substring(13).trim(); // Remove "/add_episode "
+          const params = text.substring(13).trim();
           const parts = params.split(/\s+/);
           
           if (parts.length < 2) {
-            return await ctx.reply('⚠️ Format noto\'g\'ri. To\'g\'ri format: `/add_episode [kod] [qism] [ixtiyoriy qism nomi]`', { parse_mode: 'Markdown' });
+            return await ctx.reply('⚠️ Format noto\'g\'ri. To\'g\'ri format: `/add_episode [kod] [qism]` yoki `/add_episode [kod] [sezon] [qism]`', { parse_mode: 'Markdown' });
           }
 
           const code = parts[0].trim();
-          const episodeNumber = parseInt(parts[1].trim(), 10);
+          let seasonNumber = 1;
+          let episodeNumber = 1;
+          let epTitle = '';
+
+          if (parts.length >= 3 && !isNaN(parseInt(parts[1], 10)) && !isNaN(parseInt(parts[2], 10))) {
+            seasonNumber = parseInt(parts[1], 10);
+            episodeNumber = parseInt(parts[2], 10);
+            epTitle = parts.slice(3).join(' ').trim();
+          } else {
+            episodeNumber = parseInt(parts[1], 10);
+            epTitle = parts.slice(2).join(' ').trim();
+          }
+
           if (isNaN(episodeNumber)) {
             return await ctx.reply('⚠️ Xatolik: Qism raqami faqat son bo\'lishi kerak.');
           }
 
-          const epTitle = parts.slice(2).join(' ').trim() || `${episodeNumber}-qism`;
-
-          const result = db.addEpisode(code, episodeNumber, fileId, epTitle);
+          const result = db.addEpisode(code, episodeNumber, fileId, epTitle, seasonNumber);
           if (result) {
             return await ctx.reply(
               `✅ **Serial qismi muvaffaqiyatli saqlandi!**\n\n` +
               `🔑 Serial kodi: \`${result.movie.code}\`\n` +
               `🎬 Serial nomi: *${result.movie.title}*\n` +
-              `🍿 Qism: *${result.episode.episode}-qism (${result.episode.title})*\n` +
+              `🍿 Epizod: *${seasonNumber > 1 ? seasonNumber + '-Mavsum, ' : ''}${episodeNumber}-qism*\n` +
               `🗂 Janr: _${result.movie.genre}_`,
               { parse_mode: 'Markdown' }
             );
@@ -1478,6 +1765,116 @@ function startBot(token) {
               }
             }).catch(() => {});
           } catch (e) {}
+
+          // 🛡 Health Watchdog Timer (every 30 mins)
+          setInterval(async () => {
+            try {
+              const activeChannel = getActiveSponsorChannel();
+              if (activeChannel && activeChannel.username) {
+                const adminIdsStr = process.env.MOVIE_ADMIN_IDS || '';
+                const adminIds = adminIdsStr.split(',').map(id => Number(id.trim())).filter(Boolean);
+                
+                try {
+                  const botId = botInstance.me ? botInstance.me.id : (botInfo && botInfo.id ? botInfo.id : null);
+                  if (botId) {
+                    await botInstance.api.getChatMember(activeChannel.username, botId);
+                  }
+                } catch (err) {
+                  console.error(`[Watchdog Alert] Bot member check failed for ${activeChannel.username}: ${err.message}`);
+                  const alertMsg = `⚠️ **HEALTH WATCHDOG OGOHLANTIRISHI**\n\n` +
+                    `Bot \`${activeChannel.username}\` sponsor kanaliga ADMIN qilinmagan yoki kanal topilmadi!\n` +
+                    `Xatolik: _${err.message}_\n\n` +
+                    `💡 Obunalar tekshiruvi to'g'ri ishlashi uchun botni ushbu kanalga admin qiling.`;
+
+                  for (const aid of adminIds) {
+                    try { await botInstance.api.sendMessage(aid, alertMsg, { parse_mode: 'Markdown' }); } catch (e) {}
+                  }
+
+                  const serverDb = require(path.resolve(__dirname, '../server/db'));
+                  serverDb.logActivity({
+                    bot: 'Watchdog System',
+                    icon: '🚨',
+                    text: `Sponsor kanal (${activeChannel.username}) tekshiruvida xatolik aniqlandi`,
+                    color: '#ef4444'
+                  });
+                }
+              }
+            } catch (e) {}
+          }, 30 * 60 * 1000);
+
+          // 📢 Scheduled Broadcast Processor Timer (every 60s)
+          setInterval(async () => {
+            try {
+              const serverDb = require(path.resolve(__dirname, '../server/db'));
+              const broadcasts = serverDb.getScheduledBroadcasts();
+              const now = new Date();
+
+              const pending = broadcasts.filter(b => b.status === 'pending' && new Date(b.scheduledAt) <= now);
+              for (const item of pending) {
+                item.status = 'sending';
+                serverDb.saveScheduledBroadcasts(broadcasts);
+
+                const users = db.getUsers();
+                let sent = 0, failed = 0;
+
+                for (const u of users) {
+                  try {
+                    const m = await botInstance.api.sendMessage(u.id, item.message, { parse_mode: 'Markdown' });
+                    if (item.pin) {
+                      await botInstance.api.pinChatMessage(u.id, m.message_id).catch(() => {});
+                    }
+                    sent++;
+                  } catch (e) {
+                    failed++;
+                  }
+                  await new Promise(r => setTimeout(r, 40));
+                }
+
+                item.status = 'sent';
+                item.sentStats = { sent, failed, completedAt: new Date().toISOString() };
+                serverDb.saveScheduledBroadcasts(broadcasts);
+
+                serverDb.logActivity({
+                  bot: 'Broadcast Scheduler',
+                  icon: '📢',
+                  text: `Rejalashtirilgan "${item.title}" e'loni ${sent} ta foydalanuvchiga yuborildi`,
+                  color: '#10b981'
+                });
+              }
+            } catch (e) {}
+          }, 60 * 1000);
+
+          // 📊 Daily 23:00 Admin Digest Reporter
+          let lastReportedDay = '';
+          setInterval(async () => {
+            try {
+              const now = new Date();
+              const hour = now.getHours();
+              const todayStr = now.toISOString().split('T')[0];
+
+              if (hour === 23 && lastReportedDay !== todayStr) {
+                lastReportedDay = todayStr;
+                const adminIdsStr = process.env.MOVIE_ADMIN_IDS || '';
+                const adminIds = adminIdsStr.split(',').map(id => Number(id.trim())).filter(Boolean);
+                if (adminIds.length === 0) return;
+
+                const advStats = db.getAdvancedStats();
+                const reportText =
+                  `📊 **KUNLIK ADMIN HISOBOTI (23:00)**\n` +
+                  `═════════════════════════\n` +
+                  `📅 Sana: \`${todayStr}\`\n\n` +
+                  `👥 Bugungi yangi userlar: **+${advStats.growth.newUsersToday}** ta\n` +
+                  `👁 Bugungi ko'rishlar: **${advStats.usage.today.movieViews || 0}** marta\n` +
+                  `🔍 Bugungi qidiruvlar: **${advStats.usage.today.searches || 0}** marta\n` +
+                  `🎬 Bazadagi jami kinolar: **${advStats.totalMovies}** ta\n\n` +
+                  `❤️ *Botingiz muvaffaqiyatli ishlamoqda!*`;
+
+                for (const adminId of adminIds) {
+                  await botInstance.api.sendMessage(adminId, reportText, { parse_mode: 'Markdown' }).catch(() => {});
+                }
+              }
+            } catch (e) {}
+          }, 15 * 60 * 1000);
         }
       }).catch((err) => {
         console.error('Movie Bot polling error:', err.message);
@@ -1496,6 +1893,16 @@ function startBot(token) {
 }
 
 async function sendMovie(ctx, movie) {
+  try {
+    const serverDb = require(path.resolve(__dirname, '../server/db'));
+    serverDb.logActivity({
+      bot: 'Kino Bot',
+      icon: '🎬',
+      text: `'${movie.title}' filmi ko'rildi (Kod: ${movie.code})`,
+      color: '#d946ef'
+    });
+  } catch (e) {}
+
   // Watching a movie is the qualifying action for the inviter's referral.
   if (ctx.from) {
     const q = db.qualifyReferral(ctx.from.id);
@@ -1573,12 +1980,14 @@ async function sendMovie(ctx, movie) {
     });
   }
 
+  const botUsername = ctx.me ? ctx.me.username : 'xitfilm_bot';
   const captionText = `🎬 **${cleanTitle}**\n\n` +
     `🗂 Janr: #${cleanGenre}\n` +
     `🔑 Kod: \`${movie.code}\`\n` +
     `👁 Ko'rishlar: **${viewsCount}** marta\n\n` +
     `📝 _${cleanDesc}_\n\n` +
-    `📹 Video va MP3 yuklab olish: @${downloaderBotUsername}`;
+    `❤️ **Kino Boti:** @${botUsername}\n` +
+    `📹 **Media & MP3 Yuklovchi:** @${downloaderBotUsername}`;
 
   const keyboard = new InlineKeyboard()
     .text(`👍 🔥 ${likesCount}`, `like:${movie.code}`)
@@ -1637,6 +2046,67 @@ function getBotUsername() {
   return botUsername;
 }
 
+// Publish Auto-Post to Telegram Channel
+async function publishAutoPost(movie) {
+  if (!botInstance || !movie) return false;
+  try {
+    const settings = db.getMovieSettings();
+    const targetChannel = settings.autoPostChannel || process.env.AUTO_POST_CHANNEL;
+    if (!settings.autoPostEnabled || !targetChannel) return false;
+
+    const botUsername = botInstance.me ? botInstance.me.username : 'xitfilm_bot';
+    const cleanTitle = String(movie.title || 'Yangi Kino').replace(/[_*`\[\]()]/g, ' ');
+    const cleanGenre = String(movie.genre || 'Tarjima').replace(/\s+/g, '_');
+    const cleanDesc = String(movie.description || 'Tavsif berilmagan').replace(/[_*`\[\]()]/g, ' ').substring(0, 150);
+
+    const postText =
+      `🍿 **YANGI PREMYERA KINO KANALDA!**\n\n` +
+      `🎬 **${cleanTitle}**\n` +
+      `🗂 **Janri:** #${cleanGenre}\n` +
+      `🔑 **KINO KODI:** \`${movie.code}\`\n\n` +
+      `📝 _${cleanDesc}...\_\n\n` +
+      `👇 **Ushbu kinoni botda darhol tomosha qilish uchun pastdagi tugmani bosing:**`;
+
+    const webAppUrl = process.env.MOVIE_MINI_APP_URL || 'https://movie-client.vercel.app';
+    const keyboard = new InlineKeyboard()
+      .url('📥 Botda tomosha qilish', `https://t.me/${botUsername}?start=mv_${movie.code}`)
+      .row()
+      .webApp('🍿 Mini Appda ko\'rish', webAppUrl);
+
+    if (movie.poster) {
+      await botInstance.api.sendPhoto(targetChannel, movie.poster, {
+        caption: postText,
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } else if (movie.fileId) {
+      await botInstance.api.sendVideo(targetChannel, movie.fileId, {
+        caption: postText,
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    } else {
+      await botInstance.api.sendMessage(targetChannel, postText, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+    }
+
+    const serverDb = require(path.resolve(__dirname, '../server/db'));
+    serverDb.logActivity({
+      bot: 'Auto-Poster',
+      icon: '📢',
+      text: `Kanalga "${movie.title}" avto-posti muvaffaqiyatli joylandi`,
+      color: '#10b981'
+    });
+
+    return true;
+  } catch (err) {
+    console.error('Auto-Poster Error:', err.message);
+    return false;
+  }
+}
+
 // Announce a newly added movie to every user (fire-and-forget; throttled).
 async function notifyNewMovie(movie) {
   if (!isBotRunning || !botInstance) return { sent: 0, failed: 0 };
@@ -1671,5 +2141,6 @@ module.exports = {
   getBotStatus,
   getBotInstance,
   getBotUsername,
-  notifyNewMovie
+  notifyNewMovie,
+  publishAutoPost
 };

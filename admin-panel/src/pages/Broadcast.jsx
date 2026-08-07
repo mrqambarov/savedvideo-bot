@@ -87,7 +87,7 @@ export default function Broadcast() {
         <div className="card-head">
           <h3>📢 Media & Multi-Button Reklama</h3>
           <div className="spacer" />
-          <Segmented options={[{ value: 'dl', label: 'Downloader Bot' }, { value: 'movie', label: 'Kino Bot' }]} value={bot} onChange={setBot} />
+          <Segmented options={[{ value: 'dl', label: 'Downloader Bot' }, { value: 'movie', label: 'Kino Bot' }, { value: 'music', label: '🔞 18+ Adult Bot' }]} value={bot} onChange={setBot} />
         </div>
         <div className="card-pad">
           <div className="field">

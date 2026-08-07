@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Film, Inbox, Megaphone, Radio,
-  Download, Bot, Settings, Menu, Moon, Sun, LogOut, Sparkles, Gift, Users as UsersIcon, Clapperboard, X, Tv
+  Download, Bot, Settings, Menu, Moon, Sun, LogOut, Sparkles, Gift, Users as UsersIcon, Clapperboard, X, Tv, ShieldAlert
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
 import { movieApi, safe } from '../lib/api.js';
@@ -10,37 +10,37 @@ import { movieApi, safe } from '../lib/api.js';
 const NAV = [
   { section: 'MEDIA STUDIO' },
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/movies', label: '🎬 Kino Katalogi', icon: Film },
-  { to: '/serials', label: '📺 Seriallar & Epizodlar', icon: Tv },
-  { to: '/ai-publisher', label: '✨ AI Publisher', icon: Sparkles },
-  { to: '/requests', label: "📝 Kino So'rovlari", icon: Inbox, badge: 'requests' },
+  { to: '/movies', label: 'Kino Katalogi', icon: Film },
+  { to: '/requests', label: "Kino So'rovlari", icon: Inbox, badge: 'requests' },
   { section: 'TAHLIL & FOYDALANUVCHILAR' },
-  { to: '/analytics', label: '📊 Analitika', icon: UsersIcon },
-  { to: '/users', label: '👥 Foydalanuvchilar', icon: UsersIcon },
-  { to: '/referrals', label: '🎁 Referal & Konkurs', icon: Gift },
+  { to: '/analytics', label: 'Analitika', icon: UsersIcon },
+  { to: '/users', label: 'Foydalanuvchilar', icon: UsersIcon },
+  { to: '/referrals', label: 'Referal & Konkurs', icon: Gift },
   { section: 'MARKETING & KANALLAR' },
-  { to: '/broadcast', label: '📢 Broadcast Messenger', icon: Megaphone },
-  { to: '/channels', label: '📡 Homiy Kanallar (CPA)', icon: Radio },
+  { to: '/broadcast', label: 'Broadcast Messenger', icon: Megaphone },
+  { to: '/channels', label: 'Homiy Kanallar (CPA)', icon: Radio },
   { section: 'TIZIM & BOTLAR' },
-  { to: '/downloader', label: '📥 Downloader Bot', icon: Download },
-  { to: '/movie-bot', label: '🤖 Kino Bot Studio', icon: Bot },
-  { to: '/settings', label: '⚙️ Tizim Sozlamalari', icon: Settings },
+  { to: '/downloader', label: 'Downloader Bot', icon: Download },
+  { to: '/movie-bot', label: 'Kino Bot Studio', icon: Bot },
+  { to: '/adult-bot', label: '18+ Adult Bot Studio', icon: ShieldAlert },
+  { to: '/settings', label: 'Tizim Sozlamalari', icon: Settings },
 ];
 
 const TITLES = {
   '/': ['Media Studio Dashboard', 'Real-vaqt server va botlar monitoringi'],
   '/analytics': ['Analitika & Tahlil', 'Foydalanuvchilar va yuklamalar statistikasi'],
   '/users': ['Foydalanuvchilar Ro\'yxati', 'Foydalanuvchilar katalogi va profillari'],
-  '/movies': ['🎬 Kino Katalogi', 'Kinolar va meta-ma\'lumotlarini boshqarish'],
-  '/serials': ['📺 Seriallar & Epizodlar', 'Serial qismlari va epizodlarni boshqarish'],
-  '/ai-publisher': ['✨ AI Publisher', '1-Click AI Kino Post & Promo Generator'],
-  '/requests': ["📝 Kino So'rovlari", "Foydalanuvchilar so'ragan kinolar va holat"],
-  '/broadcast': ['📢 Broadcast Messenger', 'Tugmali reklama va xabarlar yuborish'],
-  '/referrals': ['🎁 Referal & Konkurs', "Do'st taklif qilish va g'oliblar reytingi"],
-  '/channels': ['📡 Homiy Kanallar', 'Majburiy obuna va CPA rotatsiyasi'],
-  '/downloader': ['📥 Downloader Bot Studio', 'Video, audio va dumaloq video sozlamalari'],
-  '/movie-bot': ['🤖 Kino Bot Studio', 'Kino bot va qidiruv sozlamalari'],
-  '/settings': ['⚙️ Tizim Sozlamalari', 'Parol, backup va PM2 botlarni boshqarish'],
+  '/movies': ['Kino Katalogi', 'Kinolar va meta-ma\'lumotlarini boshqarish'],
+  '/serials': ['Seriallar & Epizodlar', 'Serial qismlari va epizodlarni boshqarish'],
+  '/ai-publisher': ['AI Publisher', '1-Click AI Kino Post & Promo Generator'],
+  '/requests': ["Kino So'rovlari", "Foydalanuvchilar so'ragan kinolar va holat"],
+  '/broadcast': ['Broadcast Messenger', 'Tugmali reklama va xabarlar yuborish'],
+  '/referrals': ['Referal & Konkurs', "Do'st taklif qilish va g'oliblar reytingi"],
+  '/channels': ['Homiy Kanallar', 'Majburiy obuna va CPA rotatsiyasi'],
+  '/downloader': ['Downloader Bot Studio', 'Video, audio va dumaloq video sozlamalari'],
+  '/movie-bot': ['Kino Bot Studio', 'Kino bot va qidiruv sozlamalari'],
+  '/adult-bot': ['18+ Adult Bot Studio', '18+ Adult bot va video sozlamalari'],
+  '/settings': ['Tizim Sozlamalari', 'Parol, backup va PM2 botlarni boshqarish'],
 };
 
 export default function Layout({ children }) {
@@ -64,7 +64,7 @@ export default function Layout({ children }) {
     return () => { alive = false; clearInterval(t); };
   }, [loc.pathname]);
 
-  const [title, sub] = TITLES[loc.pathname] || ['Cinema Media Studio', ''];
+  const [title, sub] = TITLES[loc.pathname] || ['XIT FILM Media Studio', ''];
   const badges = { requests: pending };
 
   return (
@@ -76,7 +76,7 @@ export default function Layout({ children }) {
           <div className="flex gap" style={{ alignItems: 'center' }}>
             <div className="brand-logo"><Clapperboard size={20} color="#ffffff" /></div>
             <div className="brand-text">
-              <h1>Cinema Studio</h1>
+              <h1>XIT FILM</h1>
               <span>Media Admin 2026</span>
             </div>
           </div>
@@ -127,8 +127,8 @@ export default function Layout({ children }) {
             </div>
           </div>
           <div className="top-bar-actions">
-            <div className="cinema-badge-pill">
-              <span>● LIVE CINEMA SERVER</span>
+            <div className="cinema-badge-pill" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', fontWeight: 700 }}>
+              <span>● 3 BOTS LIVE ONLINE</span>
             </div>
             <button className="icon-btn" onClick={toggleTheme} title="Mavzuni almashtirish">
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
