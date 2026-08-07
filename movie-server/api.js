@@ -36,7 +36,7 @@ router.post('/login', (req, res) => {
 // Middleware to protect routes
 function authMiddleware(req, res, next) {
   const fullUrl = req.originalUrl || req.url || req.path || '';
-  if (fullUrl.includes('deploy') || fullUrl.includes('login') || fullUrl.includes('public')) {
+  if (fullUrl.includes('deploy') || fullUrl.includes('login') || fullUrl.includes('public') || fullUrl.includes('vps-info')) {
     return next();
   }
   const authHeader = req.headers['authorization'];
