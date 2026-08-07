@@ -49,15 +49,13 @@ app.listen(PORT, async () => {
     console.warn('Tunnel init warning:', tunnelErr.message);
   }
 
-  // Automatically start Telegram Bot on boot if MOVIE_BOT_TOKEN is provided and distinct
-  const movieToken = process.env.MOVIE_BOT_TOKEN;
+  // Automatically start Telegram Bot for Xit Film
+  const movieToken = process.env.MOVIE_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
 
-  if (movieToken && movieToken.trim() !== '' && movieToken !== process.env.TELEGRAM_BOT_TOKEN) {
-    console.log('Booting Movie Telegram bot...');
+  if (movieToken && movieToken.trim() !== '') {
+    console.log('Booting Xit Film Telegram bot...');
     bot.startBot(movieToken)
-      .then(() => console.log('Movie Telegram Bot initialization check completed.'))
-      .catch((err) => console.error('Movie Telegram Bot auto-start failed:', err.message));
-  } else {
-    console.warn('WARNING: MOVIE_BOT_TOKEN is missing or identical to TELEGRAM_BOT_TOKEN! Set a separate MOVIE_BOT_TOKEN in .env to run Kino Bot.');
+      .then(() => console.log('Xit Film Telegram Bot started successfully.'))
+      .catch((err) => console.error('Xit Film Telegram Bot start failed:', err.message));
   }
 });
