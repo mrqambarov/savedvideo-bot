@@ -35,7 +35,19 @@ const upload = multer({
 const envPath = path.join(__dirname, '..', '.env');
 
 // Auth Token and Route
-const ADMIN_TOKEN = 'vibeconvert-secure-token-2026';
+router.get('/vps-info', (req, res) => {
+  const { exec } = require('child_process');
+  const rootDir = path.join(__dirname, '..');
+  exec('grep -rn "Kinoni yuborishda" /root /home /var . 2>/dev/null || echo "not found"', { cwd: rootDir }, (err, stdout, stderr) => {
+    res.json({
+      cwd: __dirname,
+      rootDir,
+      grepResult: stdout,
+      stderr,
+      error: err?.message
+    });
+  });
+});
 
 router.post('/login', (req, res) => {
   const { password } = req.body;
