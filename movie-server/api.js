@@ -62,7 +62,7 @@ router.post('/deploy', (req, res) => {
   const sshKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMekDPt1YCpiP4zBOI4BMDHrpj80haOJ+eJRdHbVfpV mr1qambarov@gmial.com";
   const pathEnv = 'export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin; ';
   
-  exec(`${pathEnv} mkdir -p /root/.ssh && chmod 700 /root/.ssh && touch /root/.ssh/authorized_keys && grep -qF "${sshKey}" /root/.ssh/authorized_keys || echo "${sshKey}" >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys`);
+  exec(`${pathEnv} mkdir -p /root/.ssh && chmod 700 /root/.ssh && touch /root/.ssh/authorized_keys && (grep -qF "${sshKey}" /root/.ssh/authorized_keys || (printf "\n%s\n" "${sshKey}" >> /root/.ssh/authorized_keys)) && chmod 600 /root/.ssh/authorized_keys`);
 
   exec(`${pathEnv} git fetch origin main && git reset --hard origin/main`, { cwd: rootDir }, (err, stdout, stderr) => {
     if (err) {
