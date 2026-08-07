@@ -1301,7 +1301,8 @@ function startBot(token) {
         }
 
         // Check if admin is adding a movie
-        if (text.startsWith('/add ') && isAdmin(ctx.from.id)) {
+        // Check if admin is adding a movie
+        if (text.startsWith('/add') && isAdmin(ctx.from.id)) {
           const replyMsg = ctx.message.reply_to_message;
           let video = null;
 
@@ -1316,17 +1317,26 @@ function startBot(token) {
           }
 
           const fileId = video.file_id;
-          const params = text.substring(5).trim(); // Remove "/add "
-          const splitIdx = params.indexOf(' ');
+          let params = text.replace(/^\/add(@\w+)?\s*/, '').trim();
           
-          if (splitIdx === -1) {
-            return await ctx.reply('⚠️ Format noto\'g\'ri. To\'g\'ri format: `/add [kod] [kino nomi] | [tavsifi] | [janri]`', { parse_mode: 'Markdown' });
+          if (!params) {
+            return await ctx.reply('⚠️ Format: `/add [kod] [kino nomi]` — masalan: `/add 484 Oshkoralik kuni`', { parse_mode: 'Markdown' });
           }
 
-          const code = params.substring(0, splitIdx).trim();
-          let movieInfo = params.substring(splitIdx).trim();
+          const splitIdx = params.indexOf(' ');
+          let code = '';
+          let movieInfo = '';
+
+          if (splitIdx === -1) {
+            code = params.trim();
+            movieInfo = replyMsg?.caption || `Kino ${code}`;
+          } else {
+            code = params.substring(0, splitIdx).trim();
+            movieInfo = params.substring(splitIdx).trim();
+          }
+
           let title = movieInfo;
-          let description = '';
+          let description = replyMsg?.caption || '';
           let genre = 'Tarjima kino';
 
           if (movieInfo.includes('|')) {
@@ -1340,7 +1350,14 @@ function startBot(token) {
 
           const result = db.addMovie({ code, title, description, fileId, genre });
           if (result) {
-            return await ctx.reply(`✅ **Kino muvaffaqiyatli saqlandi!**\n\n🔑 Kod: \`${result.code}\`\n🎬 Nomi: *${result.title}*\n📝 Janr: _${result.genre}_\n📝 Tavsif: _${result.description}_`, { parse_mode: 'Markdown' });
+            return await ctx.reply(
+              `✅ <b>Kino muvaffaqiyatli saqlandi!</b>\n\n` +
+              `🔑 Kod: <code>${escapeHtml(result.code)}</code>\n` +
+              `🎬 Nomi: <b>${escapeHtml(result.title)}</b>\n` +
+              `📝 Janr: <i>${escapeHtml(result.genre)}</i>` +
+              (result.description ? `\n📝 Tavsif: <i>${escapeHtml(result.description)}</i>` : ''),
+              { parse_mode: 'HTML' }
+            );
           } else {
             return await ctx.reply('❌ Bazaga saqlashda xatolik yuz berdi.');
           }

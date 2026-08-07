@@ -666,6 +666,8 @@ router.post('/deploy', (req, res) => {
       }, 1000);
     });
   });
+});
+
 router.get('/vps-info', (req, res) => {
   const { exec } = require('child_process');
   const rootDir = path.join(__dirname, '..');
