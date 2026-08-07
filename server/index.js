@@ -103,19 +103,22 @@ app.listen(PORT, async () => {
     sendDailyBackup();
   }, 24 * 60 * 60 * 1000);
 
-  // Automatically start Telegram Bot on boot if token is present
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  if (botToken) {
-    console.log('TELEGRAM_BOT_TOKEN found. Booting Telegram bot...');
-    bot.startBot(botToken)
+  // Automatically start Telegram Bot on boot (only if distinct token from Movie Bot)
+  const downloaderToken = process.env.DOWNLOADER_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
+  const movieToken = process.env.MOVIE_BOT_TOKEN;
+
+  if (downloaderToken && downloaderToken !== movieToken) {
+    console.log('TELEGRAM_BOT_TOKEN found. Booting Downloader Telegram bot...');
+    bot.startBot(downloaderToken)
       .then(() => {
         console.log('Telegram Bot initialization check completed.');
-        // Initial auto-backup send 10 seconds after bot boot
         setTimeout(sendDailyBackup, 10000);
       })
       .catch((err) => console.error('Telegram Bot auto-start failed:', err.message));
+  } else if (downloaderToken && downloaderToken === movieToken) {
+    console.warn('WARNING: DOWNLOADER_BOT_TOKEN is identical to MOVIE_BOT_TOKEN! Downloader Bot startup skipped to prevent 409 Conflict with Movie Bot.');
   } else {
-    console.log('No TELEGRAM_BOT_TOKEN configured. Bot is inactive.');
+    console.log('No TELEGRAM_BOT_TOKEN configured. Downloader Bot is inactive.');
   }
 });
 

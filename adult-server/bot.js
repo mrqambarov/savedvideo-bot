@@ -1121,18 +1121,9 @@ async function sendMovie(ctx, movie) {
       parse_mode: 'HTML',
       reply_markup: keyboard
     });
-  } catch (err) {
-    try {
-      return await ctx.replyWithDocument(movie.fileId, {
-        caption: captionText,
-        parse_mode: 'HTML',
-        reply_markup: keyboard
-      });
     } catch (e) {
-      console.error('Failed to send 18+ movie video:', e.message);
-      return await ctx.reply(`❌ Videoni yuborishda muammo yuz berdi. Iltimos, admin bilan bog'laning.`);
+      return await ctx.reply(captionText, { parse_mode: 'HTML', reply_markup: keyboard });
     }
-  }
 }
 
 function getBotStatus() {
