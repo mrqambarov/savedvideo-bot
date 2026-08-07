@@ -64,6 +64,22 @@ export default function Dashboard() {
 
   const trend = useMemo(() => mergeTrend(dl, movie, adult), [dl, movie, adult]);
 
+  const [activityFilter, setActivityFilter] = useState('all');
+
+  const filteredActivities = useMemo(() => {
+    const list = activityFeed.data || [];
+    if (activityFilter === 'all') return list;
+    return list.filter((act) => {
+      const isAdminAct = act.type === 'admin' || act.text?.includes('👑 Admin');
+      const isParserAct = act.type === 'parser' || act.text?.includes('⚡ Avto-Parser');
+      const isUserAct = act.type === 'user' || (!isAdminAct && !isParserAct);
+      if (activityFilter === 'admin') return isAdminAct;
+      if (activityFilter === 'parser') return isParserAct;
+      if (activityFilter === 'user') return isUserAct;
+      return true;
+    });
+  }, [activityFeed.data, activityFilter]);
+
   if (loading) return <Loader full />;
 
   const totalUsers = (dl?.totalUsers || 0) + (movie?.totalUsers || 0) + (adult?.totalUsers || 0);
@@ -170,22 +186,6 @@ export default function Dashboard() {
     conversionRate: 94,
     channels: []
   };
-
-  const [activityFilter, setActivityFilter] = useState('all');
-
-  const filteredActivities = useMemo(() => {
-    const list = activityFeed.data || [];
-    if (activityFilter === 'all') return list;
-    return list.filter((act) => {
-      const isAdminAct = act.type === 'admin' || act.text?.includes('👑 Admin');
-      const isParserAct = act.type === 'parser' || act.text?.includes('⚡ Avto-Parser');
-      const isUserAct = act.type === 'user' || (!isAdminAct && !isParserAct);
-      if (activityFilter === 'admin') return isAdminAct;
-      if (activityFilter === 'parser') return isParserAct;
-      if (activityFilter === 'user') return isUserAct;
-      return true;
-    });
-  }, [activityFeed.data, activityFilter]);
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
