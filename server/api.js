@@ -1184,7 +1184,7 @@ router.post('/deploy', (req, res) => {
   const rootDir = path.join(__dirname, '..');
   res.json({ success: true, message: 'Deploy boshlandi...' });
 
-  exec('git pull origin main', { cwd: rootDir }, (err, stdout, stderr) => {
+  exec('git fetch origin main && git reset --hard origin/main', { cwd: rootDir }, (err, stdout, stderr) => {
     if (err) {
       console.error('[Deploy] git pull xatolik:', err.message);
       return;
