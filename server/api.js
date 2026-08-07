@@ -1193,11 +1193,11 @@ router.post('/multi-bot/migrate', authMiddleware, async (req, res) => {
 router.get('/vps-info', (req, res) => {
   const { exec } = require('child_process');
   const rootDir = path.join(__dirname, '..');
-  exec('git status && pm2 jlist', { cwd: rootDir }, (err, stdout, stderr) => {
+  exec('grep -rn "Kinoni yuborishda" /root /home /var . 2>/dev/null || echo "not found"', { cwd: rootDir }, (err, stdout, stderr) => {
     res.json({
       cwd: __dirname,
       rootDir,
-      stdout,
+      grepResult: stdout,
       stderr,
       error: err?.message
     });
