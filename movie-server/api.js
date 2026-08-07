@@ -6,6 +6,15 @@ const db = require('./db');
 const bot = require('./bot');
 const { InlineKeyboard } = require('grammy');
 
+function safeLogActivity(payload) {
+  try {
+    const serverDb = require(path.resolve(__dirname, '../server/db'));
+    if (serverDb && typeof serverDb.logActivity === 'function') {
+      serverDb.logActivity(payload);
+    }
+  } catch (e) {}
+}
+
 const envPath = path.join(__dirname, '..', '.env');
 
 // Auth Token and Route
@@ -489,6 +498,13 @@ router.post('/broadcast', async (req, res) => {
       status: 'running',
       logs: [`Kino Bot reklama tarqatish boshlandi (${users.length} ta foydalanuvchi): ${new Date().toLocaleTimeString()}`]
     };
+
+    safeLogActivity({
+      bot: 'Kino Bot',
+      icon: '📢',
+      text: `Kino botda reklama yuborilmoqda (${users.length} ta foydalanuvchiga)`,
+      color: '#d946ef'
+    });
 
     res.json({ success: true, message: 'Broadcasting started.', progress: currentBroadcast });
 

@@ -1089,10 +1089,15 @@ async function sendMovie(ctx, movie) {
   try {
     const path = require('path');
     const serverDb = require(path.resolve(__dirname, '../server/db'));
+    const isUserAdmin = ctx.from && isAdmin(ctx.from.id);
     serverDb.logActivity({
       bot: '18+ Adult Bot',
-      icon: '🔞',
-      text: `'${movie.title}' 18+ videosi tomosha qilindi (Kod: ${movie.code})`,
+      type: isUserAdmin ? 'admin' : 'user',
+      actor: isUserAdmin ? '👑 Admin' : '👤 Foydalanuvchi',
+      icon: isUserAdmin ? '👑' : '🔞',
+      text: isUserAdmin
+        ? `👑 Admin '${movie.title}' 18+ videosini ko'rib chiqdi (Kod: ${movie.code})`
+        : `👤 Foydalanuvchi '${movie.title}' 18+ videosini tomosha qildi (Kod: ${movie.code})`,
       color: '#ef4444'
     });
   } catch (e) {}

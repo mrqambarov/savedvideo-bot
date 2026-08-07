@@ -197,17 +197,22 @@ function logActivity(act) {
   try {
     const list = getActivities();
     const now = new Date();
+    const type = act.type || (act.text?.includes('👑 Admin') ? 'admin' : act.text?.includes('⚡ Avto-Parser') ? 'parser' : 'user');
+    const actor = act.actor || (type === 'admin' ? '👑 Admin' : type === 'parser' ? '⚡ Avto-Parser' : '👤 Foydalanuvchi');
+    
     const item = {
       id: String(Date.now()) + Math.random().toString(36).substr(2, 4),
       bot: act.bot || 'Downloader Bot',
-      icon: act.icon || '⚡',
+      type: type,
+      actor: actor,
+      icon: act.icon || (type === 'admin' ? '👑' : type === 'parser' ? '⚡' : '👤'),
       text: act.text || 'Tizim amali bajarildi',
       color: act.color || '#6366f1',
       timestamp: now.toISOString(),
       time: 'Hozirgina'
     };
     list.unshift(item);
-    if (list.length > 50) list.pop();
+    if (list.length > 100) list.pop();
     fs.writeFileSync(activitiesFile, JSON.stringify(list, null, 2));
     return item;
   } catch (e) {
@@ -459,6 +464,13 @@ function trackDownload(type) {
     if (type === 'audio') stats.dailyUsage[today].audioDownloads = (stats.dailyUsage[today].audioDownloads || 0) + 1;
 
     saveStats(stats);
+
+    logActivity({
+      bot: 'Downloader Bot',
+      icon: '📥',
+      text: `Media fayl yuklab olindi (${type === 'video' ? 'Video' : 'Audio'})`,
+      color: '#6366f1'
+    });
   } catch (e) {
     console.error('Error tracking download:', e.message);
   }

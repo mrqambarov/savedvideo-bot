@@ -32,7 +32,10 @@ export function useStats() {
   const [updatedAt, setUpdatedAt] = useState(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    setDl(prevDl => {
+      if (!prevDl) setLoading(true);
+      return prevDl;
+    });
     const [dlRes, movieRes, adultRes] = await Promise.allSettled([
       safe(dlApi.get('/stats')),
       safe(movieApi.get('/stats')),

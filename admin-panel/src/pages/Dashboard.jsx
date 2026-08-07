@@ -41,7 +41,7 @@ export default function Dashboard() {
   const movieStatus = useResource(() => movieApi.get('/bot-status'), 20000);
   const adultStatus = useResource(() => adultApi.get('/bot-status'), 20000);
 
-  const activityFeed = useResource(() => dlApi.get('/activity-stream'), 15000);
+  const activityFeed = useResource(() => dlApi.get('/activity-stream'), 5000);
   const sponsorStats = useResource(() => dlApi.get('/sponsor-stats'), 30000);
 
   const [health, setHealth] = useState(null);
@@ -171,7 +171,21 @@ export default function Dashboard() {
     channels: []
   };
 
-  const activities = activityFeed.data || [];
+  const [activityFilter, setActivityFilter] = useState('all');
+
+  const filteredActivities = useMemo(() => {
+    const list = activityFeed.data || [];
+    if (activityFilter === 'all') return list;
+    return list.filter((act) => {
+      const isAdminAct = act.type === 'admin' || act.text?.includes('👑 Admin');
+      const isParserAct = act.type === 'parser' || act.text?.includes('⚡ Avto-Parser');
+      const isUserAct = act.type === 'user' || (!isAdminAct && !isParserAct);
+      if (activityFilter === 'admin') return isAdminAct;
+      if (activityFilter === 'parser') return isParserAct;
+      if (activityFilter === 'user') return isUserAct;
+      return true;
+    });
+  }, [activityFeed.data, activityFilter]);
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -419,37 +433,124 @@ export default function Dashboard() {
             </div>
 
             <div className="card-pad" style={{ paddingTop: 0 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 340, overflowY: 'auto' }}>
-                {activities.map((act) => (
-                  <div
-                    key={act.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 12,
-                      padding: '12px 16px',
-                      background: 'var(--surface-2)',
-                      borderRadius: 10,
-                      borderLeft: `4px solid ${act.color}`
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-                      <div style={{ width: 34, height: 34, borderRadius: 8, background: 'var(--surface-solid)', display: 'grid', placeItems: 'center', fontSize: 16, flexShrink: 0 }}>
-                        {act.icon}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                        <div style={{ fontSize: 13.5, fontWeight: 650, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{act.text}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
-                          Manba: <span style={{ color: act.color, fontWeight: 700 }}>{act.bot}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0, marginLeft: 12 }}>
-                      {act.time}
-                    </span>
+              {/* Category Filter Tabs */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+                <button
+                  className={`btn btn-xs ${activityFilter === 'all' ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setActivityFilter('all')}
+                  style={{ borderRadius: 6, fontSize: 11.5, padding: '4px 10px' }}
+                >
+                  🌐 Barchasi (All)
+                </button>
+                <button
+                  className={`btn btn-xs ${activityFilter === 'admin' ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setActivityFilter('admin')}
+                  style={{
+                    borderRadius: 6,
+                    fontSize: 11.5,
+                    padding: '4px 10px',
+                    background: activityFilter === 'admin' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'rgba(245,158,11,0.1)',
+                    color: activityFilter === 'admin' ? '#fff' : '#f59e0b',
+                    border: '1px solid rgba(245,158,11,0.3)'
+                  }}
+                >
+                  👑 Admin Harakatlari
+                </button>
+                <button
+                  className={`btn btn-xs ${activityFilter === 'parser' ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setActivityFilter('parser')}
+                  style={{
+                    borderRadius: 6,
+                    fontSize: 11.5,
+                    padding: '4px 10px',
+                    background: activityFilter === 'parser' ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' : 'rgba(139,92,246,0.1)',
+                    color: activityFilter === 'parser' ? '#fff' : '#a78bfa',
+                    border: '1px solid rgba(139,92,246,0.3)'
+                  }}
+                >
+                  ⚡ Avto-Parser
+                </button>
+                <button
+                  className={`btn btn-xs ${activityFilter === 'user' ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setActivityFilter('user')}
+                  style={{
+                    borderRadius: 6,
+                    fontSize: 11.5,
+                    padding: '4px 10px',
+                    background: activityFilter === 'user' ? 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)' : 'rgba(14,165,233,0.1)',
+                    color: activityFilter === 'user' ? '#fff' : '#38bdf8',
+                    border: '1px solid rgba(14,165,233,0.3)'
+                  }}
+                >
+                  👤 Foydalanuvchilar
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 360, overflowY: 'auto' }}>
+                {filteredActivities.length === 0 ? (
+                  <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
+                    Hozircha hech qanday hodisa topilmadi.
                   </div>
-                ))}
+                ) : (
+                  filteredActivities.map((act) => {
+                    const isAdminAct = act.type === 'admin' || act.text?.includes('👑 Admin');
+                    const isParserAct = act.type === 'parser' || act.text?.includes('⚡ Avto-Parser');
+                    
+                    const borderLeftColor = isAdminAct ? '#f59e0b' : isParserAct ? '#8b5cf6' : (act.color || '#6366f1');
+                    const itemBg = isAdminAct ? 'rgba(245, 158, 11, 0.04)' : isParserAct ? 'rgba(139, 92, 246, 0.04)' : 'var(--surface-2)';
+
+                    return (
+                      <div
+                        key={act.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 12,
+                          padding: '12px 16px',
+                          background: itemBg,
+                          borderRadius: 10,
+                          borderLeft: `4px solid ${borderLeftColor}`,
+                          border: isAdminAct ? '1px solid rgba(245,158,11,0.2)' : '1px solid var(--border)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--surface-solid)', display: 'grid', placeItems: 'center', fontSize: 17, flexShrink: 0 }}>
+                            {act.icon || (isAdminAct ? '👑' : isParserAct ? '⚡' : '👤')}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap' }}>
+                              <span style={{ fontSize: 13.5, fontWeight: 650, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {act.text}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 8 }}>
+                              {isAdminAct && (
+                                <span style={{ background: 'rgba(245,158,11,0.2)', color: '#f59e0b', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 4 }}>
+                                  👑 ADMIN
+                                </span>
+                              )}
+                              {isParserAct && (
+                                <span style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 4 }}>
+                                  ⚡ AVTO-PARSER
+                                </span>
+                              )}
+                              {!isAdminAct && !isParserAct && (
+                                <span style={{ background: 'rgba(14,165,233,0.15)', color: '#38bdf8', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 4 }}>
+                                  👤 FOYDALANUVCHI
+                                </span>
+                              )}
+                              <span>• Manba: <strong style={{ color: act.color || 'var(--text-2)' }}>{act.bot}</strong></span>
+                            </div>
+                          </div>
+                        </div>
+                        <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0, marginLeft: 12 }}>
+                          {act.time}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>

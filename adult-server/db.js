@@ -39,6 +39,15 @@ if (!fs.existsSync(genresFile)) safeSaveJSON(genresFile, DEFAULT_GENRES);
 if (!fs.existsSync(searchesFile)) safeSaveJSON(searchesFile, {});
 if (!fs.existsSync(tiersFile)) safeSaveJSON(tiersFile, []);
 
+function safeLogActivity(payload) {
+  try {
+    const serverDb = require(path.resolve(__dirname, '../server/db'));
+    if (serverDb && typeof serverDb.logActivity === 'function') {
+      serverDb.logActivity(payload);
+    }
+  } catch (e) {}
+}
+
 // Movies CRUD
 function getMovies() {
   return safeReadJSON(moviesFile, []);
@@ -90,6 +99,14 @@ function addMovie(movieData) {
 
   movies.push(newMovie);
   saveMovies(movies);
+
+  safeLogActivity({
+    bot: '18+ Adult Bot',
+    icon: '🔞',
+    text: `'${newMovie.title}' 18+ videosi saqlandi (Kod: ${newMovie.code})`,
+    color: '#ef4444'
+  });
+
   return newMovie;
 }
 
@@ -137,6 +154,14 @@ function addEpisode(serialCode, epNum, fileId, epTitle, seasonNum = 1, serialTit
   }
 
   saveMovies(movies);
+
+  safeLogActivity({
+    bot: '18+ Adult Bot',
+    icon: '🔞',
+    text: `'${serial.title}' 18+ serialining ${seasonNum}-mavsum, ${epNum}-qismi saqlandi (Kod: ${serialCode})`,
+    color: '#ef4444'
+  });
+
   return { movie: serial, episode: epObj };
 }
 
@@ -225,6 +250,14 @@ function deleteMovie(code) {
   if (idx !== -1) {
     movies.splice(idx, 1);
     saveMovies(movies);
+
+    safeLogActivity({
+      bot: '18+ Adult Bot',
+      icon: '🗑️',
+      text: `18+ video o'chirildi (Kod: ${code})`,
+      color: '#ef4444'
+    });
+
     return true;
   }
   return false;
@@ -241,6 +274,14 @@ function updateMovie(code, data) {
       code: String(movies[idx].code)
     };
     saveMovies(movies);
+
+    safeLogActivity({
+      bot: '18+ Adult Bot',
+      icon: '✏️',
+      text: `'${movies[idx].title}' 18+ videosi tahrirlandi (Kod: ${code})`,
+      color: '#ef4444'
+    });
+
     return movies[idx];
   } else {
     return addMovie({ ...data, code });

@@ -9,6 +9,15 @@ const router = express.Router();
 router.use(cors());
 router.use(express.json());
 
+function safeLogActivity(payload) {
+  try {
+    const serverDb = require(path.resolve(__dirname, '../server/db'));
+    if (serverDb && typeof serverDb.logActivity === 'function') {
+      serverDb.logActivity(payload);
+    }
+  } catch (e) {}
+}
+
 const ADULT_ADMIN_TOKEN_PREFIX = 'adult-secure-token-2026';
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
@@ -426,6 +435,13 @@ router.post('/broadcast', authMiddleware, async (req, res) => {
       status: 'running',
       logs: [`18+ Adult Bot reklama tarqatish boshlandi (${users.length} ta foydalanuvchi): ${new Date().toLocaleTimeString()}`]
     };
+
+    safeLogActivity({
+      bot: '18+ Adult Bot',
+      icon: '📢',
+      text: `18+ botda reklama yuborilmoqda (${users.length} ta foydalanuvchiga)`,
+      color: '#ef4444'
+    });
 
     res.json({ success: true, message: 'Broadcasting started.', progress: currentBroadcast });
 

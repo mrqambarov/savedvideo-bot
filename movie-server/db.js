@@ -85,6 +85,15 @@ function saveMovies(movies) {
   }
 }
 
+function safeLogActivity(payload) {
+  try {
+    const serverDb = require(path.resolve(__dirname, '../server/db'));
+    if (serverDb && typeof serverDb.logActivity === 'function') {
+      serverDb.logActivity(payload);
+    }
+  } catch (e) {}
+}
+
 function addMovie(movie) {
   try {
     const movies = getMovies();
@@ -109,8 +118,24 @@ function addMovie(movie) {
     if (index !== -1) {
       // Overwrite existing code
       movies[index] = movieData;
+      safeLogActivity({
+        bot: 'Kino Bot',
+        type: 'admin',
+        actor: '👑 Admin',
+        icon: '✏️',
+        text: `👑 Admin '${movieData.title}' filmini tahrirladi (Kod: ${movieData.code})`,
+        color: '#d946ef'
+      });
     } else {
       movies.push(movieData);
+      safeLogActivity({
+        bot: 'Kino Bot',
+        type: 'admin',
+        actor: '👑 Admin',
+        icon: '🎬',
+        text: `👑 Admin '${movieData.title}' filmini saqladi (Kod: ${movieData.code})`,
+        color: '#d946ef'
+      });
     }
     
     saveMovies(movies);
@@ -128,6 +153,14 @@ function deleteMovie(code) {
     movies = movies.filter(m => String(m.code).trim() !== String(code).trim());
     if (movies.length < initialLength) {
       saveMovies(movies);
+      safeLogActivity({
+        bot: 'Kino Bot',
+        type: 'admin',
+        actor: '👑 Admin',
+        icon: '🗑️',
+        text: `👑 Admin kino/serialni o'chirdi (Kod: ${code})`,
+        color: '#d946ef'
+      });
       return true;
     }
     return false;
@@ -724,6 +757,201 @@ function deleteRequest(id) {
     const initialLength = requests.length;
     requests = requests.filter(r => String(r.id) !== String(id));
     if (requests.length < initialLength) {
+movies[movieIdx].views = (movies[movieIdx].views || 0) + 1;
+      saveMovies(movies);
+    }
+
+    // Increment overall statistics
+    const stats = getStats();
+    stats.totalViews = (stats.totalViews || 0) + 1;
+
+    const today = new Date().toISOString().split('T')[0];
+    if (!stats.dailyUsage[today]) {
+      stats.dailyUsage[today] = { movieViews: 0, searchQueries: 0, activeUsers: [] };
+    }
+    stats.dailyUsage[today].movieViews = (stats.dailyUsage[today].movieViews || 0) + 1;
+
+    saveStats(stats);
+  } catch (e) {
+    console.error('Error tracking movie view:', e.message);
+  }
+}
+
+function trackSearch() {
+  try {
+    const stats = getStats();
+    stats.totalSearchQueries = (stats.totalSearchQueries || 0) + 1;
+
+    const today = new Date().toISOString().split('T')[0];
+    if (!stats.dailyUsage[today]) {
+      stats.dailyUsage[today] = { movieViews: 0, searchQueries: 0, activeUsers: [] };
+    }
+    stats.dailyUsage[today].searchQueries = (stats.dailyUsage[today].searchQueries || 0) + 1;
+
+    saveStats(stats);
+  } catch (e) {
+    console.error('Error tracking search:', e.message);
+  }
+}
+
+// Genres (editable list, seeded from DEFAULT_GENRES)
+function getGenres() {
+  try {
+    const raw = fs.readFileSync(genresFile, 'utf8');
+    const list = JSON.parse(raw);
+    return Array.isArray(list) && list.length ? list : [...DEFAULT_GENRES];
+  } catch (e) {
+    return [...DEFAULT_GENRES];
+  }
+}
+
+function saveGenres(list) {
+  try {
+    const clean = [...new Set((list || []).map(g => String(g).trim()).filter(Boolean))];
+    fs.writeFileSync(genresFile, JSON.stringify(clean, null, 2));
+    return clean;
+  } catch (e) {
+    console.error('Error saving genres:', e.message);
+    return null;
+  }
+}
+
+// Search analytics: record each query term with a hit counter and last result count.
+function trackSearchQuery(query, resultCount) {
+  try {
+    const q = String(query || '').toLowerCase().trim();
+    if (!q || q.length > 100) return;
+    let data = {};
+    try { data = JSON.parse(fs.readFileSync(searchesFile, 'utf8')) || {}; } catch (e) { data = {}; }
+    const entry = data[q] || { query: q, count: 0, lastResults: 0, lastAt: null };
+    entry.count += 1;
+    entry.lastResults = Number(resultCount) || 0;
+    entry.lastAt = new Date().toISOString();
+    data[q] = entry;
+    fs.writeFileSync(searchesFile, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.error('Error tracking search query:', e.message);
+  }
+}
+
+function getSearchAnalytics() {
+  try {
+    const data = JSON.parse(fs.readFileSync(searchesFile, 'utf8')) || {};
+    const all = Object.values(data);
+    const byCount = (a, b) => b.count - a.count;
+    return {
+      totalUnique: all.length,
+      top: [...all].sort(byCount).slice(0, 50),
+      noResults: all.filter(e => e.lastResults === 0).sort(byCount).slice(0, 50),
+    };
+  } catch (e) {
+    return { totalUnique: 0, top: [], noResults: [] };
+  }
+}
+
+function trackActiveUser(userId) {
+  try {
+    const stats = getStats();
+    const today = new Date().toISOString().split('T')[0];
+    if (!stats.dailyUsage[today]) {
+      stats.dailyUsage[today] = { movieViews: 0, searchQueries: 0, activeUsers: [] };
+    }
+    if (!stats.dailyUsage[today].activeUsers) {
+      stats.dailyUsage[today].activeUsers = [];
+    }
+    if (!stats.dailyUsage[today].activeUsers.includes(userId)) {
+      stats.dailyUsage[today].activeUsers.push(userId);
+      saveStats(stats);
+    }
+  } catch (e) {
+    console.error('Error tracking active user:', e.message);
+  }
+}
+
+// Requests CRUD
+function getRequests() {
+  try {
+    const raw = fs.readFileSync(requestsFile, 'utf8');
+    return JSON.parse(raw);
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveRequests(requests) {
+  try {
+    fs.writeFileSync(requestsFile, JSON.stringify(requests, null, 2));
+    return true;
+  } catch (e) {
+    console.error('Error saving requests:', e.message);
+    return false;
+  }
+}
+
+function addRequest(userId, usernameOrUserObj, titleArg) {
+  try {
+    let userIdVal = userId;
+    let usernameVal = typeof usernameOrUserObj === 'string' ? usernameOrUserObj : null;
+    let firstNameVal = null;
+    let titleVal = typeof usernameOrUserObj === 'string' ? titleArg : usernameOrUserObj;
+
+    if (typeof userId === 'object' && userId !== null) {
+      userIdVal = userId.id;
+      usernameVal = userId.username;
+      firstNameVal = userId.first_name;
+      titleVal = usernameOrUserObj;
+    }
+
+    if (!usernameVal || usernameVal === 'Noma\'lum') {
+      const users = getUsers();
+      const found = users.find(u => Number(u.id) === Number(userIdVal));
+      if (found) {
+        usernameVal = found.username ? (found.username.startsWith('@') ? found.username : '@' + found.username) : null;
+        firstNameVal = firstNameVal || found.first_name;
+      }
+    }
+
+    const requests = getRequests();
+    const newRequest = {
+      id: Math.random().toString(36).substring(2, 9),
+      userId: userIdVal,
+      username: usernameVal || null,
+      firstName: firstNameVal || null,
+      title: (titleVal || '').trim(),
+      status: 'pending',
+      dateRequested: new Date().toISOString()
+    };
+    requests.push(newRequest);
+    saveRequests(requests);
+    return newRequest;
+  } catch (e) {
+    console.error('Error adding request:', e.message);
+    return null;
+  }
+}
+
+function completeRequest(id) {
+  try {
+    const requests = getRequests();
+    const idx = requests.findIndex(r => String(r.id) === String(id));
+    if (idx !== -1) {
+      requests[idx].status = 'completed';
+      saveRequests(requests);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.error('Error completing request:', e.message);
+    return false;
+  }
+}
+
+function deleteRequest(id) {
+  try {
+    let requests = getRequests();
+    const initialLength = requests.length;
+    requests = requests.filter(r => String(r.id) !== String(id));
+    if (requests.length < initialLength) {
       saveRequests(requests);
       return true;
     }
@@ -745,7 +973,6 @@ function toggleLikeDislike(code, userId, voteType) {
     if (!movie.likes) movie.likes = [];
     if (!movie.dislikes) movie.dislikes = [];
 
-    // Filter out user from both arrays first to reset their vote
     const alreadyLiked = movie.likes.includes(userId);
     const alreadyDisliked = movie.dislikes.includes(userId);
 
@@ -774,10 +1001,6 @@ function toggleLikeDislike(code, userId, voteType) {
   }
 }
 
-/**
- * Computes advanced analytics for the movie bot: growth, active users,
- * usage (movie views, searches), and 14-day trend data.
- */
 function getAdvancedStats() {
   const users = getUsers();
   const stats = getStats();
@@ -794,7 +1017,6 @@ function getAdvancedStats() {
   const weekAgoStr = daysAgo(7);
   const monthAgoStr = daysAgo(30);
 
-  // Count new users by period
   let newUsersToday = 0, newUsersWeek = 0, newUsersMonth = 0;
   users.forEach(u => {
     if (!u.dateJoined) return;
@@ -804,7 +1026,6 @@ function getAdvancedStats() {
     if (joinDate >= monthAgoStr) newUsersMonth++;
   });
 
-  // Calculate active users and usage by period
   const dailyUsage = stats.dailyUsage || {};
   let activeToday = 0, activeWeek = 0, activeMonth = 0;
   let usageToday = { movieViews: 0, searches: 0 };
@@ -840,7 +1061,6 @@ function getAdvancedStats() {
   activeWeek = activeWeekSet.size;
   activeMonth = activeMonthSet.size;
 
-  // Build 14-day trend
   const trend = [];
   for (let i = 13; i >= 0; i--) {
     const dateStr = daysAgo(i);
@@ -863,8 +1083,6 @@ function getAdvancedStats() {
     active: { today: activeToday, week: activeWeek, month: activeMonth },
     usage: { today: usageToday, week: usageWeek, month: usageMonth },
     trend,
-    usersList: users,
-    moviesList: movies,
     stats
   };
 }
@@ -961,105 +1179,6 @@ function saveInstagramConfig(config) {
   }
 }
 
-function normalizeTitle(title) {
-  if (!title) return '';
-  let str = String(title).toLowerCase();
-  str = str.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, ' ');
-  str = str.replace(/(?:yakuniy qism|qism|epizod|sezon|mavsum|dublajda|uzbek tilida|tarjima|uzmovi\.net|telegram kanalda|film|kino|serial)/gi, ' ');
-  str = str.replace(/[0-9_\-*`\[\]()'".:;,?!/\\|]/g, ' ');
-  str = str.replace(/\s+/g, ' ').trim();
-  if (str.endsWith('ni') && str.length > 5) str = str.slice(0, -2);
-  if (str.endsWith('da') && str.length > 5) str = str.slice(0, -2);
-  return str.trim();
-}
-
-function findMatchingSerialByTitle(rawTitle) {
-  try {
-    const movies = getMovies();
-    const targetNorm = normalizeTitle(rawTitle);
-    if (!targetNorm || targetNorm.length < 3) return null;
-
-    for (const m of movies) {
-      if (m.isSerial || m.genre === 'Serial' || (m.episodes && m.episodes.length > 0)) {
-        const mNorm = normalizeTitle(m.title);
-        if (mNorm === targetNorm) {
-          return m;
-        }
-        if (mNorm.length >= 4 && targetNorm.length >= 4) {
-          if (mNorm.includes(targetNorm) || targetNorm.includes(mNorm)) {
-            return m;
-          }
-        }
-      }
-    }
-    return null;
-  } catch (e) {
-    console.error('Error finding matching serial by title:', e.message);
-    return null;
-  }
-}
-
-function mergeDuplicateSerials() {
-  try {
-    const movies = getMovies();
-    let modified = false;
-
-    const serialMap = new Map();
-
-    for (let i = 0; i < movies.length; i++) {
-      const m = movies[i];
-      if (m.isSerial || m.genre === 'Serial' || (m.episodes && m.episodes.length > 0)) {
-        const norm = normalizeTitle(m.title);
-        if (!norm || norm.length < 3) continue;
-
-        if (!serialMap.has(norm)) {
-          serialMap.set(norm, m);
-        } else {
-          const mainSerial = serialMap.get(norm);
-          if (!mainSerial.episodes) mainSerial.episodes = [];
-          
-          const epList = m.episodes || [];
-          if (epList.length > 0) {
-            epList.forEach(ep => {
-              const exists = mainSerial.episodes.some(e => Number(e.episode) === Number(ep.episode) && (Number(e.season) || 1) === (Number(ep.season) || 1));
-              if (!exists) {
-                mainSerial.episodes.push(ep);
-              }
-            });
-          } else if (m.fileId && !mainSerial.episodes.some(e => e.fileId === m.fileId)) {
-            const epNum = mainSerial.episodes.length + 1;
-            mainSerial.episodes.push({
-              episode: epNum,
-              season: 1,
-              fileId: m.fileId,
-              title: `${epNum}-Qism`,
-              dateAdded: m.dateAdded || new Date().toISOString()
-            });
-          }
-
-          mainSerial.episodes.sort((a, b) => {
-            if ((a.season || 1) !== (b.season || 1)) return (a.season || 1) - (b.season || 1);
-            return a.episode - b.episode;
-          });
-
-          movies.splice(i, 1);
-          i--;
-          modified = true;
-        }
-      }
-    }
-
-    if (modified) {
-      saveMovies(movies);
-      console.log('[Movie DB] Auto-merged duplicate serial entries successfully.');
-    }
-    return modified;
-  } catch (e) {
-    console.error('Error merging duplicate serials:', e.message);
-    return false;
-  }
-}
-
 function addEpisode(code, episodeNumber, fileId, title, seasonNumber = 1, serialTitle = '', genre = 'Serial') {
   try {
     const movies = getMovies();
@@ -1115,6 +1234,18 @@ function addEpisode(code, episodeNumber, fileId, title, seasonNumber = 1, serial
     });
 
     saveMovies(movies);
+
+    safeLogActivity({
+      bot: 'Kino Bot',
+      type: title?.includes('AVTO') ? 'parser' : 'admin',
+      actor: title?.includes('AVTO') ? '⚡ Avto-Parser' : '👑 Admin',
+      icon: title?.includes('AVTO') ? '⚡' : '🎬',
+      text: title?.includes('AVTO')
+        ? `⚡ Avto-Parser '${movieData.title}' serialining ${season}-mavsum, ${epNum}-qismini saqladi (Kod: ${movieData.code})`
+        : `👑 Admin '${movieData.title}' serialining ${season}-mavsum, ${epNum}-qismini saqladi (Kod: ${movieData.code})`,
+      color: '#d946ef'
+    });
+
     return { movie: movieData, episode: episodeData };
   } catch (e) {
     console.error('Error adding episode:', e.message);
