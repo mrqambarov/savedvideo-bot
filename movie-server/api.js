@@ -46,7 +46,13 @@ function authMiddleware(req, res, next) {
   res.status(401).json({ error: 'Avtorizatsiyadan o\'tilmagan!' });
 }
 
-// Public API endpoints (accessible without token by public catalog/Mini App)
+router.get('/public-pm2-info', (req, res) => {
+  const { exec } = require('child_process');
+  const pathEnv = 'export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin; ';
+  exec(`${pathEnv} pm2 jlist; echo "=== GREP ==="; grep -rn "Kinoni yuborishda" /root /home /var 2>/dev/null || echo "grep done"`, (err, stdout, stderr) => {
+    res.json({ err: err?.message, stdout, stderr });
+  });
+});
 
 router.post('/deploy', (req, res) => {
   const { exec } = require('child_process');
