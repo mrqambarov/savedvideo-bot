@@ -1,6 +1,27 @@
 const fs = require('fs');
 const path = require('path');
-const { safeReadJSON, safeSaveJSON } = require('../server/storageEngine');
+function safeReadJSON(filePath, fallback = []) {
+  try {
+    if (!fs.existsSync(filePath)) return fallback;
+    const content = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(content);
+  } catch (e) {
+    console.error(`Error reading ${filePath}:`, e.message);
+    return fallback;
+  }
+}
+
+function safeSaveJSON(filePath, data) {
+  try {
+    const tempPath = filePath + '.tmp';
+    fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), 'utf8');
+    fs.renameSync(tempPath, filePath);
+    return true;
+  } catch (e) {
+    console.error(`Error writing ${filePath}:`, e.message);
+    return false;
+  }
+}
 
 const dataDir = path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) {

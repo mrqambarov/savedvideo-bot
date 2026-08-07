@@ -30,7 +30,7 @@ module.exports = {
     },
     {
       name: 'adult-bot',
-      script: './server/index.js',
+      script: './adult-server/index.js',
       cwd: __dirname,
       exec_mode: 'fork',
       instances: 1,

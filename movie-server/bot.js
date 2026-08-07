@@ -27,7 +27,7 @@ function escapeHTML(str) {
   if (!str) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
-const escapeHtml = escapeHTML;
+// const escapeHtml = escapeHTML;
 
 function getActiveSponsorChannel() {
   try {

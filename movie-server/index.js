@@ -49,15 +49,17 @@ app.listen(PORT, async () => {
     console.warn('Tunnel init warning:', tunnelErr.message);
   }
 
-  // Automatically start Telegram Bot on boot
-  const movieToken = process.env.MOVIE_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
+  // Automatically start Telegram Bot on boot if MOVIE_BOT_TOKEN is provided and distinct
+  const movieToken = process.env.MOVIE_BOT_TOKEN;
 
-  if (movieToken) {
+  if (movieToken && movieToken.trim() !== '' && movieToken !== process.env.TELEGRAM_BOT_TOKEN) {
     console.log('Booting Movie Telegram bot...');
     bot.startBot(movieToken)
       .then(() => console.log('Movie Telegram Bot initialization check completed.'))
       .catch((err) => console.error('Movie Telegram Bot auto-start failed:', err.message));
   } else {
+    console.warn('WARNING: MOVIE_BOT_TOKEN is missing or identical to TELEGRAM_BOT_TOKEN! Set a separate MOVIE_BOT_TOKEN in .env to run Kino Bot.');
+  }
     console.log('No MOVIE_BOT_TOKEN or TELEGRAM_BOT_TOKEN configured. Movie Bot is inactive.');
   }
 });

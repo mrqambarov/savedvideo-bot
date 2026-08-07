@@ -1253,6 +1253,25 @@ function addEpisode(code, episodeNumber, fileId, title, seasonNumber = 1, serial
   }
 }
 
+function normalizeTitle(title) {
+  if (!title) return '';
+  return title.toLowerCase()
+    .replace(/[^\w\s\u0400-\u04FF]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function findMatchingSerialByTitle(title) {
+  if (!title) return null;
+  const normalized = normalizeTitle(title);
+  const movies = getMovies();
+  return movies.find(m => m.isSerial && normalizeTitle(m.title) === normalized) || null;
+}
+
+function mergeDuplicateSerials() {
+  return false;
+}
+
 module.exports = {
   getMovies,
   saveMovies,
@@ -1303,3 +1322,4 @@ module.exports = {
   getMovieSettings,
   saveMovieSettings
 };
+
