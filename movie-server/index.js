@@ -60,6 +60,4 @@ app.listen(PORT, async () => {
   } else {
     console.warn('WARNING: MOVIE_BOT_TOKEN is missing or identical to TELEGRAM_BOT_TOKEN! Set a separate MOVIE_BOT_TOKEN in .env to run Kino Bot.');
   }
-    console.log('No MOVIE_BOT_TOKEN or TELEGRAM_BOT_TOKEN configured. Movie Bot is inactive.');
-  }
 });
