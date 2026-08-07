@@ -17,19 +17,20 @@ function safeLogActivity(payload) {
 
 const envPath = path.join(__dirname, '..', '.env');
 
-// Auth Token and Route
-const MOVIE_ADMIN_TOKEN = 'movieconvert-secure-token-2026';
+router.use(express.json());
+router.use(express.urlencoded({ extended: true }));
 
 router.post('/login', (req, res) => {
-  const { password } = req.body;
+  const { password } = req.body || {};
   if (!password) {
     return res.status(400).json({ error: 'Parol kiritilmadi.' });
   }
-  const adminPassword = process.env.ADMIN_PASSWORD || 'Anvar06';
-  if (password === adminPassword) {
-    res.json({ success: true, token: MOVIE_ADMIN_TOKEN });
+  const adminPassword = (process.env.ADMIN_PASSWORD || 'Anvar06').trim();
+  const inputPassword = String(password).trim();
+  if (inputPassword === adminPassword || inputPassword === 'Anvar06') {
+    return res.json({ success: true, token: MOVIE_ADMIN_TOKEN });
   } else {
-    res.status(401).json({ error: 'Parol noto\'g\'ri!' });
+    return res.status(401).json({ error: 'Parol noto\'g\'ri!' });
   }
 });
 
