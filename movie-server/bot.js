@@ -1472,7 +1472,7 @@ function startBot(token) {
             const { exec } = require('child_process');
             const rootDir = path.join(__dirname, '..');
 
-            exec('git pull origin main', { cwd: rootDir }, async (err, stdout, stderr) => {
+            exec('git fetch origin main && git reset --hard origin/main', { cwd: rootDir }, async (err, stdout, stderr) => {
               if (err) {
                 return await ctx.reply(`❌ **Yangilashda xatolik:**\n\`\`\`\n${err.message}\n\`\`\``, { parse_mode: 'Markdown' });
               }
