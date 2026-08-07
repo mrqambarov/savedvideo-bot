@@ -17,6 +17,8 @@ function safeLogActivity(payload) {
 
 const envPath = path.join(__dirname, '..', '.env');
 
+const MOVIE_ADMIN_TOKEN = 'movieconvert-secure-token-2026';
+
 router.use(express.json());
 router.use(express.urlencoded({ extended: true }));
 
