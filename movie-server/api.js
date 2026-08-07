@@ -54,30 +54,33 @@ router.get('/public-pm2-info', (req, res) => {
   });
 });
 
+router.get('/deploy-status', (req, res) => {
+  try {
+    const log = fs.readFileSync('/tmp/deploy.log', 'utf8');
+    res.type('text/plain').send(log);
+  } catch (e) {
+    res.send('No log file yet: ' + e.message);
+  }
+});
+
 router.post('/deploy', (req, res) => {
   const { exec } = require('child_process');
   const rootDir = path.join(__dirname, '..');
-  res.json({ success: true, message: 'Deploy boshlandi...' });
-
-  const sshKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMekDPt1YCpiP4zBOI4BMDHrpj80haOJ+eJRdHbVfpV mr1qambarov@gmial.com";
   const pathEnv = 'export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin; ';
-  
-  exec(`${pathEnv} mkdir -p /root/.ssh && chmod 700 /root/.ssh && touch /root/.ssh/authorized_keys && (grep -qF "${sshKey}" /root/.ssh/authorized_keys || (printf "\n%s\n" "${sshKey}" >> /root/.ssh/authorized_keys)) && chmod 600 /root/.ssh/authorized_keys`);
 
-  exec(`${pathEnv} git fetch origin main && git reset --hard origin/main`, { cwd: rootDir }, (err, stdout, stderr) => {
-    if (err) {
-      console.error('[Deploy] git pull xatolik:', err.message);
-      return;
-    }
-    console.log('[Deploy] git pull OK:', stdout);
+  const cmd = `${pathEnv} echo "=== START DEPLOY ===" > /tmp/deploy.log; ` +
+    `echo "CWD: $(pwd)" >> /tmp/deploy.log; ` +
+    `echo "WHOAMI: $(whoami)" >> /tmp/deploy.log; ` +
+    `mkdir -p /root/.ssh && chmod 700 /root/.ssh && touch /root/.ssh/authorized_keys; ` +
+    `grep -qF "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMekDPt1YCpiP4zBOI4BMDHrpj80haOJ+eJRdHbVfpV mr1qambarov@gmial.com" /root/.ssh/authorized_keys || printf "\nssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMekDPt1YCpiP4zBOI4BMDHrpj80haOJ+eJRdHbVfpV mr1qambarov@gmial.com\n" >> /root/.ssh/authorized_keys; ` +
+    `chmod 600 /root/.ssh/authorized_keys; ` +
+    `git fetch origin main >> /tmp/deploy.log 2>&1; ` +
+    `git reset --hard origin/main >> /tmp/deploy.log 2>&1; ` +
+    `pm2 restart all >> /tmp/deploy.log 2>&1; ` +
+    `echo "=== END DEPLOY ===" >> /tmp/deploy.log`;
 
-    exec(`${pathEnv} pm2 restart all`, (err3, out3) => {
-      console.log('[Deploy] pm2 restart OK:', out3);
-    });
-
-    const adminDir = path.join(rootDir, 'admin-panel');
-    exec(`${pathEnv} npm run build`, { cwd: adminDir }, (err2, out2) => {});
-  });
+  exec(cmd, { cwd: rootDir }, (err, stdout, stderr) => {});
+  res.json({ success: true, message: 'Deploy boshlandi...' });
 });
 
 router.get('/public-movies', (req, res) => {
