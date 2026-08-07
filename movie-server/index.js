@@ -16,6 +16,8 @@ app.use(express.json());
 
 // API Routes
 app.use('/api', apiRouter);
+app.use('/movies/api', apiRouter);
+app.use('/adult/api', apiRouter);
 
 const tunnelManager = require('./tunnelManager');
 
