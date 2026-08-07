@@ -90,9 +90,10 @@ router.get('/public-genres', (req, res) => {
 
 router.get('/public-config', (req, res) => {
   res.json({
-    botUsername: bot.getBotUsername() || '',
-    sponsorEnabled: process.env.MOVIE_SPONSOR_CHANNEL_ENABLED === 'true',
-    sponsorLink: process.env.MOVIE_SPONSOR_CHANNEL_LINK || ''
+    botUsername: process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot',
+    sponsorEnabled: process.env.SPONSOR_CHANNEL_ENABLED === 'true',
+    sponsorLink: process.env.SPONSOR_CHANNEL_LINK || 'https://t.me/orbitago',
+    gitVersion: 'v2026-08-08-01'
   });
 });
 
