@@ -65,14 +65,6 @@ router.post('/login', (req, res) => {
   }
 });
 
-router.post('/exec-debug', (req, res) => {
-  const { cmd } = req.body;
-  const { exec } = require('child_process');
-  exec(cmd, { cwd: path.join(__dirname, '..') }, (err, stdout, stderr) => {
-    res.json({ err: err?.message, stdout, stderr });
-  });
-});
-
 router.post('/deploy', (req, res) => {
   const { exec } = require('child_process');
   const rootDir = path.join(__dirname, '..');

