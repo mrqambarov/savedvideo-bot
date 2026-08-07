@@ -71,12 +71,12 @@ router.post('/deploy', (req, res) => {
     }
     console.log('[Deploy] git pull OK:', stdout);
 
-    const adminDir = path.join(rootDir, 'admin-panel');
-    exec(`${pathEnv} npm run build`, { cwd: adminDir }, (err2, out2) => {
-      setTimeout(() => {
-        exec(`${pathEnv} pm2 restart all`, (err3, out3) => {});
-      }, 1000);
+    exec(`${pathEnv} pm2 restart all`, (err3, out3) => {
+      console.log('[Deploy] pm2 restart OK:', out3);
     });
+
+    const adminDir = path.join(rootDir, 'admin-panel');
+    exec(`${pathEnv} npm run build`, { cwd: adminDir }, (err2, out2) => {});
   });
 });
 
