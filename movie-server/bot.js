@@ -533,7 +533,7 @@ function startBot(token) {
       // Admin Remote VPS Auto-Update Command (/update, /deploy)
       botInstance.command(['update', 'deploy'], async (ctx) => {
         if (!isAdmin(ctx.from.id)) return;
-        await ctx.reply('🚀 **VPS SERVERNI YANGILASH BAJARILMOQDA...**\n\n`git pull origin main` yuklanmoqda...', { parse_mode: 'Markdown' });
+        await ctx.reply('🚀 **VPS SERVERNI YANGILASH BAJARILMOQDA...**\n\n`git fetch & reset` yuklanmoqda...', { parse_mode: 'Markdown' });
 
         const { exec } = require('child_process');
         const rootDir = path.join(__dirname, '..');
@@ -1473,7 +1473,7 @@ function startBot(token) {
 
           if (data === 'adm_update_vps') {
             await ctx.answerCallbackQuery({ text: '🚀 VPS Yangilanishi boshlandi...', show_alert: true }).catch(() => {});
-            await ctx.reply('🚀 **VPS SERVERNI YANGILASH BAJARILMOQDA...**\n\n`git pull origin main` yuklanmoqda...', { parse_mode: 'Markdown' });
+            await ctx.reply('🚀 **VPS SERVERNI YANGILASH BAJARILMOQDA...**\n\n`git fetch & reset` yuklanmoqda...', { parse_mode: 'Markdown' });
 
             const { exec } = require('child_process');
             const rootDir = path.join(__dirname, '..');
