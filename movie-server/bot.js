@@ -897,18 +897,19 @@ function startBot(token) {
           }
 
           const movieData = parseMovieFromPost(ctx.message);
-          if (movieData && movieData.fileId) {
+          // Only auto-save if explicit code was found in the caption!
+          const hasExplicitCode = rawCaption && /(?:kodi|kod|code|kino kodi)[\s:-]*0*\d+/i.test(rawCaption);
+
+          if (movieData && movieData.fileId && hasExplicitCode) {
             if (movieData.isEpisode && movieData.episodeNumber) {
               const epTitle = `${movieData.seasonNumber > 1 ? movieData.seasonNumber + '-Mavsum ' : ''}${movieData.episodeNumber}-Qism`;
               const result = db.addEpisode(movieData.code, movieData.episodeNumber, movieData.fileId, epTitle, movieData.seasonNumber, movieData.title, movieData.genre);
               if (result) {
                 await ctx.reply(
-                  `⚡️ **AVTO-PARSER: Serial qismi muvaffaqiyatli saqlandi!**\n\n` +
+                  `⚡️ **Serial qismi muvaffaqiyatli saqlandi!**\n\n` +
                   `🔑 **Serial kodi:** \`${result.movie.code}\`\n` +
                   `🎬 **Serial nomi:** *${result.movie.title}*\n` +
-                  `📺 **Epizod:** *${movieData.seasonNumber}-Mavsum, ${movieData.episodeNumber}-Qism*\n` +
-                  `📁 **File ID:** \`${result.episode.fileId.substring(0, 20)}...\`\n\n` +
-                  `💡 *Foydalanuvchilar botga \`${result.movie.code}\` kodini kiritib barcha qismlarni ko'rishlari mumkin!*`,
+                  `📺 **Epizod:** *${movieData.seasonNumber}-Mavsum, ${movieData.episodeNumber}-Qism*`,
                   { parse_mode: 'Markdown' }
                 );
               }
@@ -916,19 +917,24 @@ function startBot(token) {
               const result = db.addMovie(movieData);
               if (result) {
                 await ctx.reply(
-                  `⚡️ **AVTO-PARSER: Kino bazaga muvaffaqiyatli qo'shildi!**\n\n` +
+                  `⚡️ **Kino bazaga muvaffaqiyatli qo'shildi!**\n\n` +
                   `🔑 **Kino kodi:** \`${result.code}\`\n` +
                   `🎬 **Nomi:** *${result.title}*\n` +
-                  `🗂 **Janri:** _${result.genre}_\n` +
-                  `📁 **File ID:** \`${result.fileId.substring(0, 20)}...\`\n\n` +
-                  `💡 *Foydalanuvchilar botda \`${result.code}\` kodini kiritib tomosha qilishlari mumkin!*`,
+                  `🗂 **Janri:** _${result.genre}_`,
                   { parse_mode: 'Markdown' }
                 );
-
-                // Auto-Post to Telegram Channel!
                 publishAutoPost(result);
               }
             }
+          } else {
+            // Prompt admin to use reply + /add [kod] [nomi]
+            await ctx.reply(
+              `📥 **Video fayl qabul qilindi.**\n\n` +
+              `Ushbu videoni saqlash uchun unga **reply (javob)** qilib yozing:\n` +
+              `/add \`[kod]\` \`[nomi]\` | \`[tavsifi]\` | \`[janri]\` \n\n` +
+              `*Masalan:* \`/add 477 Gunohkorlar\``,
+              { parse_mode: 'Markdown', reply_to_message_id: ctx.message.message_id }
+            );
           }
         } catch (err) {
           console.error('Error in admin video auto-parser:', err.message);
