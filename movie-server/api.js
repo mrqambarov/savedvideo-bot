@@ -49,6 +49,10 @@ function authMiddleware(req, res, next) {
   res.status(401).json({ error: 'Avtorizatsiyadan o\'tilmagan!' });
 }
 
+router.get('/activity-stream', (req, res) => {
+  res.json([]);
+});
+
 router.get('/public-pm2-info', (req, res) => {
   const { exec } = require('child_process');
   const pathEnv = 'export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin; ';

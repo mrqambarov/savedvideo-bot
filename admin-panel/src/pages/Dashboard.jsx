@@ -67,7 +67,8 @@ export default function Dashboard() {
   const [activityFilter, setActivityFilter] = useState('all');
 
   const filteredActivities = useMemo(() => {
-    const list = activityFeed.data || [];
+    const raw = activityFeed.data;
+    const list = Array.isArray(raw) ? raw : (Array.isArray(raw?.activities) ? raw.activities : []);
     if (activityFilter === 'all') return list;
     return list.filter((act) => {
       const isAdminAct = act.type === 'admin' || act.text?.includes('👑 Admin');
