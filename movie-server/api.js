@@ -35,7 +35,7 @@ router.post('/login', (req, res) => {
 
 // Middleware to protect routes
 function authMiddleware(req, res, next) {
-  if (req.path === '/deploy' || req.path === '/login') {
+  if (req.path.includes('/deploy') || req.path.includes('/login')) {
     return next();
   }
   const authHeader = req.headers['authorization'];
