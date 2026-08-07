@@ -1477,8 +1477,9 @@ function startBot(token) {
 
             const { exec } = require('child_process');
             const rootDir = path.join(__dirname, '..');
+            const pathEnv = 'export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin; ';
 
-            exec('git fetch origin main && git reset --hard origin/main', { cwd: rootDir }, async (err, stdout, stderr) => {
+            exec(`${pathEnv} git fetch origin main && git reset --hard origin/main`, { cwd: rootDir }, async (err, stdout, stderr) => {
               if (err) {
                 return await ctx.reply(`❌ **Yangilashda xatolik:**\n\`\`\`\n${err.message}\n\`\`\``, { parse_mode: 'Markdown' });
               }
@@ -1491,8 +1492,8 @@ function startBot(token) {
               );
 
               setTimeout(() => {
-                exec('pm2 restart all || pm2 restart movie-bot', () => {});
-              }, 1000);
+                exec(`${pathEnv} pm2 restart all`, () => {});
+              }, 500);
             });
             return;
           }
