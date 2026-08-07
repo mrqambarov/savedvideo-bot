@@ -7,23 +7,20 @@ export const dlApi = axios.create({ baseURL: isDev ? `${DEV_HOST}/api` : '/api' 
 export const movieApi = axios.create({ baseURL: isDev ? `${DEV_HOST}/movies/api` : '/movies/api' });
 export const adultApi = axios.create({ baseURL: isDev ? `${DEV_HOST}/adult/api` : '/adult/api' });
 
-const TOKENS = { dl: 'dlToken', movie: 'movieToken', adult: 'adultToken' };
+function getAnyToken() {
+  return localStorage.getItem(TOKENS.movie) || localStorage.getItem(TOKENS.dl) || localStorage.getItem(TOKENS.adult);
+}
 
 function attach(instance, key) {
   instance.interceptors.request.use((config) => {
-    const t = localStorage.getItem(TOKENS[key]);
+    const t = localStorage.getItem(TOKENS[key]) || getAnyToken();
     if (t) config.headers['Authorization'] = `Bearer ${t}`;
     return config;
   });
   instance.interceptors.response.use(
     (r) => r,
     (err) => {
-      if (err.response && err.response.status === 401) {
-        localStorage.removeItem(TOKENS.dl);
-        localStorage.removeItem(TOKENS.movie);
-        localStorage.removeItem(TOKENS.adult);
-        window.dispatchEvent(new Event('auth-expired'));
-      }
+      // Do not automatically clear auth on individual 401s to prevent blank screens
       return Promise.reject(err);
     }
   );
@@ -38,20 +35,19 @@ export async function login(password) {
     movieApi.post('/login', { password }),
     adultApi.post('/login', { password }),
   ]);
-  let ok = false;
-  if (dl.status === 'fulfilled' && dl.value.data?.token) {
-    localStorage.setItem(TOKENS.dl, dl.value.data.token);
-    ok = true;
+  
+  let validToken = null;
+  if (dl.status === 'fulfilled' && dl.value.data?.token) validToken = dl.value.data.token;
+  if (movie.status === 'fulfilled' && movie.value.data?.token) validToken = movie.value.data.token;
+  if (adult.status === 'fulfilled' && adult.value.data?.token) validToken = adult.value.data.token;
+
+  if (validToken) {
+    localStorage.setItem(TOKENS.dl, validToken);
+    localStorage.setItem(TOKENS.movie, validToken);
+    localStorage.setItem(TOKENS.adult, validToken);
+    return true;
   }
-  if (movie.status === 'fulfilled' && movie.value.data?.token) {
-    localStorage.setItem(TOKENS.movie, movie.value.data.token);
-    ok = true;
-  }
-  if (adult.status === 'fulfilled' && adult.value.data?.token) {
-    localStorage.setItem(TOKENS.adult, adult.value.data.token);
-    ok = true;
-  }
-  return ok;
+  return false;
 }
 
 export function logout() {
@@ -61,7 +57,7 @@ export function logout() {
 }
 
 export function isLoggedIn() {
-  return !!(localStorage.getItem(TOKENS.dl) || localStorage.getItem(TOKENS.movie) || localStorage.getItem(TOKENS.adult));
+  return !!getAnyToken();
 }
 
 export async function safe(promise) {
