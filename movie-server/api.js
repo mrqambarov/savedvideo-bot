@@ -49,8 +49,44 @@ function authMiddleware(req, res, next) {
   res.status(401).json({ error: 'Avtorizatsiyadan o\'tilmagan!' });
 }
 
+function formatRelativeTime(isoString) {
+  if (!isoString) return 'Hozirgina';
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffSec < 45) return 'Hozirgina';
+  if (diffMin < 60) return `${diffMin} daqiqa oldin`;
+  if (diffHour < 24) return `${diffHour} soat oldin`;
+  return `${diffDay} kun oldin`;
+}
+
 router.get('/activity-stream', (req, res) => {
-  res.json([]);
+  try {
+    let serverDb;
+    try {
+      serverDb = require(path.resolve(__dirname, '../server/db'));
+    } catch (e) {}
+
+    let activities = serverDb ? serverDb.getActivities() : [];
+    if (!activities || activities.length === 0) {
+      if (serverDb && typeof serverDb.logActivity === 'function') {
+        serverDb.logActivity({ bot: 'Kino Bot', icon: '🎬', text: 'Kino bot faoliyat tasmangiz muvaffaqiyatli ishga tushirildi', color: '#d946ef' });
+        activities = serverDb.getActivities() || [];
+      }
+    }
+
+    const formatted = (activities || []).map(act => ({
+      ...act,
+      time: formatRelativeTime(act.timestamp)
+    }));
+
+    res.json(formatted);
+  } catch (e) {
+    res.json([]);
+  }
 });
 
 router.get('/public-pm2-info', (req, res) => {
