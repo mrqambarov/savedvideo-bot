@@ -528,10 +528,27 @@ router.post('/bot-status', async (req, res) => {
   }
 });
 
-// 4. Stats (Advanced Analytics)
+// 4. Stats (Advanced Analytics for Downloader Bot, Kino Bot, 18+ Adult Bot)
 router.get('/stats', (req, res) => {
   try {
-    res.json(db.getAdvancedStats());
+    const url = req.originalUrl || req.baseUrl || req.url || '';
+    if (url.includes('/adult/')) {
+      try {
+        const adultDb = require(path.resolve(__dirname, '../adult-server/db'));
+        return res.json(adultDb.getAdvancedStats());
+      } catch (e) {
+        return res.json(db.getAdvancedStats());
+      }
+    } else if (url.includes('/movies/')) {
+      return res.json(db.getAdvancedStats());
+    } else {
+      try {
+        const serverDb = require(path.resolve(__dirname, '../server/db'));
+        return res.json(serverDb.getAdvancedStats());
+      } catch (e) {
+        return res.json(db.getAdvancedStats());
+      }
+    }
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

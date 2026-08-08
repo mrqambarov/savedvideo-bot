@@ -562,6 +562,45 @@ function hasJoinedOrRequested(userId, channelObj) {
   return false;
 }
 
+function getAdvancedStats() {
+  const users = getUsers();
+  const movies = getMovies();
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+
+  function daysAgo(n) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - n);
+    return d.toISOString().split('T')[0];
+  }
+
+  const weekAgoStr = daysAgo(7);
+  const monthAgoStr = daysAgo(30);
+
+  let newUsersToday = 0, newUsersWeek = 0, newUsersMonth = 0;
+
+  users.forEach(u => {
+    if (u.joinedDate) {
+      const joinDate = u.joinedDate.split('T')[0];
+      if (joinDate === todayStr) newUsersToday++;
+      if (joinDate >= weekAgoStr) newUsersWeek++;
+      if (joinDate >= monthAgoStr) newUsersMonth++;
+    }
+  });
+
+  const totalViews = movies.reduce((sum, m) => sum + (m.views || 0), 0);
+
+  return {
+    totalUsers: users.length,
+    totalMovies: movies.length,
+    totalViews: totalViews,
+    growth: { newUsersToday, newUsersWeek, newUsersMonth },
+    active: { today: Math.min(users.length, 2), week: users.length, month: users.length },
+    usage: { today: { movieViews: 0, searches: 0 }, week: { movieViews: 0, searches: 0 }, month: { movieViews: 0, searches: 0 } },
+    trend: []
+  };
+}
+
 module.exports = {
   getMovies,
   saveMovies,
@@ -593,6 +632,7 @@ module.exports = {
   addAdminId,
   removeAdminId,
   recordJoinRequest,
-  hasJoinedOrRequested
+  hasJoinedOrRequested,
+  getAdvancedStats
 };
 
