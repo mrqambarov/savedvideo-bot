@@ -134,6 +134,18 @@ router.get('/public-search-added-movies', (req, res) => {
   });
 });
 
+router.get('/public-find-custom-codes', (req, res) => {
+  const { exec } = require('child_process');
+  const pathEnv = 'export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin; ';
+  const cmd = `${pathEnv} echo "=== SEARCHING PM2 LOGS FOR ADDED CODES ==="; ` +
+    `grep -rnE "/add|477|484|Kino qo'shildi|Movie added|code" /root/.pm2/logs/ 2>/dev/null | head -n 300; ` +
+    `echo "=== SEARCHING GIT LOGS FOR MOVIES ==="; ` +
+    `git log -p -n 20 movie-server/data/movies.json 2>/dev/null | head -n 300`;
+  exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    res.json({ err: err?.message, stdout, stderr });
+  });
+});
+
 router.get('/deploy-status', (req, res) => {
   try {
     const log = fs.readFileSync('/tmp/deploy.log', 'utf8');
