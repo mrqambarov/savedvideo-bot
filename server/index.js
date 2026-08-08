@@ -97,26 +97,7 @@ app.listen(PORT, async () => {
     console.error('CRITICAL: Server binaries setup failed:', err.message);
   }
 
-  // Auto-boot sub-servers (movie-server on port 5001 and adult-server on port 5002)
-  try {
-    const movieServerPath = path.join(__dirname, '..', 'movie-server', 'index.js');
-    if (fs.existsSync(movieServerPath)) {
-      console.log('Auto-booting Movie Server...');
-      require(movieServerPath);
-    }
-  } catch (e) {
-    console.error('Error auto-booting Movie Server:', e.message);
-  }
 
-  try {
-    const adultServerPath = path.join(__dirname, '..', 'adult-server', 'index.js');
-    if (fs.existsSync(adultServerPath)) {
-      console.log('Auto-booting Adult Server...');
-      require(adultServerPath);
-    }
-  } catch (e) {
-    console.error('Error auto-booting Adult Server:', e.message);
-  }
 
   // Run initial auto-update yt-dlp and schedule every 24 hours
   autoUpdateYtDlp();
