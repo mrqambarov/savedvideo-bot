@@ -91,6 +91,42 @@ function searchMoviesByTitle(query) {
   return movies.filter(m => String(m.title).toLowerCase().includes(cleanQ));
 }
 
+function cleanAdText(text) {
+  if (!text) return '';
+  let str = String(text);
+  const lines = str.split('\n');
+  const cleanLines = [];
+
+  for (let line of lines) {
+    let l = line.trim();
+    if (!l) continue;
+
+    if (l.includes('@') || /https?:\/\//i.test(l) || /t\.me\//i.test(l) || /telegram\.me\//i.test(l)) continue;
+    if (/orqali/i.test(l) && /kodlarni|olishingiz|ko['`’]?proq/i.test(l)) continue;
+    if (/kodlarni/i.test(l)) continue;
+    if (/yuklab olingan/i.test(l)) continue;
+    if (/obuna bo['`’]?ling/i.test(l)) continue;
+    if (/kanali(?:miz)?ga/i.test(l) || /kanalga/i.test(l)) continue;
+    if (/reklama|aloqa|admin|boti|botimiz/i.test(l) && /:\s*@/i.test(l)) continue;
+
+    l = l.replace(/^📦?\s*(?:nomi|title|kino nomi|kino)[\s:-]*/gi, '');
+    l = l.replace(/^🔑?\s*(?:kodi|kod|code|kino kodi)[\s:-]*/gi, '');
+    l = l.replace(/^🗂?\s*(?:janri|janr|genre)[\s:-]*/gi, '');
+    l = l.replace(/^📝?\s*(?:tavsifi|tavsif|desc|description)[\s:-]*/gi, '');
+    l = l.replace(/^[\s🎬🍿🔥⚡️📌👉📦💬📝-]+/, '').trim();
+
+    l = l.replace(/@[a-zA-Z0-9_]+/g, '').trim();
+    l = l.replace(/https?:\/\/\S+/gi, '').trim();
+    l = l.replace(/t\.me\/\S+/gi, '').trim();
+
+    if (l.length > 0 && !/^-?\s*orqali/i.test(l)) {
+      cleanLines.push(l);
+    }
+  }
+
+  return cleanLines.join('\n').trim();
+}
+
 function addMovie(movieData) {
   const movies = getMovies();
   let code = movieData.code;
@@ -105,10 +141,16 @@ function addMovie(movieData) {
     code = (maxCode + 1).toString();
   }
 
+  const cleanedTitle = cleanAdText(movieData.title) || `18+ Video #${code}`;
+  let cleanedDesc = cleanAdText(movieData.description);
+  if (!cleanedDesc || cleanedDesc.length < 3) {
+    cleanedDesc = `${cleanedTitle}`;
+  }
+
   const newMovie = {
     code: String(code),
-    title: movieData.title || `18+ Video #${code}`,
-    description: movieData.description || '',
+    title: cleanedTitle,
+    description: cleanedDesc,
     fileId: movieData.fileId || '',
     genre: movieData.genre || 'Triller (18+)',
     poster: movieData.poster || '',

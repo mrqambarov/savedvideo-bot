@@ -605,18 +605,25 @@ function startBot(token) {
           if (!l) continue;
 
           // Strip lines containing channel handles, links, or promotional filler
-          if (l.includes('@') || l.includes('http://') || l.includes('https://') || l.includes('t.me/')) continue;
-          if (/orqali ko['`’]?proq/i.test(l)) continue;
+          if (l.includes('@') || /https?:\/\//i.test(l) || /t\.me\//i.test(l) || /telegram\.me\//i.test(l)) continue;
+          if (/orqali/i.test(l) && /kodlarni|olishingiz|ko['`’]?proq/i.test(l)) continue;
           if (/kodlarni/i.test(l)) continue;
           if (/yuklab olingan/i.test(l)) continue;
           if (/obuna bo['`’]?ling/i.test(l)) continue;
-          if (/kanali(?:miz)?ga/i.test(l)) continue;
+          if (/kanali(?:miz)?ga/i.test(l) || /kanalga/i.test(l)) continue;
+          if (/reklama|aloqa|admin|boti|botimiz/i.test(l) && /:\s*@/i.test(l)) continue;
 
           // Strip labels if line starts with them
           l = l.replace(/^📦?\s*(?:nomi|title|kino nomi|kino)[\s:-]*/gi, '');
           l = l.replace(/^🔑?\s*(?:kodi|kod|code|kino kodi)[\s:-]*/gi, '');
           l = l.replace(/^🗂?\s*(?:janri|janr|genre)[\s:-]*/gi, '');
-          l = l.replace(/^[\s🎬🍿🔥⚡️📌👉📦-]+/, '').trim();
+          l = l.replace(/^📝?\s*(?:tavsifi|tavsif|desc|description)[\s:-]*/gi, '');
+          l = l.replace(/^[\s🎬🍿🔥⚡️📌👉📦💬📝-]+/, '').trim();
+
+          // Strip inline handles and external links
+          l = l.replace(/@[a-zA-Z0-9_]+/g, '').trim();
+          l = l.replace(/https?:\/\/\S+/gi, '').trim();
+          l = l.replace(/t\.me\/\S+/gi, '').trim();
 
           if (l.length > 0 && !/^-?\s*orqali/i.test(l)) {
             cleanLines.push(l);
@@ -1343,17 +1350,22 @@ function startBot(token) {
             movieInfo = params.substring(splitIdx).trim();
           }
 
-          let title = movieInfo;
-          let description = replyMsg?.caption || '';
+          let title = cleanAdText(movieInfo);
+          let description = cleanAdText(replyMsg?.caption || '');
           let genre = 'Tarjima kino';
 
           if (movieInfo.includes('|')) {
             const parts = movieInfo.split('|');
-            title = parts[0].trim();
-            description = parts[1].trim();
+            title = cleanAdText(parts[0].trim());
+            description = cleanAdText(parts[1].trim());
             if (parts[2]) {
               genre = parts[2].trim();
             }
+          }
+
+          if (!title) title = `Kino #${code}`;
+          if (!description || description.length < 3) {
+            description = `${title} - o'zbek tilida tarjima kino.`;
           }
 
           const result = db.addMovie({ code, title, description, fileId, genre });

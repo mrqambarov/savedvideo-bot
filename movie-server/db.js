@@ -94,6 +94,42 @@ function safeLogActivity(payload) {
   } catch (e) {}
 }
 
+function cleanAdText(text) {
+  if (!text) return '';
+  let str = String(text);
+  const lines = str.split('\n');
+  const cleanLines = [];
+
+  for (let line of lines) {
+    let l = line.trim();
+    if (!l) continue;
+
+    if (l.includes('@') || /https?:\/\//i.test(l) || /t\.me\//i.test(l) || /telegram\.me\//i.test(l)) continue;
+    if (/orqali/i.test(l) && /kodlarni|olishingiz|ko['`’]?proq/i.test(l)) continue;
+    if (/kodlarni/i.test(l)) continue;
+    if (/yuklab olingan/i.test(l)) continue;
+    if (/obuna bo['`’]?ling/i.test(l)) continue;
+    if (/kanali(?:miz)?ga/i.test(l) || /kanalga/i.test(l)) continue;
+    if (/reklama|aloqa|admin|boti|botimiz/i.test(l) && /:\s*@/i.test(l)) continue;
+
+    l = l.replace(/^📦?\s*(?:nomi|title|kino nomi|kino)[\s:-]*/gi, '');
+    l = l.replace(/^🔑?\s*(?:kodi|kod|code|kino kodi)[\s:-]*/gi, '');
+    l = l.replace(/^🗂?\s*(?:janri|janr|genre)[\s:-]*/gi, '');
+    l = l.replace(/^📝?\s*(?:tavsifi|tavsif|desc|description)[\s:-]*/gi, '');
+    l = l.replace(/^[\s🎬🍿🔥⚡️📌👉📦💬📝-]+/, '').trim();
+
+    l = l.replace(/@[a-zA-Z0-9_]+/g, '').trim();
+    l = l.replace(/https?:\/\/\S+/gi, '').trim();
+    l = l.replace(/t\.me\/\S+/gi, '').trim();
+
+    if (l.length > 0 && !/^-?\s*orqali/i.test(l)) {
+      cleanLines.push(l);
+    }
+  }
+
+  return cleanLines.join('\n').trim();
+}
+
 function addMovie(movie) {
   try {
     const movies = getMovies();
@@ -101,11 +137,17 @@ function addMovie(movie) {
     // Check if code already exists
     const index = movies.findIndex(m => String(m.code).trim() === String(movie.code).trim());
     const existing = index !== -1 ? movies[index] : {};
+
+    const cleanedTitle = cleanAdText(movie.title) || existing.title || `Kino #${movie.code}`;
+    let cleanedDesc = cleanAdText(movie.description);
+    if (!cleanedDesc || cleanedDesc.length < 3) {
+      cleanedDesc = `${cleanedTitle} - o'zbek tilida tarjima kino.`;
+    }
     
     const movieData = {
       code: String(movie.code).trim(),
-      title: movie.title || 'Noma\'lum film',
-      description: movie.description || '',
+      title: cleanedTitle,
+      description: cleanedDesc,
       fileId: movie.fileId,
       genre: movie.genre || existing.genre || 'Tarjima kino',
       poster: movie.poster !== undefined ? String(movie.poster || '').trim() : (existing.poster || ''),
