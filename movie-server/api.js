@@ -170,7 +170,8 @@ router.post('/deploy', (req, res) => {
     `git fetch origin main >> /tmp/deploy.log 2>&1; ` +
     `git reset --hard origin/main >> /tmp/deploy.log 2>&1; ` +
     `cp -rn /tmp/data_backup/* . 2>/dev/null; ` +
-    `pm2 restart all >> /tmp/deploy.log 2>&1; ` +
+    `pm2 start ecosystem.config.js --env production >> /tmp/deploy.log 2>&1 || pm2 restart all >> /tmp/deploy.log 2>&1; ` +
+    `pm2 save >> /tmp/deploy.log 2>&1; ` +
     `echo "=== END DEPLOY ===" >> /tmp/deploy.log`;
 
   exec(cmd, { cwd: rootDir }, (err, stdout, stderr) => {});
