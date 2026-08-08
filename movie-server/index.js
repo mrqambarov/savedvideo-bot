@@ -40,6 +40,15 @@ if (fs.existsSync(clientDist)) {
   });
 }
 
+// Automatically start Telegram Bot for Xit Film
+const movieToken = process.env.MOVIE_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
+if (movieToken && movieToken.trim() !== '') {
+  console.log('Booting Xit Film Telegram bot...');
+  bot.startBot(movieToken)
+    .then(() => console.log('Xit Film Telegram Bot started successfully.'))
+    .catch((err) => console.error('Xit Film Telegram Bot start failed:', err.message));
+}
+
 // Start Server
 app.listen(PORT, async () => {
   console.log(`Movie API Server running on port ${PORT}`);
@@ -50,14 +59,6 @@ app.listen(PORT, async () => {
   } catch (tunnelErr) {
     console.warn('Tunnel init warning:', tunnelErr.message);
   }
-
-  // Automatically start Telegram Bot for Xit Film
-  const movieToken = process.env.MOVIE_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
-
-  if (movieToken && movieToken.trim() !== '') {
-    console.log('Booting Xit Film Telegram bot...');
-    bot.startBot(movieToken)
-      .then(() => console.log('Xit Film Telegram Bot started successfully.'))
-      .catch((err) => console.error('Xit Film Telegram Bot start failed:', err.message));
-  }
+}).on('error', (err) => {
+  console.warn('Movie API Server listen notice:', err.message);
 });
