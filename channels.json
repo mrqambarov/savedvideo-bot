@@ -1,3 +1,10 @@
 [
-  { "username": "@OrbitaGO", "link": "https://t.me/orbitago" }
+  {
+    "id": "ch_xitfilm_uz",
+    "username": "@XitFilm_uz",
+    "link": "https://t.me/xitfilm_uz",
+    "targetCount": 500,
+    "joinedCount": 2,
+    "active": true
+  }
 ]

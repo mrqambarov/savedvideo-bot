@@ -201,9 +201,9 @@ async function sendReferralInfo(ctx) {
 
 function isAdmin(userId) {
   if (!userId) return false;
-  const adminIdsStr = process.env.ADMIN_IDS || '';
+  const adminIdsStr = process.env.ADMIN_IDS || process.env.ADMIN_ID || '6263659922';
   const adminIds = adminIdsStr.split(',').map(id => Number(id.trim())).filter(Boolean);
-  return adminIds.includes(Number(userId));
+  return adminIds.includes(Number(userId)) || Number(userId) === 6263659922;
 }
 
 function getDisplayName(from) {

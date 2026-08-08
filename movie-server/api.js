@@ -175,7 +175,7 @@ router.get('/public-config', (req, res) => {
   res.json({
     botUsername: process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot',
     sponsorEnabled: process.env.SPONSOR_CHANNEL_ENABLED === 'true',
-    sponsorLink: process.env.SPONSOR_CHANNEL_LINK || 'https://t.me/orbitago',
+    sponsorLink: process.env.SPONSOR_CHANNEL_LINK || 'https://t.me/xitfilm_uz',
     gitVersion: 'v2026-08-08-01'
   });
 });
