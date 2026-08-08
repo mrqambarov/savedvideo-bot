@@ -315,7 +315,22 @@ function updateEnv(botToken, adminIds, sponsorEnabled, sponsorUsername, sponsorL
 
 // 1. Get and Add Movies
 router.get('/movies', (req, res) => {
-  res.json(db.getMovies());
+  try {
+    const botType = (req.headers['x-bot-type'] || '').toLowerCase();
+    const fullPath = (req.headers['x-forwarded-uri'] || req.headers['referer'] || req.originalUrl || req.baseUrl || req.url || '').toLowerCase();
+
+    if (botType === 'adult' || fullPath.includes('adult')) {
+      try {
+        const adultDb = require(path.resolve(__dirname, '../adult-server/db'));
+        return res.json(adultDb.getMovies());
+      } catch (e) {
+        return res.json(db.getMovies());
+      }
+    }
+    return res.json(db.getMovies());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.post('/movies', (req, res) => {
@@ -357,7 +372,22 @@ router.post('/movies/bulk', (req, res) => {
 
 // 1b. Genres management
 router.get('/genres', (req, res) => {
-  res.json(db.getGenres());
+  try {
+    const botType = (req.headers['x-bot-type'] || '').toLowerCase();
+    const fullPath = (req.headers['x-forwarded-uri'] || req.headers['referer'] || req.originalUrl || req.baseUrl || req.url || '').toLowerCase();
+
+    if (botType === 'adult' || fullPath.includes('adult')) {
+      try {
+        const adultDb = require(path.resolve(__dirname, '../adult-server/db'));
+        return res.json(adultDb.getGenres());
+      } catch (e) {
+        return res.json(db.getGenres());
+      }
+    }
+    return res.json(db.getGenres());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.post('/genres', (req, res) => {
@@ -398,7 +428,30 @@ router.post('/reward-tiers', (req, res) => {
 
 // 1e. User management
 router.get('/users', (req, res) => {
-  res.json(db.getUsers());
+  try {
+    const botType = (req.headers['x-bot-type'] || '').toLowerCase();
+    const fullPath = (req.headers['x-forwarded-uri'] || req.headers['referer'] || req.originalUrl || req.baseUrl || req.url || '').toLowerCase();
+
+    if (botType === 'adult' || fullPath.includes('adult')) {
+      try {
+        const adultDb = require(path.resolve(__dirname, '../adult-server/db'));
+        return res.json(adultDb.getUsers());
+      } catch (e) {
+        return res.json(db.getUsers());
+      }
+    } else if (botType === 'movie' || fullPath.includes('movie')) {
+      return res.json(db.getUsers());
+    } else {
+      try {
+        const serverDb = require(path.resolve(__dirname, '../server/db'));
+        return res.json(serverDb.getUsers());
+      } catch (e) {
+        return res.json(db.getUsers());
+      }
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.post('/users/:id/ban', (req, res) => {
