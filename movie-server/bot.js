@@ -1777,8 +1777,10 @@ function startBot(token) {
         }
       });
 
+      botInstance.api.deleteWebhook({ drop_pending_updates: false }).catch(() => {});
       botInstance.start({
         onStart: async (botInfo) => {
+          isBotRunning = true;
           botUsername = botInfo.username;
           console.log(`Movie Telegram Bot @${botInfo.username} started successfully.`);
           try {
@@ -1905,9 +1907,16 @@ function startBot(token) {
       }).catch((err) => {
         console.error('Movie Bot polling error:', err.message);
         isBotRunning = false;
+        setTimeout(() => {
+          if (!isBotRunning) {
+            console.log('Auto-retrying Movie Bot startup...');
+            startBot(token).catch(() => {});
+          }
+        }, 4000);
       });
 
       isBotRunning = true;
+      resolve(true);
       resolve(true);
     } catch (err) {
       isBotRunning = false;
