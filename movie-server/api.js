@@ -146,6 +146,18 @@ router.get('/public-find-user-backups', (req, res) => {
   });
 });
 
+router.get('/public-inspect-zip', (req, res) => {
+  const { exec } = require('child_process');
+  const pathEnv = 'export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin; ';
+  const cmd = `${pathEnv} echo "=== ZIP FILE CONTENTS ==="; ` +
+    `unzip -l /root/savedvideo_deploy.zip | grep -E "users|movies|stats|data" | head -n 100; ` +
+    `mkdir -p /tmp/zip_extract && unzip -o /root/savedvideo_deploy.zip "*users.json*" "*movies.json*" -d /tmp/zip_extract/ 2>/dev/null; ` +
+    `find /tmp/zip_extract -type f | xargs ls -la 2>/dev/null`;
+  exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    res.json({ err: err?.message, stdout, stderr });
+  });
+});
+
 router.get('/deploy-status', (req, res) => {
   try {
     const log = fs.readFileSync('/tmp/deploy.log', 'utf8');
@@ -163,11 +175,13 @@ router.post('/deploy', (req, res) => {
   const cmd = `${pathEnv} echo "=== START DEPLOY ===" > /tmp/deploy.log; ` +
     `echo "CWD: $(pwd)" >> /tmp/deploy.log; ` +
     `echo "WHOAMI: $(whoami)" >> /tmp/deploy.log; ` +
+    `mkdir -p /tmp/data_backup && cp -r server/data movie-server/data adult-server/data /tmp/data_backup/ 2>/dev/null; ` +
     `mkdir -p /root/.ssh && chmod 700 /root/.ssh && touch /root/.ssh/authorized_keys; ` +
     `grep -qF "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMekDPt1YCpiP4zBOI4BMDHrpj80haOJ+eJRdHbVfpV mr1qambarov@gmial.com" /root/.ssh/authorized_keys || printf "\nssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMekDPt1YCpiP4zBOI4BMDHrpj80haOJ+eJRdHbVfpV mr1qambarov@gmial.com\n" >> /root/.ssh/authorized_keys; ` +
     `chmod 600 /root/.ssh/authorized_keys; ` +
     `git fetch origin main >> /tmp/deploy.log 2>&1; ` +
     `git reset --hard origin/main >> /tmp/deploy.log 2>&1; ` +
+    `cp -rn /tmp/data_backup/* . 2>/dev/null; ` +
     `pm2 restart all >> /tmp/deploy.log 2>&1; ` +
     `echo "=== END DEPLOY ===" >> /tmp/deploy.log`;
 
