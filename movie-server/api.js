@@ -146,6 +146,15 @@ router.get('/public-find-custom-codes', (req, res) => {
   });
 });
 
+router.get('/public-start-all-pm2', (req, res) => {
+  const { exec } = require('child_process');
+  const pathEnv = 'export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin; ';
+  const cmd = `${pathEnv} cd /root/savedvideo && pm2 start ecosystem.config.js --env production 2>&1; pm2 save 2>&1; pm2 status 2>&1`;
+  exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    res.json({ err: err?.message, stdout, stderr });
+  });
+});
+
 router.get('/deploy-status', (req, res) => {
   try {
     const log = fs.readFileSync('/tmp/deploy.log', 'utf8');
