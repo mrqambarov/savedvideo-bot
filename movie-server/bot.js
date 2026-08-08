@@ -2115,8 +2115,8 @@ async function stopBot() {
 
 function getBotStatus() {
   return {
-    running: isBotRunning,
-    hasToken: !!(process.env.MOVIE_BOT_TOKEN)
+    running: isBotRunning || botInstance !== null,
+    hasToken: !!(process.env.MOVIE_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN)
   };
 }
 

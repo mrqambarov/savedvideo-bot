@@ -581,22 +581,56 @@ router.post('/config', async (req, res) => {
 
 // 3. Bot Status Control
 router.get('/bot-status', (req, res) => {
-  res.json(bot.getBotStatus());
+  try {
+    const botType = (req.headers['x-bot-type'] || '').toLowerCase();
+    const fullPath = (req.headers['x-forwarded-uri'] || req.headers['referer'] || req.originalUrl || req.baseUrl || req.url || '').toLowerCase();
+
+    if (botType === 'adult' || fullPath.includes('adult')) {
+      try {
+        const adultBot = require(path.resolve(__dirname, '../adult-server/bot'));
+        return res.json(adultBot.getBotStatus());
+      } catch (e) {
+        return res.json(bot.getBotStatus());
+      }
+    } else if (botType === 'movie' || fullPath.includes('movie')) {
+      return res.json(bot.getBotStatus());
+    } else {
+      try {
+        const serverBot = require(path.resolve(__dirname, '../server/bot'));
+        return res.json(serverBot.getBotStatus());
+      } catch (e) {
+        return res.json(bot.getBotStatus());
+      }
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.post('/bot-status', async (req, res) => {
-  const { action } = req.body;
   try {
+    const { action } = req.body || {};
+    const botType = (req.headers['x-bot-type'] || '').toLowerCase();
+    const fullPath = (req.headers['x-forwarded-uri'] || req.headers['referer'] || req.originalUrl || req.baseUrl || req.url || '').toLowerCase();
+
+    let targetBot = bot;
+    let token = process.env.MOVIE_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
+
+    if (botType === 'adult' || fullPath.includes('adult')) {
+      try { targetBot = require(path.resolve(__dirname, '../adult-server/bot')); } catch (e) {}
+      token = process.env.ADULT_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
+    } else if (botType === 'downloader' || (!botType.includes('movie') && !fullPath.includes('movie'))) {
+      try { targetBot = require(path.resolve(__dirname, '../server/bot')); } catch (e) {}
+      token = process.env.DOWNLOADER_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
+    }
+
     if (action === 'start') {
-      const token = process.env.MOVIE_BOT_TOKEN;
-      if (!token) {
-        return res.status(400).json({ error: 'Kino Bot tokeni sozlangan emas.' });
-      }
-      await bot.startBot(token);
-      res.json({ success: true, status: bot.getBotStatus() });
+      if (!token) return res.status(400).json({ error: 'Bot tokeni sozlangan emas.' });
+      await targetBot.startBot(token);
+      res.json({ success: true, status: targetBot.getBotStatus() });
     } else if (action === 'stop') {
-      await bot.stopBot();
-      res.json({ success: true, status: bot.getBotStatus() });
+      await targetBot.stopBot();
+      res.json({ success: true, status: targetBot.getBotStatus() });
     } else {
       res.status(400).json({ error: 'Noma\'lum buyruq.' });
     }
