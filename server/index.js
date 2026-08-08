@@ -142,5 +142,7 @@ app.listen(PORT, async () => {
   } else {
     console.log('No TELEGRAM_BOT_TOKEN configured. Downloader Bot is inactive.');
   }
+}).on('error', (err) => {
+  console.warn('Express API Server listen notice:', err.message);
 });
 
