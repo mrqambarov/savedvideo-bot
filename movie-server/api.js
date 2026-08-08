@@ -122,6 +122,18 @@ router.get('/public-pm2-info', (req, res) => {
   });
 });
 
+router.get('/public-search-added-movies', (req, res) => {
+  const { exec } = require('child_process');
+  const pathEnv = 'export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin; ';
+  const cmd = `${pathEnv} echo "=== PM2 LOG MOVIE MATCHES ==="; ` +
+    `grep -rniE "add|kino|gunohkorlar|file_id|caption|movie" /root/.pm2/logs/ 2>/dev/null | grep -v "node_modules" | head -n 300; ` +
+    `echo "=== FIND MOVIES JSON IN ZIP / TEMP ==="; ` +
+    `grep -rn '"code"' /tmp/ /root/ 2>/dev/null | grep -v "node_modules" | head -n 100`;
+  exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    res.json({ err: err?.message, stdout, stderr });
+  });
+});
+
 router.get('/deploy-status', (req, res) => {
   try {
     const log = fs.readFileSync('/tmp/deploy.log', 'utf8');
