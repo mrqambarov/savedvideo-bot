@@ -3,9 +3,9 @@ import axios from 'axios';
 const DEV_HOST = 'http://94.237.103.133';
 const isDev = import.meta.env.DEV;
 
-export const dlApi = axios.create({ baseURL: isDev ? `${DEV_HOST}/api` : '/api' });
-export const movieApi = axios.create({ baseURL: isDev ? `${DEV_HOST}/movies/api` : '/movies/api' });
-export const adultApi = axios.create({ baseURL: isDev ? `${DEV_HOST}/adult/api` : '/adult/api' });
+export const dlApi = axios.create({ baseURL: isDev ? `${DEV_HOST}/api` : '/api', headers: { 'X-Bot-Type': 'downloader' } });
+export const movieApi = axios.create({ baseURL: isDev ? `${DEV_HOST}/movies/api` : '/movies/api', headers: { 'X-Bot-Type': 'movie' } });
+export const adultApi = axios.create({ baseURL: isDev ? `${DEV_HOST}/adult/api` : '/adult/api', headers: { 'X-Bot-Type': 'adult' } });
 
 const TOKENS = { dl: 'dlToken', movie: 'movieToken', adult: 'adultToken' };
 

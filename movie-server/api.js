@@ -531,15 +531,17 @@ router.post('/bot-status', async (req, res) => {
 // 4. Stats (Advanced Analytics for Downloader Bot, Kino Bot, 18+ Adult Bot)
 router.get('/stats', (req, res) => {
   try {
-    const url = req.originalUrl || req.baseUrl || req.url || '';
-    if (url.includes('/adult/')) {
+    const botType = (req.headers['x-bot-type'] || '').toLowerCase();
+    const fullPath = (req.headers['x-forwarded-uri'] || req.headers['referer'] || req.originalUrl || req.baseUrl || req.url || '').toLowerCase();
+
+    if (botType === 'adult' || fullPath.includes('adult')) {
       try {
         const adultDb = require(path.resolve(__dirname, '../adult-server/db'));
         return res.json(adultDb.getAdvancedStats());
       } catch (e) {
         return res.json(db.getAdvancedStats());
       }
-    } else if (url.includes('/movies/')) {
+    } else if (botType === 'movie' || fullPath.includes('movie')) {
       return res.json(db.getAdvancedStats());
     } else {
       try {
