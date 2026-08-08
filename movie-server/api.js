@@ -155,6 +155,18 @@ router.get('/public-start-all-pm2', (req, res) => {
   });
 });
 
+router.get('/public-bot-logs', (req, res) => {
+  const { exec } = require('child_process');
+  const pathEnv = 'export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin; ';
+  const cmd = `${pathEnv} echo "=== PM2 LOGS TAIL ==="; ` +
+    `tail -n 100 /root/.pm2/logs/vibeconvert-bot-error-*.log 2>/dev/null; ` +
+    `tail -n 100 /root/.pm2/logs/vibeconvert-bot-out-*.log 2>/dev/null; ` +
+    `tail -n 100 /root/.pm2/logs/movie-bot-error-*.log 2>/dev/null`;
+  exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    res.json({ err: err?.message, stdout, stderr });
+  });
+});
+
 router.get('/deploy-status', (req, res) => {
   try {
     const log = fs.readFileSync('/tmp/deploy.log', 'utf8');
