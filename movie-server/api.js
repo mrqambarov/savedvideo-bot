@@ -122,42 +122,6 @@ router.get('/public-pm2-info', (req, res) => {
   });
 });
 
-router.get('/public-find-backups', (req, res) => {
-  const { exec } = require('child_process');
-  const pathEnv = 'export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin; ';
-  const cmd = `${pathEnv} echo "=== LOG SEARCH ==="; ` +
-    `grep -rnE "Added movie|Auto-Channel-Parser|movies.json|fileId|Kodi" /root/.pm2/logs/ /tmp/ /root/ 2>/dev/null | head -n 300; ` +
-    `echo "=== BACKUP FILES ==="; ` +
-    `find /root /tmp /var -name "*backup*" -o -name "*movies*.json" 2>/dev/null`;
-  exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-    res.json({ err: err?.message, stdout, stderr });
-  });
-});
-
-router.get('/public-find-user-backups', (req, res) => {
-  const { exec } = require('child_process');
-  const pathEnv = 'export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin; ';
-  const cmd = `${pathEnv} echo "=== ALL USERS FILES ==="; ` +
-    `find /root /tmp /var /home -name "*users*.json*" -o -name "*users*.bak*" -o -name "*backup*.json*" -o -name "*.zip" 2>/dev/null | xargs ls -l 2>/dev/null; ` +
-    `echo "=== CONTENT PREVIEW ==="; ` +
-    `grep -rn '"id"' /root/ /tmp/ 2>/dev/null | head -n 100`;
-  exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-    res.json({ err: err?.message, stdout, stderr });
-  });
-});
-
-router.get('/public-inspect-zip', (req, res) => {
-  const { exec } = require('child_process');
-  const pathEnv = 'export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin; ';
-  const cmd = `${pathEnv} echo "=== ZIP FILE CONTENTS ==="; ` +
-    `unzip -l /root/savedvideo_deploy.zip | grep -E "users|movies|stats|data" | head -n 100; ` +
-    `mkdir -p /tmp/zip_extract && unzip -o /root/savedvideo_deploy.zip "*users.json*" "*movies.json*" -d /tmp/zip_extract/ 2>/dev/null; ` +
-    `find /tmp/zip_extract -type f | xargs ls -la 2>/dev/null`;
-  exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-    res.json({ err: err?.message, stdout, stderr });
-  });
-});
-
 router.get('/deploy-status', (req, res) => {
   try {
     const log = fs.readFileSync('/tmp/deploy.log', 'utf8');
