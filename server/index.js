@@ -23,6 +23,7 @@ app.use('/api', apiRouter);
 const adminDist = path.join(__dirname, '..', 'admin-panel', 'dist');
 if (fs.existsSync(adminDist)) {
   app.use('/panel', express.static(adminDist));
+  app.use('/assets', express.static(path.join(adminDist, 'assets')));
   app.use(express.static(adminDist));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();
