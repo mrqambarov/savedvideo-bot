@@ -3,6 +3,9 @@ node_modules/
 cookies.txt
 server/data/
 server/temp/
+movie-server/data/
+adult-server/data/
+public-site/uploads/
 client/node_modules/
 client/dist/
 admin-panel/node_modules/
@@ -12,4 +15,5 @@ movie-server/node_modules/
 *.zip
 *.tar.gz
 .idea/
+
 
