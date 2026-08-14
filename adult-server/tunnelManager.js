@@ -6,6 +6,10 @@ let activeTunnelUrl = null;
 let isStarting = false;
 
 function ensureHttpsTunnel(port = 5002) {
+  if (process.env.ADULT_MINI_APP_URL && process.env.ADULT_MINI_APP_URL.startsWith('https://') && !process.env.ADULT_MINI_APP_URL.includes('loca.lt')) {
+    activeTunnelUrl = process.env.ADULT_MINI_APP_URL;
+    return Promise.resolve(activeTunnelUrl);
+  }
   if (activeTunnelUrl) {
     return Promise.resolve(activeTunnelUrl);
   }

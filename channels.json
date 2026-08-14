@@ -4,7 +4,19 @@
     "username": "@XitFilm_uz",
     "link": "https://t.me/xitfilm_uz",
     "targetCount": 500,
-    "joinedCount": 2,
+    "joinedCount": 6,
+    "joinedUsers": [
+      "5857139730",
+      "7986073240",
+      "8662379576",
+      "5446407557"
+    ],
+    "dailyStats": {
+      "2026-08-08": 4
+    },
+    "monthlyStats": {
+      "2026-08": 4
+    },
     "active": true
   }
 ]

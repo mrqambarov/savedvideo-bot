@@ -17,6 +17,7 @@ import MovieBot from './pages/MovieBot.jsx';
 import SettingsPage from './pages/Settings.jsx';
 import AiPublisher from './pages/AiPublisher.jsx';
 import AdultBotPage from './pages/AdultBot.jsx';
+import Shorts from './pages/Shorts.jsx';
 
 export default function App() {
   const { authed } = useApp();
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/users" element={<Users />} />
           <Route path="/movies" element={<Movies />} />
+          <Route path="/shorts" element={<Shorts />} />
           <Route path="/serials" element={<Serials />} />
           <Route path="/ai-publisher" element={<AiPublisher />} />
           <Route path="/requests" element={<Requests />} />

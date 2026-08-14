@@ -19,14 +19,36 @@ app.use(express.json());
 // API Routes
 app.use('/api', apiRouter);
 
-// Serve Admin Panel (admin-panel/dist) on / and /panel
+// Unregister any cached service workers across the domain
+app.get('/sw.js', (req, res) => {
+  res.set('Content-Type', 'application/javascript');
+  res.send('self.addEventListener("install", () => self.skipWaiting()); self.addEventListener("activate", (e) => { e.waitUntil(self.registration.unregister().then(() => self.clients.matchAll()).then(clients => clients.forEach(c => c.navigate(c.url)))); });');
+});
+
+// Serve Admin Panel (admin-panel/dist) on /panel and Client (client/dist) on /
 const adminDist = path.join(__dirname, '..', 'admin-panel', 'dist');
+const clientDist = path.join(__dirname, '..', 'client', 'dist');
+
 if (fs.existsSync(adminDist)) {
   app.use('/panel', express.static(adminDist));
-  app.use('/assets', express.static(path.join(adminDist, 'assets')));
+  app.get('/panel', (req, res) => {
+    res.sendFile(path.join(adminDist, 'index.html'));
+  });
+  app.get('/panel/*', (req, res) => {
+    res.sendFile(path.join(adminDist, 'index.html'));
+  });
+}
+
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/panel') || req.path.startsWith('/movies') || req.path.startsWith('/movie') || req.path.startsWith('/adult')) return next();
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+} else if (fs.existsSync(adminDist)) {
   app.use(express.static(adminDist));
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
+    if (req.path.startsWith('/api') || req.path.startsWith('/panel')) return next();
     res.sendFile(path.join(adminDist, 'index.html'));
   });
 } else {

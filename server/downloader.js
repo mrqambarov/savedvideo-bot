@@ -49,9 +49,10 @@ function getCookiesArgs() {
   return [];
 }
 
-// Player client strategies to bypass YouTube/Instagram VPS datacenter IP blocks
+// Player client strategies to bypass YouTube/Instagram VPS datacenter IP blocks without cookies
 const CLIENT_STRATEGIES = [
-  ['--extractor-args', 'youtube:player_client=ios,android,mweb,web;player_skip=webpage'],
+  ['--extractor-args', 'youtube:player_client=ios,android_creator,android,mweb,tv_embedded;player_skip=webpage,configs'],
+  ['--extractor-args', 'youtube:player_client=android_creator,ios,android'],
   ['--extractor-args', 'youtube:player_client=android,ios'],
   ['--extractor-args', 'youtube:player_client=tv_embedded,mweb'],
   ['--extractor-args', 'youtube:player_client=mweb']
@@ -71,8 +72,10 @@ const BASE_NET_ARGS = [
 async function fallbackCobaltDownload(url, outputName, isAudio = false, quality = '720') {
   const cobaltEndpoints = [
     'https://api.cobalt.tools/',
+    'https://cobalt.kwippy.com/',
     'https://co.wuk.sh/api/json',
-    'https://cobalt.kwippy.com/'
+    'https://cobalt.stream/',
+    'https://cobalt.ezzi.net/'
   ];
 
   for (const endpoint of cobaltEndpoints) {
@@ -206,12 +209,14 @@ async function downloadVideo(url, outputName, quality = '720') {
   const templatePath = path.join(tempDir, `${outputName}.%(ext)s`);
   const targetHeight = parseInt(quality, 10) || 720;
   
-  // Prioritize H.264/AAC for speed and native playback, but allow any best stream if needed
-  const formatFilter = `bestvideo[height<=${targetHeight}][vcodec^=avc1]+bestaudio[acodec^=mp4a]/bestvideo[height<=${targetHeight}]+bestaudio/best[height<=${targetHeight}]/best`;
+  // Format filter optimized for YouTube, Shorts, Instagram, TikTok & Facebook
+  const formatFilter = `bestvideo[height<=${targetHeight}]+bestaudio/best[height<=${targetHeight}]/best`;
 
   const cookiesArgs = getCookiesArgs();
   const ytDlpBin = getYtDlpBin();
   let lastErrMsg = '';
+
+  const isPhotoOnlyDomain = url.includes('instagram.com/p/') || url.includes('pinterest.com');
 
   for (const strategyArgs of CLIENT_STRATEGIES) {
     try {
@@ -219,7 +224,6 @@ async function downloadVideo(url, outputName, quality = '720') {
         const args = [
           '-f', formatFilter,
           '--merge-output-format', 'mp4',
-          '--recode-video', 'mp4',
           '--no-playlist',
           ...BASE_NET_ARGS,
           ...strategyArgs,
@@ -232,7 +236,7 @@ async function downloadVideo(url, outputName, quality = '720') {
         execFile(ytDlpBin, args, { env }, (err, stdout, stderr) => {
           const errMsg = stderr || (err ? err.message : '');
           if (err) {
-            if (errMsg.includes('No video formats found') || errMsg.includes('Requested format is not available')) {
+            if (isPhotoOnlyDomain && (errMsg.includes('No video formats found') || errMsg.includes('Requested format is not available'))) {
               return downloadPhoto(url, outputName).then(resolve).catch(() => reject(new Error(errMsg)));
             }
             return reject(new Error(errMsg));
@@ -254,8 +258,10 @@ async function downloadVideo(url, outputName, quality = '720') {
 
             if (validFiles.length > 0) {
               resolve(path.join(tempDir, validFiles[0]));
-            } else {
+            } else if (isPhotoOnlyDomain) {
               downloadPhoto(url, outputName).then(resolve).catch(() => reject(new Error('Downloaded media file not found.')));
+            } else {
+              reject(new Error('Downloaded media file not found.'));
             }
           } catch (e) {
             reject(e);
@@ -269,18 +275,15 @@ async function downloadVideo(url, outputName, quality = '720') {
     }
   }
 
-  // Try photo extraction before giving up to Cobalt
-  try {
-    const photoResult = await downloadPhoto(url, outputName);
-    if (photoResult) return photoResult;
-  } catch (pErr) {}
-
-  // Fallback to Cobalt API download service if yt-dlp is blocked by IP / bot detection
-  console.log('[Downloader] yt-dlp failed on VPS. Invoking Cobalt API fallback...');
+  // Fallback to Cobalt API download service if yt-dlp failed on VPS
+  console.log('[Downloader] yt-dlp failed on VPS. Invoking Cobalt API fallback for video...');
   try {
     return await fallbackCobaltDownload(url, outputName, false, quality);
   } catch (fallbackErr) {
-    throw new Error(lastErrMsg || fallbackErr.message || 'Media download failed.');
+    if (isPhotoOnlyDomain) {
+      try { return await downloadPhoto(url, outputName); } catch (e) {}
+    }
+    throw new Error(lastErrMsg || fallbackErr.message || 'Media video download failed.');
   }
 }
 

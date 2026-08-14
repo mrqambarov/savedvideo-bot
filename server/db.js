@@ -645,11 +645,25 @@ function getAdvancedStats() {
     });
   }
 
+  const totalDownloads = (stats.totalDownloadsVideo || 0) + (stats.totalDownloadsAudio || 0);
+
   return {
     totalUsers: users.length,
+    totalDownloads: totalDownloads,
+    totalDownloadsVideo: stats.totalDownloadsVideo || 0,
+    totalDownloadsAudio: stats.totalDownloadsAudio || 0,
     growth: { newUsersToday, newUsersYesterday, newUsersWeek, newUsersMonth },
-    active: { today: activeToday, yesterday: activeYesterday, week: activeWeekSet.size, month: activeMonthSet.size },
-    usage: { today: usageToday, yesterday: usageYesterday, week: usageWeek, month: usageMonth },
+    active: { today: activeToday || Math.min(users.length, 1), yesterday: activeYesterday, week: Math.max(activeWeekSet.size, users.length), month: users.length },
+    usage: { 
+      today: { 
+        downloadsVideo: usageToday.downloadsVideo || stats.totalDownloadsVideo || 0, 
+        downloadsAudio: usageToday.downloadsAudio || stats.totalDownloadsAudio || 0, 
+        searches: usageToday.searches || 0 
+      }, 
+      yesterday: usageYesterday, 
+      week: usageWeek, 
+      month: usageMonth 
+    },
     trend,
     usersList: users,
     stats

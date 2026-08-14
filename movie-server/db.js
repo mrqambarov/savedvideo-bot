@@ -154,7 +154,13 @@ function addMovie(movie) {
       likes: existing.likes || [],
       dislikes: existing.dislikes || [],
       views: existing.views || 0,
-      dateAdded: existing.dateAdded || new Date().toISOString()
+      dateAdded: existing.dateAdded || new Date().toISOString(),
+      isPremium: movie.isPremium !== undefined ? !!movie.isPremium : (existing.isPremium || false),
+      videoUrl: movie.videoUrl !== undefined ? String(movie.videoUrl || '').trim() : (existing.videoUrl || ''),
+      type: movie.type || existing.type || 'film',
+      seasons: movie.seasons || existing.seasons || [],
+      qualities: movie.qualities || existing.qualities || null,
+      subtitles: movie.subtitles || existing.subtitles || []
     };
 
     if (index !== -1) {
@@ -389,7 +395,9 @@ function addUser(user, referredBy = null) {
       referredBy: null,
       refCount: 0,
       refPending: 0,
-      refQualified: false
+      refQualified: false,
+      isPremium: false,
+      premiumUntil: null
     };
     if (referredBy && Number(referredBy) !== Number(user.id)) {
       const referrer = users.find(u => Number(u.id) === Number(referredBy));
@@ -403,6 +411,48 @@ function addUser(user, referredBy = null) {
     return true;
   } catch (e) {
     console.error('Error adding user:', e.message);
+    return false;
+  }
+}
+
+function isUserPremium(userId) {
+  try {
+    const users = getUsers();
+    const user = users.find(u => Number(u.id) === Number(userId));
+    if (!user) return false;
+    if (user.isPremium === true) {
+      if (!user.premiumUntil) return true; // Lifetime
+      if (new Date(user.premiumUntil).getTime() > Date.now()) return true;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+function upgradeUserToPremium(userId, days = 30) {
+  try {
+    const users = getUsers();
+    const user = users.find(u => Number(u.id) === Number(userId));
+    if (!user) return false;
+    user.isPremium = true;
+    const currentExpiry = user.premiumUntil ? new Date(user.premiumUntil).getTime() : Date.now();
+    const baseTime = currentExpiry > Date.now() ? currentExpiry : Date.now();
+    user.premiumUntil = new Date(baseTime + days * 24 * 60 * 60 * 1000).toISOString();
+    saveUsers(users);
+    
+    safeLogActivity({
+      bot: 'Kino Bot',
+      type: 'user',
+      actor: user.first_name || String(userId),
+      icon: '👑',
+      text: `👤 ${user.first_name || userId} VIP obunaga a'zo bo'ldi (${days} kunga)`,
+      color: '#fbbf24'
+    });
+    
+    return true;
+  } catch (e) {
+    console.error('Error upgrading user to premium:', e.message);
     return false;
   }
 }
@@ -1043,6 +1093,56 @@ function toggleLikeDislike(code, userId, voteType) {
   }
 }
 
+// Sync user activity (Favorites, History) between Web and Bot
+function syncUserActivity(userId, data) {
+  try {
+    const users = getUsers();
+    let user = users.find(u => Number(u.id) === Number(userId));
+    if (!user) return null;
+
+    if (data.favorite) {
+      if (!user.favorites) user.favorites = [];
+      const c = String(data.favorite).trim();
+      const idx = user.favorites.indexOf(c);
+      if (idx === -1) user.favorites.push(c);
+      else user.favorites.splice(idx, 1);
+    }
+
+    if (data.history) {
+      if (!user.watchHistory) user.watchHistory = [];
+      const c = String(data.history).trim();
+      user.watchHistory = [c, ...user.watchHistory.filter(item => item !== c)].slice(0, 20);
+    }
+
+    saveUsers(users);
+    return user;
+  } catch (e) {
+    return null;
+  }
+}
+
+function addComment(code, userId, username, text) {
+  try {
+    const movies = getMovies();
+    const movie = movies.find(m => String(m.code) === String(code));
+    if (!movie) return null;
+    if (!movie.comments) movie.comments = [];
+
+    movie.comments.unshift({
+      id: Date.now(),
+      userId,
+      username: username || 'Foydalanuvchi',
+      text: String(text).trim(),
+      date: new Date().toISOString()
+    });
+
+    saveMovies(movies);
+    return movie.comments;
+  } catch (e) {
+    return null;
+  }
+}
+
 function getAdvancedStats() {
   const users = getUsers();
   const stats = getStats();
@@ -1351,6 +1451,8 @@ module.exports = {
   completeRequest,
   deleteRequest,
   toggleLikeDislike,
+  syncUserActivity,
+  addComment,
   getAdvancedStats,
   recommendMoviesByMood,
   getMovieReviews,
@@ -1362,6 +1464,760 @@ module.exports = {
   findMatchingSerialByTitle,
   mergeDuplicateSerials,
   getMovieSettings,
-  saveMovieSettings
+  saveMovieSettings,
+  saveAuthCode,
+  verifyAuthCode,
+  isUserPremium,
+  upgradeUserToPremium,
+  saveLinkLogin,
+  checkLinkLogin,
+  saveUsers,
+  applyPromoCode,
+  savePlaybackProgress,
+  getPlaybackProgress,
+  getPendingResumeNotifications,
+  markResumeNotified,
+  subscribeMovieAlert,
+  getWaitingUsersForMovie,
+  removeMovieAlert,
+  addVipStarsPayment,
+  getSponsorChannels,
+  addSponsorChannel,
+  deleteSponsorChannel,
+  getShorts,
+  saveShorts,
+  addShort,
+  updateShort,
+  deleteShort,
+  incrementShortViews,
+  toggleShortLike,
+  addShortComment,
+  getShortComments,
+  getCreators,
+  saveCreators,
+  registerCreator,
+  addCreatorViews,
+  getCreatorStats
 };
+
+function savePlaybackProgress(userId, code, { currentTime, duration, title, poster, genre }) {
+  try {
+    const cleanCode = String(code || '').trim();
+    if (!userId || !cleanCode) return null;
+    const users = getUsers();
+    let user = users.find(u => Number(u.id) === Number(userId));
+    if (!user) {
+      user = { id: Number(userId), dateJoined: new Date().toISOString() };
+      users.push(user);
+    }
+    if (!user.playbackProgress) user.playbackProgress = {};
+    if (!user.watchHistory) user.watchHistory = [];
+
+    if (!user.watchHistory.includes(cleanCode)) {
+      user.watchHistory.unshift(cleanCode);
+      if (user.watchHistory.length > 50) user.watchHistory.pop();
+    }
+
+    const curTime = Number(currentTime) || 0;
+    const dur = Number(duration) || 0;
+
+    user.playbackProgress[cleanCode] = {
+      code: cleanCode,
+      title: title || user.playbackProgress[cleanCode]?.title || `Kino #${cleanCode}`,
+      poster: poster || user.playbackProgress[cleanCode]?.poster || '',
+      genre: genre || user.playbackProgress[cleanCode]?.genre || '',
+      currentTime: Math.round(curTime),
+      duration: Math.round(dur),
+      progressPercent: dur > 0 ? Math.min(100, Math.round((curTime / dur) * 100)) : 0,
+      lastWatched: Date.now(),
+      notified: false
+    };
+
+    saveUsers(users);
+    return user.playbackProgress[cleanCode];
+  } catch (e) {
+    console.error('Error saving playback progress:', e.message);
+    return null;
+  }
+}
+
+function getPlaybackProgress(userId) {
+  try {
+    const users = getUsers();
+    const user = users.find(u => Number(u.id) === Number(userId));
+    if (!user || !user.playbackProgress) return [];
+
+    const items = Object.values(user.playbackProgress)
+      .filter(item => item.currentTime >= 10 && item.progressPercent < 95)
+      .sort((a, b) => (b.lastWatched || 0) - (a.lastWatched || 0));
+
+    return items;
+  } catch (e) {
+    return [];
+  }
+}
+
+function getPendingResumeNotifications() {
+  try {
+    const users = getUsers();
+    const twoHoursAgo = Date.now() - (2 * 60 * 60 * 1000);
+    const fortyEightHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
+    const pending = [];
+
+    users.forEach(u => {
+      if (!u.playbackProgress || !u.id) return;
+      Object.entries(u.playbackProgress).forEach(([code, p]) => {
+        // Paused at least 30s in, not finished (< 90%), stopped between 2h and 48h ago, not yet notified
+        if (
+          !p.notified &&
+          p.currentTime >= 30 &&
+          p.progressPercent < 90 &&
+          p.lastWatched <= twoHoursAgo &&
+          p.lastWatched >= fortyEightHoursAgo
+        ) {
+          pending.push({
+            userId: u.id,
+            userLang: u.lang || 'uz',
+            code: code,
+            title: p.title || `Kino #${code}`,
+            currentTime: p.currentTime,
+            duration: p.duration,
+            progressPercent: p.progressPercent,
+            lastWatched: p.lastWatched
+          });
+        }
+      });
+    });
+
+    return pending;
+  } catch (e) {
+    console.error('Error getting pending resume notifications:', e.message);
+    return [];
+  }
+}
+
+function markResumeNotified(userId, code) {
+  try {
+    const cleanCode = String(code || '').trim();
+    const users = getUsers();
+    const user = users.find(u => Number(u.id) === Number(userId));
+    if (user && user.playbackProgress && user.playbackProgress[cleanCode]) {
+      user.playbackProgress[cleanCode].notified = true;
+      saveUsers(users);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+const authCodes = new Map(); // userId -> { code, expires }
+const linkLogins = new Map(); // token -> { user, expires }
+
+function saveAuthCode(userId, code, userObj = null) {
+  authCodes.set(String(code).trim(), {
+    userId: Number(userId),
+    userObj: userObj || null,
+    expires: Date.now() + 10 * 60 * 1000 // 10 minutes
+  });
+}
+
+function verifyAuthCode(code) {
+  const cleanCode = String(code || '').trim();
+  const entry = authCodes.get(cleanCode);
+  if (!entry) return null;
+  if (Date.now() > entry.expires) {
+    authCodes.delete(cleanCode);
+    return null;
+  }
+  authCodes.delete(cleanCode);
+  const users = getUsers();
+  let user = users.find(u => Number(u.id) === Number(entry.userId));
+  if (!user && entry.userObj) {
+    addUser(entry.userObj);
+    user = entry.userObj;
+  }
+  return user || { id: entry.userId, first_name: 'Foydalanuvchi' };
+}
+
+function saveLinkLogin(token, user) {
+  const cleanToken = String(token || '').trim();
+  linkLogins.set(cleanToken, {
+    user,
+    expires: Date.now() + 10 * 60 * 1000 // 10 minutes
+  });
+}
+
+function checkLinkLogin(token) {
+  const cleanToken = String(token || '').trim();
+  const entry = linkLogins.get(cleanToken);
+  if (!entry) return null;
+  if (Date.now() > entry.expires) {
+    linkLogins.delete(cleanToken);
+    return null;
+  }
+  linkLogins.delete(cleanToken);
+  const users = getUsers();
+  const fullUser = users.find(u => Number(u.id) === Number(entry.user.id));
+  return fullUser || entry.user;
+}
+
+function addSerialEpisode(code, seasonNumber, episodeObj) {
+  const movies = getMovies();
+  const index = movies.findIndex(m => String(m.code).trim() === String(code).trim());
+  if (index === -1) return false;
+  
+  const movie = movies[index];
+  movie.type = 'serial';
+  if (!movie.seasons) movie.seasons = [];
+  
+  let season = movie.seasons.find(s => Number(s.seasonNumber) === Number(seasonNumber));
+  if (!season) {
+    season = { seasonNumber: Number(seasonNumber), episodes: [] };
+    movie.seasons.push(season);
+  }
+  
+  const epIndex = season.episodes.findIndex(e => Number(e.episodeNumber) === Number(episodeObj.episodeNumber));
+  if (epIndex !== -1) {
+    season.episodes[epIndex] = { ...season.episodes[epIndex], ...episodeObj };
+  } else {
+    season.episodes.push(episodeObj);
+  }
+  
+  saveMovies(movies);
+  return true;
+}
+
+function applyPromoCode(userId, promoCode) {
+  try {
+    const cleanCode = String(promoCode || '').trim().toUpperCase();
+    if (!cleanCode) return { success: false, message: 'Promokod kiritilmadi' };
+
+    const users = getUsers();
+    const userIndex = users.findIndex(u => Number(u.id) === Number(userId));
+    if (userIndex === -1) return { success: false, message: 'Foydalanuvchi topilmadi' };
+
+    const user = users[userIndex];
+    if (!user.usedPromos) user.usedPromos = [];
+
+    if (user.usedPromos.includes(cleanCode)) {
+      return { success: false, message: 'Ushbu promokoddan avval foydalangansiz' };
+    }
+
+    let days = 0;
+    if (cleanCode === 'XIT2026' || cleanCode === 'VIP2026' || cleanCode === 'XITFILM') {
+      days = 7;
+    } else if (cleanCode === 'PREMIUM30') {
+      days = 30;
+    } else {
+      return { success: false, message: 'Yaroqsiz promokod' };
+    }
+
+    user.usedPromos.push(cleanCode);
+    const now = new Date();
+    let currentExp = user.premiumUntil ? new Date(user.premiumUntil) : new Date();
+    if (currentExp < now) currentExp = now;
+    
+    currentExp.setDate(currentExp.getDate() + days);
+    user.isPremium = true;
+    user.premiumUntil = currentExp.toISOString();
+
+    saveUsers(users);
+    return { success: true, message: `Tabriklaymiz! Promokod muvaffaqiyatli faollashtirildi (${days} kunlik VIP berildi)! 🎉`, days, premiumUntil: user.premiumUntil };
+  } catch (e) {
+    return { success: false, message: 'Server xatosi' };
+  }
+}
+
+const settingsPath = path.join(dataDir, 'movie_settings.json');
+
+function getMovieSettings() {
+  try {
+    if (fs.existsSync(settingsPath)) {
+      return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    }
+  } catch (e) {}
+  return {
+    autoPostEnabled: true,
+    autoPostChannel: '@XitFilm_uz',
+    sponsorUsername: '@XitFilm_uz',
+    sponsorLink: 'https://t.me/XitFilm_uz',
+    sponsorChannels: [{ username: '@XitFilm_uz', link: 'https://t.me/XitFilm_uz', title: '1-Homiy Kanal' }]
+  };
+}
+
+function saveMovieSettings(settings) {
+  try {
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+  } catch (e) {}
+}
+
+function getAdvancedStats() {
+  try {
+    const users = getUsers() || [];
+    const movies = getMovies() || [];
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    
+    const daysAgo = (n) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() - n);
+      return d.toISOString().split('T')[0];
+    };
+
+    const weekAgoStr = daysAgo(7);
+    const monthAgoStr = daysAgo(30);
+
+    let newUsersToday = 0, newUsersWeek = 0, newUsersMonth = 0;
+    users.forEach(u => {
+      if (u.dateJoined || u.joinedDate) {
+        const joinDate = (u.dateJoined || u.joinedDate).split('T')[0];
+        if (joinDate === todayStr) newUsersToday++;
+        if (joinDate >= weekAgoStr) newUsersWeek++;
+        if (joinDate >= monthAgoStr) newUsersMonth++;
+      }
+    });
+
+    const totalViews = movies.reduce((sum, m) => sum + (Number(m.views) || 0), 0);
+
+    return {
+      totalUsers: users.length,
+      totalMovies: movies.length,
+      totalViews: totalViews,
+      growth: { newUsersToday, newUsersWeek, newUsersMonth },
+      active: { today: Math.min(users.length, Math.max(1, newUsersToday || 1)), week: users.length, month: users.length },
+      usage: { 
+        today: { movieViews: totalViews, searches: 0, downloadsVideo: 0, downloadsAudio: 0 }, 
+        week: { movieViews: totalViews }, 
+        month: { movieViews: totalViews } 
+      },
+      trend: []
+    };
+  } catch (e) {
+    return {
+      totalUsers: 0,
+      totalMovies: 0,
+      totalViews: 0,
+      growth: { newUsersToday: 0, newUsersWeek: 0, newUsersMonth: 0 },
+      active: { today: 0, week: 0, month: 0 },
+      usage: { today: { movieViews: 0 } }
+    };
+  }
+}
+
+// ============================================
+// PREMYERA QO'NG'IROG'I (MOVIE ALERT SUBSCRIPTIONS)
+// ============================================
+const alertsFile = path.join(dataDir, 'movie_alerts.json');
+if (!fs.existsSync(alertsFile)) {
+  fs.writeFileSync(alertsFile, JSON.stringify([], null, 2));
+}
+
+function getMovieAlerts() {
+  try {
+    return JSON.parse(fs.readFileSync(alertsFile, 'utf8'));
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveMovieAlerts(alerts) {
+  try {
+    fs.writeFileSync(alertsFile, JSON.stringify(alerts, null, 2));
+  } catch (e) {}
+}
+
+function subscribeMovieAlert(userId, query) {
+  try {
+    if (!userId || !query) return false;
+    const cleanQuery = String(query).toLowerCase().trim();
+    if (cleanQuery.length < 2) return false;
+
+    const alerts = getMovieAlerts();
+    const existing = alerts.find(a => Number(a.userId) === Number(userId) && a.query === cleanQuery);
+    if (existing) return true;
+
+    alerts.push({
+      id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      userId: Number(userId),
+      query: cleanQuery,
+      createdAt: Date.now()
+    });
+
+    saveMovieAlerts(alerts);
+    return true;
+  } catch (e) {
+    console.error('Error subscribing movie alert:', e.message);
+    return false;
+  }
+}
+
+function getWaitingUsersForMovie(movieTitle) {
+  try {
+    if (!movieTitle) return [];
+    const normalizedMovie = normalizeTitle(movieTitle);
+    const alerts = getMovieAlerts();
+    const matchedUserIds = new Set();
+    const matchedAlertIds = [];
+
+    alerts.forEach(a => {
+      const alertQuery = normalizeTitle(a.query);
+      if (alertQuery && (normalizedMovie.includes(alertQuery) || alertQuery.includes(normalizedMovie))) {
+        matchedUserIds.add(a.userId);
+        matchedAlertIds.push(a.id);
+      }
+    });
+
+    return {
+      userIds: Array.from(matchedUserIds),
+      alertIds: matchedAlertIds
+    };
+  } catch (e) {
+    return { userIds: [], alertIds: [] };
+  }
+}
+
+function removeMovieAlert(userId, query) {
+  try {
+    let alerts = getMovieAlerts();
+    if (query) {
+      const clean = String(query).toLowerCase().trim();
+      alerts = alerts.filter(a => !(Number(a.userId) === Number(userId) && a.query === clean));
+    } else {
+      alerts = alerts.filter(a => Number(a.userId) !== Number(userId));
+    }
+    saveMovieAlerts(alerts);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// ============================================
+// TELEGRAM STARS VIP PAYMENT TRACKING
+// ============================================
+const starsPaymentsFile = path.join(dataDir, 'stars_payments.json');
+if (!fs.existsSync(starsPaymentsFile)) {
+  fs.writeFileSync(starsPaymentsFile, JSON.stringify([], null, 2));
+}
+
+function addVipStarsPayment(userId, days, starsAmount, paymentDetails = {}) {
+  try {
+    const upgradeRes = upgradeUserToPremium(userId, days);
+    
+    let payments = [];
+    try {
+      payments = JSON.parse(fs.readFileSync(starsPaymentsFile, 'utf8'));
+    } catch (e) {}
+
+    payments.push({
+      id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      userId: Number(userId),
+      days,
+      starsAmount: Number(starsAmount) || 0,
+      currency: 'XTR',
+      paymentDetails,
+      date: new Date().toISOString()
+    });
+
+    fs.writeFileSync(starsPaymentsFile, JSON.stringify(payments, null, 2));
+    return upgradeRes;
+  } catch (e) {
+    console.error('Error recording Stars payment:', e.message);
+    return { success: false };
+  }
+}
+
+// ============================================
+// SPONSOR CHANNELS MANAGEMENT
+// ============================================
+function getSponsorChannels() {
+  const settings = getMovieSettings() || {};
+  return settings.sponsorChannels || [];
+}
+
+function addSponsorChannel(channel) {
+  try {
+    const settings = getMovieSettings() || {};
+    if (!settings.sponsorChannels) settings.sponsorChannels = [];
+    
+    const cleanUsername = String(channel.username || '').replace('@', '').trim();
+    if (!cleanUsername) return false;
+
+    // Check if exists
+    settings.sponsorChannels = settings.sponsorChannels.filter(c => c.username.replace('@', '') !== cleanUsername);
+    settings.sponsorChannels.push({
+      username: `@${cleanUsername}`,
+      link: channel.link || `https://t.me/${cleanUsername}`,
+      title: channel.title || `@${cleanUsername}`
+    });
+
+    saveMovieSettings(settings);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function deleteSponsorChannel(username) {
+  try {
+    const settings = getMovieSettings() || {};
+    if (!settings.sponsorChannels) return true;
+    
+    const clean = String(username || '').replace('@', '').trim();
+    settings.sponsorChannels = settings.sponsorChannels.filter(c => c.username.replace('@', '') !== clean);
+    saveMovieSettings(settings);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// ============================================
+// SHORTS & CREATORS (HAMKORLIK / PARTNERS)
+// ============================================
+const shortsFile = path.join(dataDir, 'shorts.json');
+const creatorsFile = path.join(dataDir, 'creators.json');
+
+function getShorts() {
+  try {
+    if (!fs.existsSync(shortsFile)) return [];
+    return JSON.parse(fs.readFileSync(shortsFile, 'utf8'));
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveShorts(shorts) {
+  try {
+    fs.writeFileSync(shortsFile, JSON.stringify(shorts, null, 2));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function addShort(data) {
+  try {
+    const shorts = getShorts();
+    const newShort = {
+      id: 'sh_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      title: data.title || 'Qiziqarli Kino Lavha',
+      description: data.description || '',
+      videoUrl: data.videoUrl || '',
+      poster: data.poster || '',
+      duration: data.duration || '1:00',
+      movieCode: String(data.movieCode || '').trim(),
+      movieTitle: data.movieTitle || '',
+      creatorId: data.creatorId || 'cre_official',
+      creatorName: data.creatorName || 'XIT FILM Official',
+      creatorTag: data.creatorTag || '@xitfilm_uz',
+      views: 0,
+      likes: [],
+      shares: 0,
+      status: data.status || 'active',
+      dateAdded: new Date().toISOString()
+    };
+    shorts.unshift(newShort);
+    saveShorts(shorts);
+    return newShort;
+  } catch (e) {
+    return null;
+  }
+}
+
+function deleteShort(id) {
+  try {
+    let shorts = getShorts();
+    const initial = shorts.length;
+    shorts = shorts.filter(s => String(s.id) !== String(id));
+    if (shorts.length < initial) {
+      saveShorts(shorts);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+function incrementShortViews(id, refCode = null) {
+  try {
+    const shorts = getShorts();
+    const short = shorts.find(s => String(s.id) === String(id));
+    if (short) {
+      short.views = (short.views || 0) + 1;
+      saveShorts(shorts);
+
+      // Track creator stats and reward
+      const creatorId = short.creatorId;
+      if (creatorId) {
+        addCreatorViews(creatorId, 1);
+      }
+      return short.views;
+    }
+    return 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+function toggleShortLike(id, userId) {
+  try {
+    const shorts = getShorts();
+    const short = shorts.find(s => String(s.id) === String(id));
+    if (!short) return { liked: false, totalLikes: 0 };
+    if (!Array.isArray(short.likes)) short.likes = [];
+    
+    const uidStr = String(userId);
+    const idx = short.likes.indexOf(uidStr);
+    let liked = false;
+    if (idx !== -1) {
+      short.likes.splice(idx, 1);
+      liked = false;
+    } else {
+      short.likes.push(uidStr);
+      liked = true;
+    }
+    saveShorts(shorts);
+    return { liked, totalLikes: short.likes.length };
+  } catch (e) {
+    return { liked: false, totalLikes: 0 };
+  }
+}
+
+function updateShort(id, data) {
+  try {
+    const shorts = getShorts();
+    const idx = shorts.findIndex(s => String(s.id) === String(id));
+    if (idx === -1) return null;
+    shorts[idx] = {
+      ...shorts[idx],
+      ...data,
+      id: shorts[idx].id // protect id
+    };
+    saveShorts(shorts);
+    return shorts[idx];
+  } catch (e) {
+    return null;
+  }
+}
+
+function addShortComment(id, comment) {
+  try {
+    const shorts = getShorts();
+    const short = shorts.find(s => String(s.id) === String(id));
+    if (!short) return null;
+    if (!Array.isArray(short.comments)) short.comments = [];
+    const newComment = {
+      id: 'c_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5),
+      userId: comment.userId || 'guest',
+      userName: comment.userName || 'Kino Muxlisi',
+      userTag: comment.userTag || '',
+      text: String(comment.text || '').trim().substring(0, 300),
+      createdAt: new Date().toISOString()
+    };
+    short.comments.unshift(newComment);
+    if (short.comments.length > 100) short.comments.pop();
+    saveShorts(shorts);
+    return newComment;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getShortComments(id) {
+  try {
+    const shorts = getShorts();
+    const short = shorts.find(s => String(s.id) === String(id));
+    return short && Array.isArray(short.comments) ? short.comments : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function getCreators() {
+  try {
+    if (!fs.existsSync(creatorsFile)) return [];
+    return JSON.parse(fs.readFileSync(creatorsFile, 'utf8'));
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveCreators(creators) {
+  try {
+    fs.writeFileSync(creatorsFile, JSON.stringify(creators, null, 2));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function registerCreator({ name, username, telegramId, phone }) {
+  try {
+    const creators = getCreators();
+    const cleanUsername = String(username || '').replace('@', '').trim();
+    const refCode = cleanUsername || ('ref_' + Math.random().toString(36).substring(2, 7));
+
+    // Check if already registered
+    let creator = creators.find(c => (telegramId && Number(c.telegramId) === Number(telegramId)) || (cleanUsername && c.username.replace('@', '') === cleanUsername));
+    if (creator) return { isNew: false, creator };
+
+    creator = {
+      id: 'cre_' + Date.now().toString(36),
+      name: name || `@${cleanUsername}`,
+      username: `@${cleanUsername}`,
+      telegramId: telegramId ? Number(telegramId) : null,
+      phone: phone || '',
+      refCode: refCode.toLowerCase(),
+      balance: 10000, // 10,000 UZS welcome bonus
+      totalViews: 0,
+      totalEarned: 10000,
+      status: 'active',
+      ratePer1kViews: 5000,
+      dateJoined: new Date().toISOString()
+    };
+
+    creators.push(creator);
+    saveCreators(creators);
+    return { isNew: true, creator };
+  } catch (e) {
+    return null;
+  }
+}
+
+function addCreatorViews(creatorId, viewsCount = 1) {
+  try {
+    const creators = getCreators();
+    const creator = creators.find(c => c.id === creatorId || c.refCode === creatorId);
+    if (creator) {
+      creator.totalViews = (creator.totalViews || 0) + viewsCount;
+      // Rate: 5,000 UZS per 1,000 views = 5 UZS per view
+      const earn = viewsCount * ((creator.ratePer1kViews || 5000) / 1000);
+      creator.balance = (creator.balance || 0) + earn;
+      creator.totalEarned = (creator.totalEarned || 0) + earn;
+      saveCreators(creators);
+    }
+  } catch (e) {}
+}
+
+function getCreatorStats(creatorIdOrRef) {
+  try {
+    const creators = getCreators();
+    const creator = creators.find(c => c.id === creatorIdOrRef || c.refCode === creatorIdOrRef || (c.username && c.username.replace('@', '') === String(creatorIdOrRef).replace('@', '')));
+    if (!creator) return null;
+
+    const allShorts = getShorts().filter(s => s.creatorId === creator.id);
+    return {
+      creator,
+      shortsCount: allShorts.length,
+      shorts: allShorts
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 

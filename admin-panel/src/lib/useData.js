@@ -1,17 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { dlApi, movieApi, adultApi, safe } from './api.js';
 
 export function useResource(apiCall, interval = 0) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const apiCallRef = useRef(apiCall);
+  apiCallRef.current = apiCall;
 
   const load = useCallback(async () => {
-    const { data: res, error: err } = await safe(apiCall());
+    const { data: res, error: err } = await safe(apiCallRef.current());
     if (err) setError(err);
     else setData(res);
     setLoading(false);
-  }, [apiCall]);
+  }, []);
 
   useEffect(() => {
     load();

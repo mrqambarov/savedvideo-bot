@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+
+  <!-- Asosiy Sahifa -->
+  <url>
+    <loc>https://xitfilm.uz/</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/shorts.html</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/creators.html</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- Axborot Sahifalari -->
+  <url>
+    <loc>https://xitfilm.uz/profile.html</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/about.html</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/help.html</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/terms.html</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/privacy.html</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <url>
+    <loc>https://xitfilm.uz/?genre=Jangari</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?genre=Komediya</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?genre=Melodrama</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?genre=Multfilm</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?genre=Tarixiy</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?genre=Tarjima%20kino</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?genre=Sarguzasht</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?genre=Fantastika</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?genre=Drama</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?genre=Qo'rqinchli</loc>
+    <lastmod>2026-08-14</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?code=477</loc>
+    <lastmod>2026-08-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Gunohkorlar (Sinners 4K)</image:title>
+      <image:caption>Gunohkorlar - Hayajonli va shiddatli tarjima kino. Yuqori HD sifatda va o&apos;zbek tilida.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?code=484</loc>
+    <lastmod>2026-08-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Oshkoralik Kuni</image:title>
+      <image:caption>Oshkoralik kuni - Sirli va dramatik voqealar rivojiga boy o&apos;zbek tilidagi tarjima kino.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?code=1001</loc>
+    <lastmod>2026-07-31</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Titanlar Jangi 2 (Wrath of the Titans)</image:title>
+      <image:caption>Persey ma&apos;budlar va titanlar o&apos;rtasidagi dahshatli to&apos;qnashuvda dunyoni saqlab qolishi kerak.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?code=1002</loc>
+    <lastmod>2026-07-31</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Men Afsonaman (I Am Legend)</image:title>
+      <image:caption>Nyu-Yorkda qolgan so&apos;nggi inson virusga qarshi zardob yaratish uchun kurashadi.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?code=1003</loc>
+    <lastmod>2026-07-31</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Sahro Ovchilari (Badland Hunters)</image:title>
+      <image:caption>Xarobaga aylangan shaharda omon qolish va xavfli dushmanlarga qarshi shafqatsiz janglar.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?code=1004</loc>
+    <lastmod>2026-07-31</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>RED 2 (Agentlar Qaytishi)</image:title>
+      <image:caption>Nafaqadagi maxsus agentlar yangi avlod qurollariga qarshi birlashadilar.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?code=1005</loc>
+    <lastmod>2026-07-31</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Devlarni Yenggan Jek</image:title>
+      <image:caption>Insaniyat va devlar dunyosi o&apos;rtasidagi qadimiy afsonaviy urush.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?code=1006</loc>
+    <lastmod>2026-07-31</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>O&apos;g&apos;irlangan Qiz (Taken)</image:title>
+      <image:caption>Sobiq maxfiy xizmat xodimi o&apos;g&apos;irlangan qizini qutqarish uchun Parijga yo&apos;l oladi.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?code=1007</loc>
+    <lastmod>2026-07-31</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Majburiy Hamkorlik</image:title>
+      <image:caption>Ikki turli politsiya maxsus agenti jinoyat to&apos;dasini yo&apos;q qilish uchun majburan birlashadilar.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?code=1008</loc>
+    <lastmod>2026-07-31</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Inson G&apos;azabi (Wrath of Man)</image:title>
+      <image:caption>Mister X inkassatorlik kompaniyasiga ishga kirib, millionlab dollarlarni o&apos;g&apos;irlagan to&apos;dani poylaydi.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?code=478</loc>
+    <lastmod>2026-08-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800</image:loc>
+      <image:title>Janob xech kim</image:title>
+      <image:caption>Janob hech kim
+� 1-qism / 1</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?code=481</loc>
+    <lastmod>2026-08-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800</image:loc>
+      <image:title>Amerikalik snayper</image:title>
+      <image:caption>Amerikalik snayper
+� 1-qism / 1</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?code=327</loc>
+    <lastmod>2026-08-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800</image:loc>
+      <image:title>kodi: 327</image:title>
+      <image:caption>� Kino kodi: 327
+� Ko&apos;rishlar: 1584 ta</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?code=337</loc>
+    <lastmod>2026-08-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800</image:loc>
+      <image:title>kodi: 337</image:title>
+      <image:caption>� Kino kodi: 337
+� Ko&apos;rishlar: 1528 ta</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://xitfilm.uz/?code=424</loc>
+    <lastmod>2026-08-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800</image:loc>
+      <image:title>Chaqmoq zarbasi</image:title>
+      <image:caption>Chaqmoq zarbasi
+� 1-qism / 1</image:caption>
+    </image:image>
+  </url>
+</urlset>

@@ -22,15 +22,18 @@ export default function Downloader() {
       safe(dlApi.get('/config'))
     ]);
     if (sRes.data) setStatus(sRes.data);
-    if (cRes.data) {
-      let channels = cRes.data.sponsorChannels || [];
-      if (!Array.isArray(channels) || channels.length === 0) {
-        channels = [
-          { username: cRes.data.sponsorUsername || '', link: cRes.data.sponsorLink || '', title: '1-Homiy Kanal' }
-        ];
-      }
-      setConfig({ ...cRes.data, sponsorChannels: channels });
+    const configData = cRes.data || {
+      sponsorUsername: '@XitFilm_uz',
+      sponsorLink: 'https://t.me/XitFilm_uz',
+      sponsorChannels: [{ username: '@XitFilm_uz', link: 'https://t.me/XitFilm_uz', title: '1-Homiy Kanal' }]
+    };
+    let channels = configData.sponsorChannels || [];
+    if (!Array.isArray(channels) || channels.length === 0) {
+      channels = [
+        { username: configData.sponsorUsername || '', link: configData.sponsorLink || '', title: '1-Homiy Kanal' }
+      ];
     }
+    setConfig({ ...configData, sponsorChannels: channels });
   };
 
   useEffect(() => {
@@ -298,7 +301,7 @@ export default function Downloader() {
                   <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontWeight: 650, fontSize: 14 }}>
                     <input
                       type="checkbox"
-                      checked={config.sponsorEnabled || false}
+                      checked={config.sponsorEnabled ?? true}
                       onChange={(e) => setConfig({ ...config, sponsorEnabled: e.target.checked })}
                       style={{ width: 18, height: 18, accentColor: '#6366f1' }}
                     />
@@ -306,7 +309,7 @@ export default function Downloader() {
                   </label>
                 </div>
 
-                {config.sponsorEnabled && (
+                {(config.sponsorEnabled ?? true) && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     {channels.map((chan, idx) => (
                       <div

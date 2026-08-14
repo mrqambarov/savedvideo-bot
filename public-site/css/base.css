@@ -1,0 +1,553 @@
+/* ============================================
+   XIT FILM — Base Module v4.0
+   Design System: Tokens, Reset, Utilities
+   ============================================ */
+
+:root {
+    --primary: #8b5cf6;
+    --primary-hover: #7c3aed;
+    --primary-light: #a78bfa;
+    --primary-dark: #6d28d9;
+    --primary-glow: rgba(139, 92, 246, 0.4);
+
+    --bg-black: #060608;
+    --bg-dark: #0a0a0f;
+    --surface-dark: #121217;
+    --surface-hover: #1a1a22;
+
+    --text-white: #ffffff;
+    --text-light: #e2e8f0;
+    --text-dim: #94a3b8;
+    --text-muted: #64748b;
+
+    --accent: #fbbf24;
+    --accent-light: #fcd34d;
+    --success: #10b981;
+    --danger: #ef4444;
+
+    --glass-white: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-border-hover: rgba(255, 255, 255, 0.15);
+
+    --transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    --transition-fast: all 0.2s ease;
+
+    --radius-sm: 12px;
+    --radius-md: 20px;
+    --radius-lg: 30px;
+    --radius-xl: 40px;
+}
+
+/* Global Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    background: var(--bg-black);
+    color: var(--text-white);
+    overflow-x: hidden;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.container {
+    max-width: 1700px;
+    margin: 0 auto;
+    padding: 0 40px;
+}
+
+::selection {
+    background: var(--primary);
+    color: #fff;
+}
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-black); }
+::-webkit-scrollbar-thumb { background: var(--primary-dark); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+/* ============================================
+   Splash Screen
+   ============================================ */
+.splash-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: var(--bg-black);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+
+.splash-screen.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.splash-content {
+    text-align: center;
+}
+
+.splash-logo {
+    font-size: 48px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: -2px;
+    margin-bottom: 30px;
+}
+
+.splash-logo span {
+    color: var(--primary);
+    text-shadow: 0 0 30px var(--primary-glow);
+}
+
+.splash-loader {
+    width: 200px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 0 auto 15px;
+}
+
+.splash-bar {
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--primary-light));
+    border-radius: 10px;
+    animation: splashLoad 1.2s ease infinite;
+}
+
+@keyframes splashLoad {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(350%); }
+}
+
+.splash-text {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+}
+
+/* ============================================
+   Back to Top
+   ============================================ */
+.back-to-top {
+    position: fixed;
+    bottom: 40px;
+    right: 40px;
+    width: 55px;
+    height: 55px;
+    border-radius: 18px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px);
+    transition: var(--transition);
+    box-shadow: 0 10px 30px var(--primary-glow);
+}
+
+.back-to-top.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.back-to-top:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px var(--primary-glow);
+}
+
+/* ============================================
+   Toast Notification
+   ============================================ */
+.toast {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%) translateY(30px);
+    background: var(--surface-dark);
+    color: #fff;
+    padding: 16px 30px;
+    border-radius: 16px;
+    font-size: 14px;
+    font-weight: 700;
+    z-index: 99999;
+    opacity: 0;
+    transition: all 0.4s ease;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.toast i {
+    color: var(--success);
+}
+
+/* ============================================
+   Filter Results
+   ============================================ */
+.filter-results-header {
+    padding: 40px 40px 0;
+}
+
+.filter-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.filter-breadcrumb a {
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.filter-breadcrumb a:hover {
+    color: var(--primary-light);
+}
+
+.filter-breadcrumb i.fa-chevron-right {
+    font-size: 10px;
+    opacity: 0.5;
+}
+
+.filter-title {
+    font-size: 42px;
+    font-weight: 950;
+    margin-bottom: 40px;
+}
+
+.filter-count {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-left: 10px;
+}
+
+/* Full Grid Layout for filtered view */
+.movie-grid-full {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 30px;
+    padding: 0 40px 80px;
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+@media (max-width: 768px) {
+    .container { padding: 0 16px; }
+
+    .back-to-top {
+        bottom: 20px;
+        right: 20px;
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+    }
+
+    .filter-results-header {
+        padding: 20px 16px 0;
+    }
+
+    .filter-title {
+        font-size: 28px;
+    }
+
+    .movie-grid-full {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 15px;
+        padding: 0 16px 60px;
+    }
+}
+
+/* ============================================
+   Light Theme Overrides
+   ============================================ */
+body.light-theme {
+    --bg-black: #f1f5f9;
+    --bg-dark: #f8fafc;
+    --surface-dark: #ffffff;
+    --surface-hover: #e2e8f0;
+
+    --text-white: #0f172a;
+    --text-light: #1e293b;
+    --text-dim: #334155;
+    --text-muted: #64748b;
+
+    --glass-white: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(0, 0, 0, 0.08);
+    --glass-border-hover: rgba(0, 0, 0, 0.15);
+}
+
+body.light-theme .premium-modal-box {
+    background: #ffffff;
+    border-color: rgba(0, 0, 0, 0.1);
+    box-shadow: 0 30px 60px rgba(0,0,0,0.15);
+}
+
+body.light-theme .p-close-btn {
+    color: #1e293b;
+}
+
+body.light-theme .auth-card {
+    background: linear-gradient(145deg, #ffffff, #f8fafc);
+    border-color: rgba(0, 0, 0, 0.1);
+    color: #0f172a;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.15);
+}
+
+body.light-theme .auth-card input {
+    background: #f1f5f9;
+    color: #0f172a;
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .auth-card input:focus {
+    border-color: var(--primary);
+}
+
+body.light-theme .comment-item {
+    background: rgba(0, 0, 0, 0.01);
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+body.light-theme .comment-item:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+body.light-theme .comment-author {
+    color: #0f172a;
+}
+
+body.light-theme .navbar {
+    background: rgba(255, 255, 255, 0.7);
+    border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .navbar.scrolled {
+    background: rgba(255, 255, 255, 0.95);
+}
+
+body.light-theme .nav-link {
+    color: #475569;
+}
+
+body.light-theme .nav-link:hover, body.light-theme .nav-link.active {
+    color: var(--primary);
+}
+
+body.light-theme .logo {
+    color: #0f172a;
+}
+
+body.light-theme .search-wrapper input {
+    background: rgba(0, 0, 0, 0.03);
+    color: #0f172a;
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .search-wrapper input:focus {
+    background: #fff;
+    border-color: var(--primary);
+}
+
+body.light-theme .search-dropdown {
+    background: #fff;
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+}
+
+body.light-theme .search-item {
+    border-bottom-color: rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .search-item:hover {
+    background: #f1f5f9;
+}
+
+body.light-theme .search-item-title {
+    color: #0f172a;
+}
+
+body.light-theme .mobile-menu {
+    background: #ffffff;
+    border-right-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .mobile-nav-item {
+    color: #475569;
+}
+
+body.light-theme .mobile-nav-item:hover, body.light-theme .mobile-nav-item.active {
+    background: #f1f5f9;
+    color: var(--primary);
+}
+
+body.light-theme .footer-premium {
+    background: #ffffff;
+    border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .footer-copyright {
+    border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme #commentsList {
+    color: #0f172a;
+}
+
+body.light-theme .p-modal-right h2 {
+    color: #0f172a;
+}
+
+body.light-theme .speed-item {
+    color: #475569;
+}
+
+body.light-theme .player-dropdown-content {
+    background: #ffffff;
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+
+body.light-theme .player-dropdown-content div {
+    color: #475569;
+}
+
+body.light-theme .player-dropdown-content div:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+/* ============================================
+   Toast Notification System
+   ============================================ */
+.toast-container {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 999999;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: none;
+}
+
+.toast {
+    background: rgba(18, 18, 23, 0.95);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    color: #fff;
+    padding: 14px 22px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(139, 92, 246, 0.2);
+    transform: translateY(30px) scale(0.95);
+    opacity: 0;
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: auto;
+}
+
+.toast.show {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+}
+
+.toast-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(139, 92, 246, 0.2);
+    color: var(--primary-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.toast-success .toast-icon { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+.toast-error .toast-icon { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.toast-info .toast-icon { background: rgba(14, 165, 233, 0.2); color: #38bdf8; }
+
+/* Pulse Animation */
+@keyframes neonPulse {
+    0%, 100% { opacity: 0.8; filter: drop-shadow(0 0 15px rgba(139, 92, 246, 0.6)); }
+    50% { opacity: 1; filter: drop-shadow(0 0 25px rgba(139, 92, 246, 0.9)); }
+}
+
+.neon-pulse {
+    animation: neonPulse 3s ease-in-out infinite;
+}
+
+/* ============================================
+   Mobile & Telegram WebApp Container Rules
+   ============================================ */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 14px;
+    }
+    .toast-container {
+        bottom: 80px;
+        right: 14px;
+        left: 14px;
+    }
+    .toast {
+        width: 100%;
+        font-size: 13px;
+        padding: 12px 18px;
+    }
+}
+

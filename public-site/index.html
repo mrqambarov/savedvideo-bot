@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>XIT FILM — Premium Kinoteatr | O'zbekistonning #1 Onlayn Kinosi</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="XIT FILM — O'zbekistondagi eng zamonaviy onlayn kinoteatr. Eng yangi filmlar, seriallar va premyeralarni professional tarjimada, Full HD sifatda tomosha qiling.">
+    <meta name="keywords" content="xitfilm, xit film, kino, uzbek kino, onlayn kinoteatr, filmlar, seriallar, tarjima kino, o'zbek tili">
+    <meta name="author" content="XIT FILM">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="XIT FILM — Premium Kinoteatr">
+    <meta property="og:description" content="O'zbekistondagi eng zamonaviy va yuqori sifatli onlayn kinoteatr. Filmlar, seriallar va premyeralar.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://xitfilm.uz">
+    <meta property="og:site_name" content="XIT FILM">
+
+    <!-- Sitemap & Favicon -->
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%238b5cf6'/><text x='50' y='72' font-size='55' font-weight='900' text-anchor='middle' fill='white'>XF</text></svg>">
+
+    <!-- Modular CSS -->
+    <link rel="stylesheet" href="css/base.css?v=4.2.0">
+    <link rel="stylesheet" href="css/navbar.css?v=4.2.0">
+    <link rel="stylesheet" href="css/hero.css?v=4.2.0">
+    <link rel="stylesheet" href="css/movie-grid.css?v=4.2.0">
+    <link rel="stylesheet" href="css/modals.css?v=4.2.0">
+    <link rel="stylesheet" href="css/footer.css?v=4.2.0">
+    <link rel="stylesheet" href="css/pages.css?v=4.2.0">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Loading Splash Screen -->
+    <div id="splashScreen" class="splash-screen">
+        <div class="splash-content">
+            <div class="splash-logo">XIT<span>FILM</span></div>
+            <div class="splash-loader">
+                <div class="splash-bar"></div>
+            </div>
+            <p class="splash-text">Yuklanmoqda...</p>
+        </div>
+    </div>
+
+    <!-- Professional Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="container nav-wrapper">
+            <div class="nav-left">
+                <div class="logo" onclick="goHome()">XIT<span>FILM</span></div>
+                <div class="nav-menu">
+                    <a href="#" class="nav-link active" id="navAsosiy">Asosiy</a>
+                    <a href="shorts.html" class="nav-link"><i class="fas fa-bolt" style="color:#ec4899; margin-right:4px;"></i> Shorts</a>
+                    <a href="#" class="nav-link" id="navFilmlar">Filmlar</a>
+                    <a href="#" class="nav-link" id="navSeriallar">Seriallar</a>
+                    <a href="creators.html" class="nav-link" title="Hamkorlik"><i class="fas fa-handshake" style="color:#38bdf8; margin-right:4px;"></i> Hamkorlik</a>
+                    <a href="#" class="nav-link" onclick="openRequestModal(); return false;" title="Kino buyurtma berish"><i class="fas fa-paper-plane" style="color:var(--primary-light); margin-right:4px;"></i> Buyurtma</a>
+                    <div class="dropdown">
+                        <span class="nav-link">Janrlar <i class="fas fa-chevron-down"></i></span>
+                        <div class="dropdown-content" id="genreDropdown">
+                            <!-- Dynamic Genres -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="nav-right">
+                <div class="search-wrapper" id="desktopSearchWrapper">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Kino va serial qidirish..." autocomplete="off">
+                    <button id="voiceSearchBtn" onclick="startVoiceSearch()" title="Ovozli Qidiruv">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <div class="search-dropdown" id="searchResults"></div>
+                </div>
+
+                <!-- Mobile Header Quick Actions -->
+                <button class="nav-icon-btn mobile-header-btn" onclick="focusSearch()" title="Qidiruv">
+                    <i class="fas fa-search"></i>
+                </button>
+                <button class="nav-icon-btn mobile-header-btn vip-gold-btn" onclick="showVipModal()" title="VIP Obuna">
+                    <i class="fas fa-crown"></i>
+                </button>
+                <button class="nav-icon-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Mavzuni o'zgartirish">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <button class="btn-auth-premium desktop-vip-btn" id="vipBtn" onclick="showVipModal()">
+                    <i class="fas fa-crown"></i> <span>VIP Premium</span>
+                </button>
+                <button class="btn-auth-premium" id="loginBtn">
+                    <i class="fas fa-user-circle"></i> <span>Kirish</span>
+                </button>
+                <!-- Mobile Hamburger -->
+                <button class="hamburger" onclick="toggleMobileMenu()" aria-label="Menyu">
+                    <span></span><span></span><span></span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu Drawer -->
+    <div id="mobileOverlay" class="mobile-overlay" onclick="closeMobileMenu()"></div>
+    <div id="mobileMenu" class="mobile-menu">
+        <div class="mobile-menu-header">
+            <div class="logo">XIT<span>FILM</span></div>
+            <button class="mobile-close" onclick="closeMobileMenu()"><i class="fas fa-times"></i></button>
+        </div>
+        <nav class="mobile-nav">
+            <a href="#" class="mobile-nav-item active" onclick="closeMobileMenu(); goHome(); return false;">
+                <i class="fas fa-home"></i> Asosiy
+            </a>
+            <a href="shorts.html" class="mobile-nav-item">
+                <i class="fas fa-bolt" style="color: #ec4899;"></i> ⚡️ Shorts Lavhalar
+            </a>
+            <a href="#" class="mobile-nav-item" onclick="closeMobileMenu(); filterByType('films'); return false;">
+                <i class="fas fa-film"></i> Filmlar
+            </a>
+            <a href="#" class="mobile-nav-item" onclick="closeMobileMenu(); filterByType('serials'); return false;">
+                <i class="fas fa-tv"></i> Seriallar
+            </a>
+            <a href="creators.html" class="mobile-nav-item">
+                <i class="fas fa-handshake" style="color: #38bdf8;"></i> 🤝 Hamkorlik (Creator Park)
+            </a>
+            <a href="#" class="mobile-nav-item" onclick="closeMobileMenu(); openRequestModal(); return false;">
+                <i class="fas fa-paper-plane"></i> Kino Buyurtma
+            </a>
+            <div class="mobile-nav-divider"></div>
+            <div class="mobile-nav-label">Janrlar</div>
+            <div id="mobileGenres" class="mobile-genres">
+                <!-- Dynamic -->
+            </div>
+        </nav>
+        <div class="mobile-menu-footer">
+            <a href="https://t.me/xitfilm_uz" class="mobile-social" target="_blank">
+                <i class="fab fa-telegram-plane"></i> Telegram kanal
+            </a>
+        </div>
+    </div>
+
+    <!-- Hero Cinematic Slider Section -->
+    <header class="hero" id="hero">
+        <div class="hero-slider-container" id="heroSlider"></div>
+        <div class="hero-overlay"></div>
+        <div class="container hero-container">
+            <div class="hero-content" id="heroContent">
+                <div class="hero-badge"><i class="fas fa-fire"></i> Eng ko'p ko'rilgan</div>
+                <h1 id="heroTitle">XIT Filmlar va Premyeralar</h1>
+                <div class="hero-meta">
+                    <span id="heroRating"><i class="fas fa-star"></i> 8.5</span>
+                    <span id="heroYear">2025</span>
+                    <span class="age-limit">16+</span>
+                    <span id="heroGenre">Premyera</span>
+                </div>
+                <p id="heroDesc">XIT FILM portalida eng sara filmlarni professional tarjimada va yuqori sifatda tomosha qiling.</p>
+                <div class="hero-actions">
+                    <button class="btn-primary-udar" id="heroPlay"><i class="fas fa-play"></i> Ko'rish</button>
+                    <button class="btn-secondary-udar" id="heroInfo"><i class="fas fa-info-circle"></i> Batafsil</button>
+                </div>
+            </div>
+            <div class="hero-dots" id="heroDots"></div>
+        </div>
+    </header>
+
+    <main class="container">
+        <div id="sectionsWrapper">
+            <!-- Dynamic Rows -->
+        </div>
+    </main>
+
+    <!-- Universal Movie Modal -->
+    <div id="movieModal" class="modal">
+        <div class="ambient-glow-layer" id="ambientGlow"></div>
+        <div class="modal-overlay" onclick="closeMovieModal()"></div>
+        <div class="premium-modal-box">
+            <button class="p-close-btn" onclick="closeMovieModal()">&times;</button>
+            <div class="p-modal-backdrop" id="modalBackdrop"></div>
+            <div class="p-modal-body">
+                <div class="p-modal-content-grid">
+                    <div class="p-modal-left">
+                        <img id="modalImg" src="" alt="Poster">
+                    </div>
+                    <div class="p-modal-right">
+                        <div id="resumeBannerBox"></div>
+                        <h2 id="modalTitle">Kino Nomi</h2>
+                        <div class="p-modal-meta">
+                            <span class="p-rate" id="modalRating"><i class="fas fa-star"></i> 8.5</span>
+                            <span id="modalYear">2024</span>
+                            <span id="modalGenre">Janr</span>
+                        </div>
+                        <p id="modalDesc">Tavsif yuklanmoqda...</p>
+                        <div id="videoContainer" class="p-video-box" style="display: none;">
+                            <!-- YouTube Player (Trailers) -->
+                            <iframe id="ytPlayer" width="100%" height="100%" src="" frameborder="0" allowfullscreen style="display: none;"></iframe>
+                            
+                            <!-- Custom HTML5 Video Player -->
+                            <div id="customPlayer" class="custom-player" style="display: none;">
+                                <video id="mainVideo" playsinline></video>
+                                <div class="player-controls">
+                                    <div class="progress-area">
+                                        <div class="progress-bar">
+                                            <div class="buffered-bar"></div>
+                                            <div class="current-bar"></div>
+                                        </div>
+                                    </div>
+                                    <div class="controls-buttons">
+                                        <div class="controls-left">
+                                            <button class="player-btn" id="playPauseBtn"><i class="fas fa-play"></i></button>
+                                            <button class="player-btn" id="skipBackBtn"><i class="fas fa-backward"></i></button>
+                                            <button class="player-btn" id="skipForwardBtn"><i class="fas fa-forward"></i></button>
+                                            <button class="player-btn" id="nextEpisodeBtn" style="display:none;" title="Keyingi qism"><i class="fas fa-step-forward"></i></button>
+                                            <div class="volume-container">
+                                                <button class="player-btn" id="muteBtn"><i class="fas fa-volume-up"></i></button>
+                                                <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1" class="volume-slider">
+                                            </div>
+                                            <span class="player-time" id="playerTime">0:00 / 0:00</span>
+                                        </div>
+                                        <div class="controls-right">
+                                            <div class="player-dropdown" id="subtitlesMenu" style="display: none;">
+                                                <button class="player-btn" id="subtitlesBtn" title="Subtitrlar"><i class="fas fa-closed-captioning"></i></button>
+                                                <div class="player-dropdown-content" id="subtitlesList"></div>
+                                            </div>
+                                            <div class="player-dropdown" id="qualityMenu" style="display: none;">
+                                                <button class="player-btn" id="qualityBtn" title="Sifat"><i class="fas fa-cog"></i></button>
+                                                <div class="player-dropdown-content" id="qualityList"></div>
+                                            </div>
+                                            <div class="player-dropdown">
+                                                <button class="player-btn" id="speedBtn">1.0x</button>
+                                                <div class="player-dropdown-content" id="speedList">
+                                                    <div class="speed-item" data-speed="0.5">0.5x</div>
+                                                    <div class="speed-item active" data-speed="1.0">1.0x</div>
+                                                    <div class="speed-item" data-speed="1.5">1.5x</div>
+                                                    <div class="speed-item" data-speed="2.0">2.0x</div>
+                                                </div>
+                                            </div>
+                                            <button class="player-btn" id="fullscreenBtn"><i class="fas fa-expand"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Serial Seasons & Episodes Container -->
+                        <div id="serialSeasonsBox" style="display:none; margin-bottom: 30px; background: rgba(255,255,255,0.02); padding:20px; border-radius:18px; border:1px solid var(--glass-border);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                                <h3 style="font-size:16px; font-weight:800; color:#fff;"><i class="fas fa-layer-group" style="color:var(--primary-light);"></i> Fasllar va Qismlar</h3>
+                                <select id="seasonSelect" onchange="switchSeason(this.value)" style="height:36px; padding:0 15px; border-radius:10px; background:rgba(0,0,0,0.5); border:1px solid var(--glass-border); color:#fff; font-size:13px; outline:none; cursor:pointer; font-weight:700;"></select>
+                            </div>
+                            <div id="episodesGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap:10px;"></div>
+                        </div>
+
+                        <div class="p-modal-footer">
+                            <a id="watchLink" href="#" class="p-btn-watch" target="_blank">
+                                <i class="fab fa-telegram-plane"></i> Telegramda Yuklash
+                            </a>
+                            <button class="p-btn-icon" id="modalFavBtn"><i class="far fa-heart"></i></button>
+                            <button class="p-btn-icon" id="modalShareBtn"><i class="fas fa-share-alt"></i></button>
+                        </div>
+                        
+                        <!-- Comments & Reviews Section -->
+                        <div class="comments-section" style="margin-top: 50px; border-top: 1px solid var(--glass-border); padding-top: 30px; text-align: left;">
+                            <h3 style="font-size: 20px; font-weight: 800; margin-bottom: 20px;"><i class="far fa-comments"></i> Fikr-mulohazalar</h3>
+                            
+                            <!-- Comment Form -->
+                            <div class="comment-form-container" style="margin-bottom: 30px;">
+                                <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
+                                    <select id="ratingSelect" style="height: 42px; padding: 0 15px; border-radius: 12px; font-size: 14px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: #fff; outline: none; cursor: pointer;">
+                                        <option value="10">⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ (10/10 - Zo'r)</option>
+                                        <option value="9">⭐⭐⭐⭐⭐⭐⭐⭐⭐ (9/10 - A'lo)</option>
+                                        <option value="8">⭐⭐⭐⭐⭐⭐⭐⭐ (8/10 - Yaxshi)</option>
+                                        <option value="7">⭐⭐⭐⭐⭐⭐⭐ (7/10 - Normal)</option>
+                                        <option value="6">⭐⭐⭐⭐⭐⭐ (6/10 - O'rtacha)</option>
+                                        <option value="5">⭐⭐⭐⭐⭐ (5/10 - Qoniqarli)</option>
+                                        <option value="4">⭐⭐⭐⭐ (4/10 - Yomon emas)</option>
+                                        <option value="3">⭐⭐⭐ (3/10 - Yomon)</option>
+                                        <option value="2">⭐⭐ (2/10 - Juda yomon)</option>
+                                        <option value="1">⭐ (1/10 - Daxshat)</option>
+                                    </select>
+                                </div>
+                                <div style="display: flex; gap: 12px; width: 100%;">
+                                    <input type="text" id="commentInput" placeholder="Kino haqida fikringizni yozing..." style="flex: 1; height: 42px; border-radius: 12px; padding: 0 20px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: #fff; font-size: 14px; outline: none;" autocomplete="off">
+                                    <button class="p-btn-watch" onclick="submitReview()" style="height: 42px; border-radius: 12px; font-weight: 800; padding: 0 25px; font-size: 14px; box-shadow: none; cursor: pointer; border: none;">Yuborish</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Comments List -->
+                            <div id="commentsList" class="comments-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="authModal" class="modal">
+        <div class="modal-overlay" onclick="closeAuthModal()"></div>
+        <div class="auth-card" style="max-width: 480px; position:relative; overflow:hidden;">
+            <button class="p-close-btn" onclick="closeAuthModal()" style="top:15px; right:20px; font-size:35px; width:40px; height:40px;">&times;</button>
+            <div style="font-size: 40px; color:var(--primary-light); margin-bottom: 12px;"><i class="fab fa-telegram"></i></div>
+            <h2 style="font-size:24px; font-weight:900;">Tizimga Kirish</h2>
+            <p class="auth-subtitle" style="margin-bottom:20px;">Xizmatlardan to'liq foydalanish uchun Telegram orqali kiring.</p>
+            
+            <!-- Auth Tabs -->
+            <div class="auth-tabs" style="display: flex; background: rgba(255,255,255,0.03); border:1px solid var(--glass-border); border-radius:14px; padding:4px; margin-bottom:25px;">
+                <button class="auth-tab-btn active" id="tabLinkBtn" onclick="switchAuthTab('link')" style="flex:1; background:none; border:none; padding:10px; border-radius:10px; color:#fff; font-weight:700; font-size:13px; cursor:pointer; transition:0.3s; outline:none;">🚀 Tezkor Kirish</button>
+                <button class="auth-tab-btn" id="tabCodeBtn" onclick="switchAuthTab('code')" style="flex:1; background:none; border:none; padding:10px; border-radius:10px; color:var(--text-muted); font-weight:700; font-size:13px; cursor:pointer; transition:0.3s; outline:none;">🔑 PIN Kod Orqali</button>
+            </div>
+
+            <!-- Tab Content 1: One-Click Link -->
+            <div id="authTabLink" class="auth-tab-content active" style="display: block;">
+                <p style="font-size: 13px; color: var(--text-dim); line-height:1.6; margin-bottom:25px; text-align:left;">
+                    Quyidagi tugmani bosing va Telegram botimizda <b>Start</b> buyrug'ini bosing. Tizim sizni saytda avtomatik tanib oladi va kirgizadi!
+                </p>
+                <a id="telegramLoginLink" href="#" target="_blank" class="p-btn-watch" onclick="handleTelegramLinkClick(event)" style="width:100%; display:inline-flex; justify-content:center; align-items:center; gap:10px; height:50px; font-size:15px; border-radius:14px; text-decoration:none; margin-bottom:20px; border:none; cursor:pointer;">
+                    <i class="fab fa-telegram-plane"></i> Telegram Orqali Kirish
+                </a>
+                
+                <div id="pollingStatus" style="display:none; text-align:center; margin-top:15px; animation: pulse 1.5s infinite;">
+                    <i class="fas fa-circle-notch fa-spin" style="color:var(--primary-light); margin-right:8px;"></i>
+                    <span style="font-size:13px; color:var(--text-white); font-weight:600;">Telegram orqali tasdiqlash kutilmoqda...</span>
+                </div>
+            </div>
+
+            <!-- Tab Content 2: Code input -->
+            <div id="authTabCode" class="auth-tab-content" style="display:none;">
+                <p style="font-size: 13px; color: var(--text-dim); line-height:1.6; margin-bottom:15px; text-align:left;">
+                    Botimizga <a href="https://t.me/xitfilm_bot" target="_blank" style="color:var(--primary-light); font-weight:700; text-decoration:none;">@xitfilm_bot</a> o'tib, <b>/start login</b> buyrug'ini yuboring va sizga berilgan 6 xonali kodni kiriting:
+                </p>
+                
+                <!-- Styled PIN grid inputs -->
+                <div class="pin-code-container" onpaste="onPinPaste(event)">
+                    <input type="text" class="pin-digit" maxlength="1" oninput="onPinInput(this, 0)" onkeydown="onPinKeyDown(event, this, 0)" autocomplete="off" inputmode="numeric">
+                    <input type="text" class="pin-digit" maxlength="1" oninput="onPinInput(this, 1)" onkeydown="onPinKeyDown(event, this, 1)" autocomplete="off" inputmode="numeric">
+                    <input type="text" class="pin-digit" maxlength="1" oninput="onPinInput(this, 2)" onkeydown="onPinKeyDown(event, this, 2)" autocomplete="off" inputmode="numeric">
+                    <input type="text" class="pin-digit" maxlength="1" oninput="onPinInput(this, 3)" onkeydown="onPinKeyDown(event, this, 3)" autocomplete="off" inputmode="numeric">
+                    <input type="text" class="pin-digit" maxlength="1" oninput="onPinInput(this, 4)" onkeydown="onPinKeyDown(event, this, 4)" autocomplete="off" inputmode="numeric">
+                    <input type="text" class="pin-digit" maxlength="1" oninput="onPinInput(this, 5)" onkeydown="onPinKeyDown(event, this, 5)" autocomplete="off" inputmode="numeric">
+                </div>
+                
+                <input type="hidden" id="loginCode">
+                <button class="btn-auth-submit" id="pinSubmitBtn" onclick="verifyLoginCode()" style="width: 100%; height:50px; border-radius:14px; font-weight:800; font-size:15px;" disabled>Kodni Kiriting</button>
+            </div>
+            
+            <button class="btn-cancel-link" onclick="closeAuthModal()" style="margin-top:20px;">Orqaga qaytish</button>
+        </div>
+    </div>
+
+    <!-- VIP Upgrade Modal -->
+    <div id="vipModal" class="modal">
+        <div class="modal-overlay" onclick="closeVipModal()"></div>
+        <div class="auth-card" style="max-width: 500px; background: linear-gradient(145deg, #0d0d12, #07070a); border-color: rgba(251, 191, 36, 0.25);">
+            <button class="p-close-btn" onclick="closeVipModal()" style="top:15px; right:20px; font-size:35px; width:40px; height:40px;">&times;</button>
+            <div style="font-size: 40px; color:#fbbf24; margin-bottom: 15px;"><i class="fas fa-crown"></i></div>
+            <h2 style="font-size:24px; font-weight:900;">VIP Premium Obuna</h2>
+            <p class="auth-subtitle" style="margin-bottom:20px;">VIP obuna orqali barcha premyeralarni birinchilardan bo'lib reklamalarsiz va cheksiz sifatda tomosha qiling!</p>
+            
+            <div class="vip-benefits" style="text-align: left; background: rgba(255,255,255,0.02); padding: 15px 18px; border-radius: 16px; border:1px solid var(--glass-border); margin-bottom:20px; font-size:13px; line-height:1.6;">
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;"><i class="fas fa-check" style="color:#10b981; font-size:12px;"></i> <span>Barcha premyera kinolarga cheksiz kirish</span></div>
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;"><i class="fas fa-check" style="color:#10b981; font-size:12px;"></i> <span>Reklamasiz, ultra-tezkor video oqimi</span></div>
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;"><i class="fas fa-check" style="color:#10b981; font-size:12px;"></i> <span>Ko'rish progressini avtomatik saqlash</span></div>
+                <div style="display:flex; align-items:center; gap:10px;"><i class="fas fa-check" style="color:#10b981; font-size:12px;"></i> <span>HD 1080p sifat va ko'p tilli subtitrlar</span></div>
+            </div>
+
+            <!-- VIP Tiers -->
+            <div class="vip-tiers" style="display: grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom: 20px;">
+                <div class="vip-tier-card" onclick="selectVipTier(30, 15000)" style="border: 2px solid var(--primary); background: rgba(139,92,246,0.06); padding: 15px; border-radius: 16px; cursor: pointer; text-align: center; transition: 0.3s;" id="tier-30">
+                    <h4 style="font-weight:800; font-size:14px; margin:0;">1 Oylik VIP</h4>
+                    <div style="font-size: 18px; font-weight: 900; color:#fbbf24; margin:8px 0;">15,000 so'm</div>
+                    <small style="color:var(--text-muted); font-size:11px;">500 so'm / kun</small>
+                </div>
+                <div class="vip-tier-card" onclick="selectVipTier(365, 99000)" style="border: 1px solid var(--glass-border); padding: 15px; border-radius: 16px; cursor: pointer; text-align: center; transition: 0.3s; position:relative;" id="tier-365">
+                    <h4 style="font-weight:800; font-size:14px; margin:0;">1 Yillik VIP</h4>
+                    <div style="font-size: 18px; font-weight: 900; color:#fbbf24; margin:8px 0;">99,000 so'm</div>
+                    <small style="color:var(--text-muted); font-size:11px; text-decoration:line-through; margin-right:4px;">180,000</small>
+                    <span style="background:#ef4444; color:#fff; font-size:9px; padding:1px 4px; border-radius:8px; font-weight:800; position:absolute; top:-8px; right:10px;">Xayratli -45%</span>
+                </div>
+            </div>
+
+            <!-- Payment Methods -->
+            <div style="display:flex; justify-content:center; gap:15px; margin-bottom: 20px;">
+                <button id="pay-click" onclick="payWith('click')" style="width:110px; height:45px; border-radius:12px; background:#fff; border:2px solid var(--primary); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; outline:none;" title="Click"><span style="color:#1f2538; font-weight:900; font-size:16px; letter-spacing: 0.5px;">CLICK</span></button>
+                <button id="pay-payme" onclick="payWith('payme')" style="width:110px; height:45px; border-radius:12px; background:#00c3d7; border:2px solid transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; outline:none;" title="Payme"><span style="color:#fff; font-weight:900; font-size:18px; font-style:italic; letter-spacing:-1px;">payme</span></button>
+            </div>
+
+            <button class="btn-auth-submit" id="paySubmitBtn" onclick="processVipPayment()" style="width: 100%; height:50px; font-weight:800;">15,000 so'm to'lash</button>
+        </div>
+    </div>
+
+    <!-- Back to Top Button -->
+    <button id="backToTop" class="back-to-top" onclick="scrollToTop()">
+        <i class="fas fa-chevron-up"></i>
+    </button>
+
+    <footer class="footer-premium">
+        <div class="container">
+            <div class="footer-main">
+                <div class="footer-brand">
+                    <div class="logo">XIT<span>FILM</span></div>
+                    <p>O'zbekistondagi eng zamonaviy va yuqori sifatli onlayn kinoteatr. Biz bilan vaqtingizni mazmunli va maroqli o'tkazing.</p>
+                    <div class="social-wrapper">
+                        <a href="https://t.me/xitfilm_uz" class="social-link tg" target="_blank"><i class="fab fa-telegram-plane"></i></a>
+                        <a href="#" class="social-link insta"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="social-link yt"><i class="fab fa-youtube"></i></a>
+                    </div>
+                </div>
+                <div class="footer-nav-group">
+                    <h4>Asosiy Bo'limlar</h4>
+                    <ul>
+                        <li><a href="/">Asosiy sahifa</a></li>
+                        <li><a href="?type=films">Filmlar</a></li>
+                        <li><a href="?type=serials">Seriallar</a></li>
+                        <li><a href="?type=all">Barcha Kinolar</a></li>
+                    </ul>
+                </div>
+                <div class="footer-nav-group">
+                    <h4>Ma'lumot</h4>
+                    <ul>
+                        <li><a href="about.html">Biz haqimizda</a></li>
+                        <li><a href="help.html">Yordam markazi</a></li>
+                        <li><a href="terms.html">Foydalanish shartlari</a></li>
+                        <li><a href="privacy.html">Maxfiylik siyosati</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-copyright">
+                <p>&copy; 2026 XIT FILM. Barcha huquqlar himoyalangan.</p>
+                <div class="footer-badges">
+                    <span>16+</span>
+                    <span>HD 1080p</span>
+                    <span>UZB</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Mobile Search Modal (Full Screen Instant Search) -->
+    <div id="mobileSearchModal" class="modal">
+        <div class="modal-overlay" onclick="closeMobileSearch()"></div>
+        <div class="mobile-search-card">
+            <div class="mobile-search-top">
+                <div class="mobile-search-input-wrap">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="mobileSearchInput" placeholder="Kino, serial yoki aktyor qidirish..." autocomplete="off">
+                    <button class="mobile-voice-btn" onclick="startMobileVoiceSearch()"><i class="fas fa-microphone"></i></button>
+                </div>
+                <button class="mobile-search-cancel" onclick="closeMobileSearch()">Bekor</button>
+            </div>
+            <div class="mobile-search-results" id="mobileSearchResults">
+                <div class="mobile-search-empty"><i class="fas fa-film"></i> Qidirish uchun kino nomini yozing</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Movie Request Modal (Kino Buyurtma) -->
+    <div id="requestModal" class="modal">
+        <div class="modal-overlay" onclick="closeRequestModal()"></div>
+        <div class="request-card">
+            <button class="p-close-btn" onclick="closeRequestModal()" style="top:15px; right:20px; font-size:35px; width:40px; height:40px;">&times;</button>
+            <div style="font-size: 38px; color: #38bdf8; margin-bottom: 12px;"><i class="fas fa-paper-plane"></i></div>
+            <h2 style="font-size: 22px; font-weight: 900; color: #fff; margin-bottom: 6px;">Kino Buyurtma Qilish</h2>
+            <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 24px;">Saytdan topolmagan sevimli filmingiz yoki serialingizni yozib qoldiring. Tez orada bazaga qo'shamiz!</p>
+            
+            <form onsubmit="handleMovieRequestSubmit(event)">
+                <div class="request-input-group">
+                    <label>🎬 Film yoki Serial Nomi *</label>
+                    <input type="text" id="reqMovieTitle" class="request-input" placeholder="Masalan: Forsaj 11, Qasoskorlar..." required autocomplete="off">
+                </div>
+                <div class="request-input-group">
+                    <label>📝 Qo'shimcha Izoh (Yil, Qism, Tarjima turi)</label>
+                    <textarea id="reqMovieComment" class="request-textarea" placeholder="Masalan: 2025-yil premyera, o'zbek tilida tarjimasi bilan..."></textarea>
+                </div>
+                <div class="request-input-group">
+                    <label>👤 Aloqa / Telegram username (Ixtiyoriy)</label>
+                    <input type="text" id="reqMovieContact" class="request-input" placeholder="@username yoki ismingiz" autocomplete="off">
+                </div>
+                <button type="submit" class="request-submit-btn" id="reqSubmitBtn">
+                    <i class="fas fa-paper-plane"></i> <span>Buyurtma Yuborish</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Mobile Bottom Navigation Bar (App Experience) -->
+    <nav class="mobile-bottom-bar" id="mobileBottomBar">
+        <button class="bottom-bar-item active" onclick="goHome(); return false;" id="mbHomeBtn">
+            <i class="fas fa-home"></i>
+            <span>Asosiy</span>
+        </button>
+        <a href="shorts.html" class="bottom-bar-item" style="color: #ec4899;">
+            <i class="fas fa-bolt"></i>
+            <span>Shorts</span>
+        </a>
+        <button class="bottom-bar-item" onclick="openRequestModal(); return false;">
+            <i class="fas fa-paper-plane"></i>
+            <span>Buyurtma</span>
+        </button>
+        <button class="bottom-bar-item" onclick="filterFavorites(); return false;" id="mbFavBtn">
+            <i class="fas fa-heart"></i>
+            <span>Sevimlilar</span>
+        </button>
+        <button class="bottom-bar-item" onclick="handleProfileNav(); return false;" id="mbProfileBtn">
+            <i class="fas fa-user-circle"></i>
+            <span>Profil</span>
+        </button>
+    </nav>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="app.js?v=4.2.0"></script>
+</body>
+</html>

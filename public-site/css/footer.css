@@ -1,0 +1,181 @@
+/* ============================================
+   XIT FILM — Footer Module v4.0
+   Premium Footer with Gradient Accent
+   ============================================ */
+
+.footer-premium {
+    background: linear-gradient(180deg, var(--bg-black), #000);
+    padding: 100px 0 40px 0;
+    border-top: 1px solid var(--glass-border);
+    margin-top: 120px;
+    position: relative;
+}
+
+.footer-premium::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--primary), transparent);
+    opacity: 0.5;
+}
+
+.footer-main {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 80px;
+    margin-bottom: 60px;
+}
+
+.footer-brand .logo {
+    margin-bottom: 5px;
+}
+
+.footer-brand p {
+    color: var(--text-muted);
+    margin: 20px 0 30px 0;
+    font-size: 15px;
+    max-width: 420px;
+    line-height: 1.8;
+}
+
+/* Footer Nav */
+.footer-nav-group h4 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin-bottom: 28px;
+    color: #fff;
+    font-weight: 800;
+}
+
+.footer-nav-group ul {
+    list-style: none;
+    padding: 0;
+}
+
+.footer-nav-group li {
+    margin-bottom: 14px;
+}
+
+.footer-nav-group a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 15px;
+    transition: 0.3s;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.footer-nav-group a:hover {
+    color: var(--primary-light);
+    transform: translateX(5px);
+}
+
+/* Social Links */
+.social-wrapper {
+    display: flex;
+    gap: 12px;
+}
+
+.social-link {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: var(--glass-white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 18px;
+    text-decoration: none;
+    transition: 0.3s;
+    border: 1px solid var(--glass-border);
+}
+
+.social-link.tg:hover {
+    background: #2AABEE;
+    border-color: #2AABEE;
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(42, 171, 238, 0.3);
+}
+
+.social-link.insta:hover {
+    background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+    border-color: #e6683c;
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(230, 104, 60, 0.3);
+}
+
+.social-link.yt:hover {
+    background: #FF0000;
+    border-color: #FF0000;
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(255, 0, 0, 0.3);
+}
+
+/* Copyright */
+.footer-copyright {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 35px;
+    border-top: 1px solid var(--glass-border);
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.footer-badges {
+    display: flex;
+    gap: 15px;
+}
+
+.footer-badges span {
+    padding: 5px 14px;
+    background: var(--glass-white);
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 800;
+    border: 1px solid var(--glass-border);
+    letter-spacing: 0.5px;
+}
+
+/* Footer Bottom for sub-pages */
+.footer-bottom {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 20px 0;
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+@media (max-width: 1000px) {
+    .footer-main {
+        grid-template-columns: 1fr;
+        gap: 50px;
+        text-align: center;
+    }
+
+    .footer-brand p {
+        margin: 20px auto 30px;
+    }
+
+    .social-wrapper {
+        justify-content: center;
+    }
+
+    .footer-copyright {
+        flex-direction: column;
+        gap: 20px;
+        text-align: center;
+    }
+
+    .footer-premium {
+        padding: 80px 0 30px;
+        margin-top: 80px;
+    }
+}

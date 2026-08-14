@@ -1,6 +1,6 @@
 {
-  "totalViews": 0,
-  "totalSearchQueries": 4,
+  "totalViews": 21,
+  "totalSearchQueries": 18,
   "dailyUsage": {
     "2026-07-30": {
       "movieViews": 0,
@@ -9,6 +9,20 @@
         821276009,
         6263659922,
         5215184836
+      ]
+    },
+    "2026-08-08": {
+      "movieViews": 21,
+      "searchQueries": 14,
+      "activeUsers": [
+        6263659922,
+        8597631745,
+        8257490655,
+        5857139730,
+        7986073240,
+        8662379576,
+        5446407557,
+        1317802195
       ]
     }
   }

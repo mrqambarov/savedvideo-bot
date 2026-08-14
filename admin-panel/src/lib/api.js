@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const DEV_HOST = 'http://94.237.103.133';
+const DEV_HOST = 'https://xitfilm.uz';
 const isDev = import.meta.env.DEV;
 
 export const dlApi = axios.create({ baseURL: isDev ? `${DEV_HOST}/api` : '/api', headers: { 'X-Bot-Type': 'downloader' } });

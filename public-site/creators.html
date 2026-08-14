@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XIT FILM Creator Park — Hamkorlik va Daromad Dasturi</title>
+    <meta name="description" content="Instagram, TikTok va Telegram adminlari uchun kino lavhalari (Shorts) orqali doimiy daromad olish tizimi.">
+
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%238b5cf6'/><text x='50' y='72' font-size='55' font-weight='900' text-anchor='middle' fill='white'>XF</text></svg>">
+    
+    <!-- Modular CSS -->
+    <link rel="stylesheet" href="css/base.css?v=4.3.0">
+    <link rel="stylesheet" href="css/navbar.css?v=4.3.0">
+    <link rel="stylesheet" href="css/footer.css?v=4.3.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        .creator-hero {
+            padding: 120px 20px 60px;
+            text-align: center;
+            background: radial-gradient(circle at 50% 30%, rgba(139, 92, 246, 0.15) 0%, rgba(0,0,0,0) 70%);
+        }
+        .creator-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(139, 92, 246, 0.4);
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 800;
+            color: #c4b5fd;
+            margin-bottom: 20px;
+        }
+        .creator-title {
+            font-size: clamp(28px, 5vw, 46px);
+            font-weight: 900;
+            line-height: 1.2;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .creator-subtitle {
+            font-size: clamp(15px, 2vw, 18px);
+            color: #94a3b8;
+            max-width: 680px;
+            margin: 0 auto 35px;
+            line-height: 1.6;
+        }
+        .cta-btns {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .btn-primary-glow {
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            color: #fff;
+            padding: 14px 28px;
+            border-radius: 14px;
+            font-size: 15px;
+            font-weight: 800;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.4);
+            transition: transform 0.2s;
+        }
+        .btn-primary-glow:hover { transform: scale(1.04); }
+
+        .features-grid {
+            max-width: 1100px;
+            margin: 40px auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            padding: 0 20px;
+        }
+        .feature-card {
+            background: rgba(18, 18, 24, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 30px 24px;
+            backdrop-filter: blur(10px);
+            transition: 0.3s;
+        }
+        .feature-card:hover {
+            border-color: rgba(139, 92, 246, 0.4);
+            transform: translateY(-5px);
+        }
+        .feature-icon {
+            width: 54px;
+            height: 54px;
+            border-radius: 14px;
+            background: rgba(139, 92, 246, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: #a78bfa;
+            margin-bottom: 20px;
+        }
+        .feature-card h3 {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        .feature-card p {
+            font-size: 14px;
+            color: #94a3b8;
+            line-height: 1.6;
+        }
+
+        /* Dashboard Section */
+        .creator-cabinet {
+            max-width: 800px;
+            margin: 40px auto 80px;
+            background: rgba(18, 18, 24, 0.85);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 24px;
+            padding: 35px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+        }
+        .cabinet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .balance-card {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(236, 72, 153, 0.1));
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #cbd5e1;
+        }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            padding: 12px 16px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            font-family: inherit;
+        }
+        .form-group input:focus, .form-group textarea:focus {
+            border-color: #8b5cf6;
+        }
+    </style>
+</head>
+<body class="page-body">
+
+    <!-- Header Navigation -->
+    <header class="navbar">
+        <div class="nav-container" style="display: flex; align-items: center; justify-content: space-between; max-width: 1200px; margin: 0 auto; padding: 15px 20px;">
+            <a href="/" class="logo" style="font-size: 22px; font-weight: 900; color: #fff; text-decoration: none;">XIT<span style="color: #8b5cf6;">FILM</span></a>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <a href="shorts.html" class="partner-btn" style="padding: 8px 16px; border-radius: 20px; text-decoration: none; color: #fff; background: linear-gradient(135deg, #ec4899, #8b5cf6); font-weight: 800; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-bolt"></i> <span>Shorts</span>
+                </a>
+                <a href="/" style="background: rgba(255,255,255,0.1); color: #fff; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none;">
+                    <i class="fas fa-home"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="creator-hero">
+        <div class="creator-badge">
+            <i class="fas fa-gem"></i> XIT FILM CREATOR PARK
+        </div>
+        <h1 class="creator-title">Kino Lavhalari Orqali<br>Doimiy Daromad Oling</h1>
+        <p class="creator-subtitle">
+            Instagram Reels, TikTok va Telegram kanallaringizga eng qiziqarli kino lavhalarini (Shorts) joylang. Har bir ko'rish va jalb qilingan tomoshabindan kafolatlangan daromad ishlang!
+        </p>
+        <div class="cta-btns">
+            <a href="#registerSection" class="btn-primary-glow">
+                <i class="fas fa-rocket"></i> Hamkor Bo'lish (Bepul)
+            </a>
+            <a href="shorts.html" class="btn-primary-glow" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);">
+                <i class="fas fa-bolt"></i> Shortslarni Ko'rish
+            </a>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-eye"></i></div>
+            <h3>Ko'rishlar uchun to'lov</h3>
+            <p>Siz yuklagan har bir qisqa lavha (Shorts) ko'rilganida balansingizga avtomatik mablag' qo'shiladi.</p>
+        </div>
+
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-user-plus"></i></div>
+            <h3>Referal Tizimi</h3>
+            <p>Sizning havolangiz orqali botga yoki saytga kirgan har bir yangi a'zo sizga biriktiriladi.</p>
+        </div>
+
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-wallet"></i></div>
+            <h3>Haftalik To'lovlar</h3>
+            <p>Ishlangan pullarni har hafta Click, Payme yoki USDT orqali 100% kafolat bilan yechib oling.</p>
+        </div>
+    </section>
+
+    <!-- Creator Cabinet / Register Section -->
+    <section class="creator-cabinet" id="registerSection">
+        <div class="cabinet-header">
+            <div>
+                <h2 style="font-size: 22px; font-weight: 800; color: #fff;">🤝 Hamkor Kabineti</h2>
+                <p style="font-size: 13px; color: #94a3b8;">Ro'yxatdan o'ting yoki shaxsiy havolangiz orqali kiring</p>
+            </div>
+            <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #34d399; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 800;">
+                🎁 10,000 so'm bonus
+            </div>
+        </div>
+
+        <div id="registerFormBox">
+            <form onsubmit="handleCreatorRegister(event)">
+                <div class="form-group">
+                    <label>Ism / Kanal Nomi:</label>
+                    <input type="text" id="creatorName" placeholder="Masalan: Kino Olami" required>
+                </div>
+                <div class="form-group">
+                    <label>Telegram yoki Instagram Username:</label>
+                    <input type="text" id="creatorUsername" placeholder="@kino_olami" required>
+                </div>
+                <div class="form-group">
+                    <label>Telefon raqam (Bog'lanish uchun):</label>
+                    <input type="tel" id="creatorPhone" placeholder="+998 90 123 45 67">
+                </div>
+                <button type="submit" class="btn-primary-glow" style="width: 100%; margin-top: 10px;">
+                    🚀 Hamkorlikni Boshlash & Shaxsiy ID olish
+                </button>
+            </form>
+        </div>
+
+        <div id="creatorDashboardBox" style="display: none;">
+            <div class="balance-card">
+                <div>
+                    <div style="font-size: 13px; color: #94a3b8; font-weight: 700;">Hozirgi Balans:</div>
+                    <div style="font-size: 28px; font-weight: 900; color: #34d399;" id="dashBalance">10,000 UZS</div>
+                </div>
+                <button class="btn-primary-glow" style="padding: 8px 16px; font-size: 13px;" onclick="alert('Pul yechish uchun admin bilan bog\'laning: @mrqambarov')">
+                    💸 Pul Yechish
+                </button>
+            </div>
+
+            <div style="background: rgba(255, 255, 255, 0.04); padding: 18px; border-radius: 14px; margin-bottom: 20px;">
+                <div style="font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">Sizning Shaxsiy Referal Havolangiz:</div>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="myRefUrl" readonly style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; color: #38bdf8; font-weight: 700; flex: 1;">
+                    <button class="btn-primary-glow" style="padding: 10px 18px;" onclick="copyRefUrl()">Nusxalash</button>
+                </div>
+                <p style="font-size: 12px; color: #94a3b8; margin-top: 6px;">Ushbu havolani Instagram bio yoki Telegram kanalingizga qo'ying.</p>
+            </div>
+
+            <div style="text-align: center; margin-top: 25px;">
+                <a href="shorts.html" class="btn-primary-glow">
+                    🍿 Shorts Tasmasiga O'tish
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-copyright" style="text-align: center; padding: 20px 0; color: #64748b;">
+                <p>&copy; 2026 XIT FILM Creator Park. Barcha huquqlar himoyalangan.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        async function handleCreatorRegister(e) {
+            e.preventDefault();
+            const name = document.getElementById('creatorName').value.trim();
+            const username = document.getElementById('creatorUsername').value.trim();
+            const phone = document.getElementById('creatorPhone').value.trim();
+
+            try {
+                const res = await fetch('/movies/api/public-creator-register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, username, phone })
+                });
+                const data = await res.json();
+                if (data.success && data.creator) {
+                    showDashboard(data.creator);
+                } else {
+                    alert('Ro\'yxatdan o\'tishda xatolik yuz berdi.');
+                }
+            } catch (err) {
+                alert('Serverga ulanishda xatolik: ' + err.message);
+            }
+        }
+
+        function showDashboard(creator) {
+            document.getElementById('registerFormBox').style.display = 'none';
+            document.getElementById('creatorDashboardBox').style.display = 'block';
+            document.getElementById('dashBalance').innerText = Number(creator.balance || 10000).toLocaleString('uz-UZ') + ' UZS';
+            const refUrl = `${window.location.origin}/shorts.html?ref=${creator.refCode}`;
+            document.getElementById('myRefUrl').value = refUrl;
+        }
+
+        function copyRefUrl() {
+            const el = document.getElementById('myRefUrl');
+            el.select();
+            document.execCommand('copy');
+            alert('✅ Referal havolangiz nusxalandi!');
+        }
+    </script>
+</body>
+</html>

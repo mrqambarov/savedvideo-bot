@@ -17,7 +17,7 @@ app.use(express.json());
 // API Routes
 app.use('/api', apiRouter);
 app.use('/movies/api', apiRouter);
-app.use('/adult/api', apiRouter);
+// NOTE: /adult/api is handled exclusively by adult-server (port 5002)
 
 const tunnelManager = require('./tunnelManager');
 
@@ -32,6 +32,10 @@ const clientDist = path.join(__dirname, '..', 'movie-client', 'dist');
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
   app.get('*', (req, res) => {
+    // Don't serve SPA for API or adult routes
+    if (req.path.startsWith('/api') || req.path.startsWith('/adult')) {
+      return res.status(404).json({ error: 'Not found' });
+    }
     res.sendFile(path.join(clientDist, 'index.html'));
   });
 } else {

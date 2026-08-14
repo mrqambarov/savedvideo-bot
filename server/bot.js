@@ -354,6 +354,13 @@ function startBot(token) {
 
       // User Tracking and Sponsor Verification Middleware
       botInstance.use(async (ctx, next) => {
+        // DEBUG: barcha kiruvchi xabarlarni loglash
+        const chatType = ctx.chat?.type || 'unknown';
+        const msgText = ctx.message?.text || ctx.message?.caption || '';
+        if (chatType === 'group' || chatType === 'supergroup') {
+          console.log(`[GROUP MSG] chat="${ctx.chat?.title}" type=${chatType} from=${ctx.from?.username || ctx.from?.id} text="${msgText.substring(0, 80)}"`);
+        }
+
         if (ctx.from && !ctx.from.is_bot) {
           let referredBy = null;
           const txt = ctx.message && ctx.message.text;
@@ -399,6 +406,13 @@ function startBot(token) {
           ctx.message.text.startsWith('/ban') ||
           ctx.message.text.startsWith('/unban')
         )) {
+          return await next();
+        }
+
+        // === GURUH XABARLARI: Sponsor tekshiruvisiz o'tkazib yuborish ===
+        // Bot guruhda admin bo'lmasa ham link yuklashi uchun sponsorni skip qilamiz
+        const isGroupChat = chatType === 'group' || chatType === 'supergroup';
+        if (isGroupChat) {
           return await next();
         }
 
@@ -793,6 +807,51 @@ function startBot(token) {
           }
           return;
         }
+
+        if (data.startsWith('dl_aud:')) {
+          const shortId = data.split(':')[1];
+          let mediaPath = localVideoCache.get(shortId);
+          const url = urlCache.get(shortId);
+
+          await ctx.answerCallbackQuery({ text: '🎵 MP3 musiqa ajratilmoqda...' });
+          const statusMsg = await ctx.reply('🎧 **Videodan MP3 musiqa ajratilmoqda...**', { parse_mode: 'Markdown' });
+
+          let tempDlPath = null;
+          try {
+            if (!mediaPath || !fs.existsSync(mediaPath)) {
+              if (!url) throw new Error('Fayl muddati o\'tgan. Qayta havola yuboring.');
+              mediaPath = await downloader.downloadVideo(url, `temp_audio_${shortId}`);
+              tempDlPath = mediaPath;
+            }
+
+            const audioPath = await processor.extractAudio(mediaPath, `audio_${shortId}`);
+            const botUsername = ctx.me ? ctx.me.username : 'vibeconvert_bot';
+            const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
+            const captionText = `🎵 @${botUsername} orqali ajratib olindi 🚀\n\n🍿 Yangi HD kinolar va premyeralar: @${movieBotUsername}`;
+
+            await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
+            await ctx.replyWithAudio(new InputFile(audioPath), {
+              caption: captionText,
+              title: `Audio_${shortId}`,
+              performer: `@${botUsername}`
+            });
+
+            db.trackDownload('audio');
+            db.trackUserDownload(ctx.from.id, `MP3 Audio`, 'audio', url || 'media');
+
+            try {
+              if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
+              if (tempDlPath && fs.existsSync(tempDlPath)) fs.unlinkSync(tempDlPath);
+            } catch (e) {}
+          } catch (err) {
+            console.error('Extract audio error:', err);
+            try {
+              await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `❌ Musiqani ajratishda xatolik: ${escapeHTML(err.message)}`);
+            } catch (e) {}
+          }
+          return;
+        }
+
         if (data.startsWith('video_note:')) {
           const shortId = data.split(':')[1];
           let mediaPath = localVideoCache.get(shortId);
@@ -1040,12 +1099,31 @@ function formatDownloadError(err) {
         if (urlRegex.test(text)) {
           // Direct URL Download
           const url = text.match(urlRegex)[0];
+
+          const isGroup = ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup');
+
+          // Guruhda faqat ijtimoiy media havolalarini avtomatik yuklash
+          const SOCIAL_REGEX = /(instagram\.com|youtu\.be|youtube\.com\/shorts|youtube\.com\/watch|tiktok\.com|pinterest\.com|twitter\.com|x\.com\/.*\/status|fb\.watch|facebook\.com\/reel|vimeo\.com)/i;
+          if (isGroup && !SOCIAL_REGEX.test(url)) return; // guruhda boshqa URL lar e'tiborga olinmaydi
+
           const shortId = Math.random().toString(36).substring(2, 8);
           urlCache.set(shortId, url);
 
-          const botUsername = ctx.me.username;
+          const botUsername = ctx.me ? ctx.me.username : 'savemedia_music_bot';
           const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
-          const captionText = `❤️ @${botUsername} orqali yuklab olindi 🚀\n\n🍿 Yangi kinolar bepul: @${movieBotUsername}`;
+
+          const replyOptions = isGroup ? { reply_to_message_id: ctx.message.message_id } : {};
+
+          const senderName = ctx.from ? (ctx.from.first_name || 'Foydalanuvchi') : 'Foydalanuvchi';
+          const senderTag = ctx.from ? `<a href="tg://user?id=${ctx.from.id}">${escapeHTML(senderName)}</a>` : 'Foydalanuvchi';
+          
+          const captionText = isGroup 
+            ? `🎥 ${senderTag} yuborgan video:\n\n❤️ @${botUsername} orqali yuklab olindi 🚀`
+            : `❤️ @${botUsername} orqali yuklab olindi 🚀\n\n🍿 Yangi kinolar bepul: @${movieBotUsername}`;
+
+          const instantCaption = isGroup 
+            ? `🎥 ${senderTag} yuborgan video (Instant ⚡):\n\n❤️ @${botUsername} orqali yuklab olindi 🚀`
+            : `❤️ @${botUsername} orqali (Instant ⚡) yuklab olindi 🚀\n\n🍿 Yangi kinolar bepul: @${movieBotUsername}`;
           
           const shareText = encodeURIComponent(`Eng tezkor video va musiqa yuklovchi bot! 🚀`);
           const shareUrl = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${shareText}`;
@@ -1061,17 +1139,14 @@ function formatDownloadError(err) {
             .row()
             .url('👉 👥 Guruhga qo\'shish ⤴️', `https://t.me/${botUsername}?startgroup=true`);
 
-          const isGroup = ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup');
-          const replyOptions = isGroup ? { reply_to_message_id: ctx.message.message_id } : {};
-
           // 1. Check Instant Cache (0.1s speed)
           const cached = db.getMediaCache(url);
           if (cached) {
-            const instantCaption = `❤️ @${botUsername} orqali (Instant ⚡) yuklab olindi 🚀\n\n🍿 Yangi kinolar bepul: @${movieBotUsername}`;
             try {
               if (cached.type === 'video') {
                 await ctx.replyWithVideo(cached.fileId, {
                   caption: instantCaption,
+                  parse_mode: 'HTML',
                   reply_markup: keyboard,
                   supports_streaming: true,
                   ...replyOptions
@@ -1123,6 +1198,7 @@ function formatDownloadError(err) {
               if (isVideo) {
                 const sentMsg = await ctx.replyWithVideo(new InputFile(mediaPath), {
                   caption: captionText,
+                  parse_mode: 'HTML',
                   reply_markup: keyboard,
                   supports_streaming: true,
                   ...replyOptions
@@ -1147,6 +1223,7 @@ function formatDownloadError(err) {
               } else if (isPhoto) {
                 const sentMsg = await ctx.replyWithPhoto(new InputFile(mediaPath), {
                   caption: captionText,
+                  parse_mode: 'HTML',
                   reply_markup: keyboard,
                   ...replyOptions
                 });
@@ -1160,6 +1237,7 @@ function formatDownloadError(err) {
                 // Document fallback
                 await ctx.replyWithDocument(new InputFile(mediaPath), {
                   caption: captionText,
+                  parse_mode: 'HTML',
                   reply_markup: keyboard,
                   ...replyOptions
                 });
@@ -1271,7 +1349,61 @@ function formatDownloadError(err) {
         }
       });
 
-      // Listen for videos
+      // === GURUH: Caption dagi havolalarni avtomatik yuklash ===
+      // Foydalanuvchi guruhda rasm/video captionida link yuborganda ham ishlaydi
+      botInstance.on('message:caption', async (ctx) => {
+        const caption = ctx.message.caption || '';
+        const chatType = ctx.chat?.type;
+        const isGroup = chatType === 'group' || chatType === 'supergroup';
+        if (!isGroup) return; // faqat guruhlarda ishlaydi
+
+        const urlRegex = /https?:\/\/[^\s]+/;
+        const match = caption.match(urlRegex);
+        if (!match) return;
+
+        const url = match[0];
+        // Faqat ijtimoiy media havolalarini yuklash
+        const isSocialLink = /(instagram\.com|youtu\.be|youtube\.com\/shorts|youtube\.com\/watch|tiktok\.com|pinterest\.com|twitter\.com|x\.com|fb\.watch|facebook\.com\/reel)/i.test(url);
+        if (!isSocialLink) return;
+
+        const shortId = Math.random().toString(36).substring(2, 8);
+        urlCache.set(shortId, url);
+
+        const senderName = ctx.from ? (ctx.from.first_name || 'Foydalanuvchi') : 'Foydalanuvchi';
+        const senderTag = ctx.from ? `<a href="tg://user?id=${ctx.from.id}">${escapeHTML(senderName)}</a>` : 'Foydalanuvchi';
+        const botUsername = ctx.me ? ctx.me.username : (process.env.DOWNLOADER_BOT_USERNAME || 'savemedia_music_bot');
+        const replyOptions = { reply_to_message_id: ctx.message.message_id };
+        const captionText = `🎥 ${senderTag} yuborgan video:\n\n❤️ @${botUsername} orqali yuklab olindi 🚀`;
+
+        const statusMsg = await ctx.reply('📥 Caption dagi havola yuklanmoqda...', replyOptions);
+        try {
+          const mediaResult = await downloader.downloadVideo(url, `dl_cap_${shortId}`);
+          const mediaPaths = Array.isArray(mediaResult) ? mediaResult : [mediaResult];
+          await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
+
+          if (mediaPaths.length === 1) {
+            const mediaPath = mediaPaths[0];
+            const ext = path.extname(mediaPath).toLowerCase();
+            const isVideo = ['.mp4', '.webm', '.mkv', '.mov', '.avi'].includes(ext);
+            if (isVideo) {
+              await ctx.replyWithVideo(new InputFile(mediaPath), {
+                caption: captionText, parse_mode: 'HTML',
+                supports_streaming: true, ...replyOptions
+              });
+            } else {
+              await ctx.replyWithPhoto(new InputFile(mediaPath), {
+                caption: captionText, parse_mode: 'HTML', ...replyOptions
+              });
+            }
+            db.trackDownload('video');
+            try { fs.unlinkSync(mediaPath); } catch (e) {}
+          }
+        } catch (err) {
+          try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (e) {}
+          console.error('Caption link download error:', err.message);
+        }
+      });
+
       botInstance.on('message:video', async (ctx) => {
         const fileId = ctx.message.video.file_id;
         const duration = ctx.message.video.duration || 0;
@@ -2005,9 +2137,21 @@ function formatDownloadError(err) {
       });
 
       // Start bot polling safely with error catching
+      // allowed_updates: barcha guruh va shaxsiy xabarlarni olish uchun
       botInstance.start({
+        allowed_updates: [
+          'message',
+          'edited_message',
+          'callback_query',
+          'inline_query',
+          'chosen_inline_result',
+          'chat_member',
+          'my_chat_member'
+        ],
         onStart: (botInfo) => {
           console.log(`Telegram Bot @${botInfo.username} started successfully.`);
+          // Guruh xabarlarini olish uchun Privacy Mode o'chirilganligini tekshir
+          console.log(`[Group Mode] Bot guruh xabarlarini qabul qilish uchun sozlandi.`);
         }
       }).catch((err) => {
         console.error('Telegram Bot polling encountered an error:', err.message);

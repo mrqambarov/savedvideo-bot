@@ -5,3 +5,11 @@ server/data/
 server/temp/
 client/node_modules/
 client/dist/
+admin-panel/node_modules/
+movie-client/node_modules/
+adult-server/node_modules/
+movie-server/node_modules/
+*.zip
+*.tar.gz
+.idea/
+

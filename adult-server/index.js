@@ -13,6 +13,10 @@ const PORT = process.env.ADULT_PORT || 5002;
 
 app.use(cors());
 app.use(express.json());
+
+// Match Nginx proxy and dashboard expectations
+app.use('/adult/api', apiRouter);
+// Fallback for direct local calls or old client calls
 app.use('/api', apiRouter);
 
 app.get('/health', (req, res) => {
@@ -20,22 +24,16 @@ app.get('/health', (req, res) => {
 });
 
 // Boot 18+ Video Telegram Bot (only if distinct token is set)
-const adultToken = process.env.ADULT_BOT_TOKEN || process.env.MUSIC_BOT_TOKEN;
-const movieToken = process.env.MOVIE_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
+const adultToken = process.env.ADULT_BOT_TOKEN;
+const movieToken = process.env.MOVIE_BOT_TOKEN;
 
 if (adultToken && adultToken !== movieToken && adultToken !== process.env.TELEGRAM_BOT_TOKEN) {
   console.log('ADULT_BOT_TOKEN found. Booting 18+ Video Telegram bot...');
   bot.startBot(adultToken).catch(e => console.error('Adult Bot start error:', e.message));
-} else if (adultToken && (adultToken === movieToken || adultToken === process.env.TELEGRAM_BOT_TOKEN)) {
-  console.warn('WARNING: ADULT_BOT_TOKEN is identical to MOVIE_BOT_TOKEN/TELEGRAM_BOT_TOKEN! Adult Bot startup skipped to prevent conflict.');
-} else {
-  console.warn('WARNING: No unique ADULT_BOT_TOKEN configured. Set a unique ADULT_BOT_TOKEN in .env to activate it.');
 }
 
 app.listen(PORT, async () => {
   console.log(`18+ Video API Server running on port ${PORT}`);
-
-  // Ensure HTTPS Tunnel for Telegram Mini App
   ensureHttpsTunnel(PORT);
 }).on('error', (err) => {
   console.warn('18+ Video API Server listen notice:', err.message);

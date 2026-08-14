@@ -7,7 +7,7 @@ import DataTable from '../components/DataTable.jsx';
 import { nf, fmtDate } from '../lib/format.js';
 import { toCSV, downloadCSV, parseCSV } from '../lib/csv.js';
 
-const EMPTY = { code: '', title: '', description: '', genre: '', fileId: '', poster: '', notify: false };
+const EMPTY = { code: '', title: '', description: '', genre: '', fileId: '', youtubeUrl: '', poster: '', notify: false };
 
 function Poster({ src, size = 42 }) {
   const [err, setErr] = useState(false);
@@ -68,15 +68,16 @@ export default function Movies() {
   const highRatedCount = useMemo(() => movies.filter(m => (m.likes?.length || 0) > (m.dislikes?.length || 0)).length, [movies]);
   const totalGenresCount = genres.length;
 
-  const openAdd = () => { setForm({ ...EMPTY, genre: genres[0] || 'Triller (18+)' }); setEditing(false); };
-  const openEdit = (m) => { setForm({ code: m.code, title: m.title, description: m.description || '', genre: m.genre || '', fileId: m.fileId || '', poster: m.poster || '' }); setEditing(true); };
+  const openAdd = () => { setForm({ ...EMPTY, genre: genres[0] || 'Tarjima kino' }); setEditing(false); };
+  const openEdit = (m) => { setForm({ code: m.code, title: m.title, description: m.description || '', genre: m.genre || '', fileId: m.fileId || '', youtubeUrl: m.youtubeUrl || '', poster: m.poster || '' }); setEditing(true); };
 
   const save = async () => {
-    if (!form.code || !form.title || !form.fileId) { toast('Kod, sarlavha va fileId majburiy', 'error'); return; }
+    if (!form.code || !form.title) { toast('Kod va sarlavha majburiy', 'error'); return; }
     setBusy(true);
     const { error } = await safe(api.post('/movies', form));
     setBusy(false);
     if (error) { toast(error, 'error'); return; }
+
     toast(editing ? 'Kino/Video yangilandi' : "Kino/Video qo'shildi");
     setForm(null);
     reload();
@@ -87,6 +88,7 @@ export default function Movies() {
     const { error } = await safe(api.delete(`/movies/${encodeURIComponent(del.code)}`));
     setBusy(false);
     if (error) { toast(error, 'error'); return; }
+
     toast("Kino/Video o'chirildi");
     setDel(null);
     reload();
@@ -229,7 +231,7 @@ export default function Movies() {
                 </div>
                 <div className="field" style={{ marginBottom: 0 }}>
                   <label>Janr</label>
-                  <select className="select" value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })}>
+                  <select className="input" value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })}>
                     {!genres.includes(form.genre) && form.genre && <option value={form.genre}>{form.genre}</option>}
                     {genres.map((g) => <option key={g} value={g}>{g}</option>)}
                   </select>
@@ -241,6 +243,13 @@ export default function Movies() {
               <input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="masalan: Titanik (O'zbek tilida)" />
             </div>
             <div className="field">
+              <label>YouTube Video URL (Agar bo'lsa)</label>
+              <div style={{ position: 'relative' }}>
+                <input className="input mono" style={{ paddingLeft: 40 }} value={form.youtubeUrl} onChange={(e) => setForm({ ...form, youtubeUrl: e.target.value })} placeholder="https://www.youtube.com/watch?v=..." />
+                <PlayCircle size={16} color="#ef4444" style={{ position: 'absolute', left: 14, top: 12 }} />
+              </div>
+            </div>
+            <div className="field">
               <label>Poster URL (Rasm havolasi)</label>
               <input className="input mono" value={form.poster} onChange={(e) => setForm({ ...form, poster: e.target.value })} placeholder="https://.../poster.jpg" />
             </div>
@@ -248,8 +257,19 @@ export default function Movies() {
               <label>Tavsif va Ma'lumot</label>
               <textarea className="textarea" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Kino haqida qisqa tavsif..." />
             </div>
+            <div className="field">
+              <label>Turi (Film / Serial)</label>
+              <select className="input" value={form.type || 'film'} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                <option value="film">🎬 Film (Kino)</option>
+                <option value="serial">🍿 Serial (Fasllar & Qismlar)</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>Direct Stream Video URL (MP4 / HLS Link)</label>
+              <input className="input mono" value={form.videoUrl || ''} onChange={(e) => setForm({ ...form, videoUrl: e.target.value })} placeholder="https://.../video.mp4" />
+            </div>
             <div className="field" style={{ marginBottom: editing ? 0 : 16 }}>
-              <label>Telegram Video File ID *</label>
+              <label>Telegram Video File ID (Ixtiyoriy)</label>
               <input className="input mono" value={form.fileId} onChange={(e) => setForm({ ...form, fileId: e.target.value })} placeholder="BAACAgI..." />
             </div>
             {!editing && (
@@ -272,12 +292,14 @@ export default function Movies() {
       </Modal>
 
       {/* Genre Management Modal */}
-      <GenreModal open={genreModal} onClose={() => setGenreModal(false)} genres={genres} onSaved={() => { genresRes.reload(); }} />
+      <Modal open={genreModal} title="Janrlarni boshqarish" onClose={() => setGenreModal(false)} footer={<button className="btn btn-primary" onClick={() => setGenreModal(false)}>Yopish</button>}>
+        <div style={{ display: 'grid', gap: 10 }}>
+            {genres.map(g => <div key={g} className="badge badge-muted">{g}</div>)}
+        </div>
+      </Modal>
 
-      {/* Bulk CSV Import Modal */}
       <BulkImport open={bulkOpen} onClose={() => setBulkOpen(false)} onDone={reload} />
 
-      {/* Delete Confirmation Modal */}
       <Modal
         open={!!del}
         title="Kinoni o'chirish"
@@ -335,101 +357,8 @@ function BulkImport({ open, onClose, onDone }) {
   const close = () => { setText(''); setResult(null); onClose(); };
 
   return (
-    <Modal
-      open={open}
-      title="Ommaviy import (CSV)"
-      onClose={close}
-      width={620}
-      footer={
-        <>
-          <button className="btn btn-ghost" onClick={close}>Yopish</button>
-          <button className="btn btn-primary" onClick={submit} disabled={busy || preview.length === 0}>
-            {busy ? <span className="spinner" /> : `${preview.length} ta kinoni import qilish`}
-          </button>
-        </>
-      }
-    >
-      <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
-        Har bir qatorda vergul bilan ajratilgan: <span className="mono">kod,nomi,janr,fileId,tavsif</span>. Birinchi qator sarlavha boʻlsa avtomatik oʻtkazib yuboriladi.
-      </p>
-      <textarea
-        className="textarea mono"
-        style={{ minHeight: 160, fontSize: 12.5 }}
-        value={text}
-        onChange={(e) => { setText(e.target.value); setResult(null); }}
-        placeholder={'101,Titanik,Melodrama,BAACAgI...,Klassik film\n102,Avatar,Fantastika,BAACAgI...,'}
-      />
-      {preview.length > 0 && (
-        <div className="muted" style={{ marginTop: 10, fontSize: 12.5 }}>👀 {preview.length} ta qator aniqlandi</div>
-      )}
-      {result && (
-        <div style={{ marginTop: 12, padding: 12, background: 'var(--success-soft)', borderRadius: 10 }}>
-          <strong style={{ color: 'var(--success)' }}>✅ {result.added} / {result.total} ta qoʻshildi</strong>
-          {result.errors?.length > 0 && (
-            <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-              {result.errors.slice(0, 5).map((e, i) => <div key={i}>⚠️ {e}</div>)}
-            </div>
-          )}
-        </div>
-      )}
-    </Modal>
-  );
-}
-
-function GenreModal({ open, onClose, genres, onSaved }) {
-  const { toast } = useApp();
-  const [list, setList] = useState([]);
-  const [input, setInput] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const [wasOpen, setWasOpen] = useState(false);
-  if (open && !wasOpen) { setList(genres); setWasOpen(true); }
-  if (!open && wasOpen) { setWasOpen(false); setInput(''); }
-
-  const add = () => {
-    const v = input.trim();
-    if (!v) return;
-    if (list.includes(v)) { toast('Bu janr allaqachon bor', 'error'); return; }
-    setList([...list, v]);
-    setInput('');
-  };
-  const remove = (g) => setList(list.filter((x) => x !== g));
-
-  const save = async () => {
-    setBusy(true);
-    const { error } = await safe(movieApi.post('/genres', { genres: list }));
-    setBusy(false);
-    if (error) { toast(error, 'error'); return; }
-    toast('Janrlar saqlandi');
-    onSaved?.();
-    onClose();
-  };
-
-  return (
-    <Modal
-      open={open}
-      title="Janrlarni boshqarish"
-      onClose={onClose}
-      footer={
-        <>
-          <button className="btn btn-ghost" onClick={onClose}>Bekor</button>
-          <button className="btn btn-primary" onClick={save} disabled={busy}>{busy ? <span className="spinner" /> : 'Saqlash'}</button>
-        </>
-      }
-    >
-      <div className="flex gap" style={{ marginBottom: 16 }}>
-        <input className="input" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} placeholder="Yangi janr nomi" />
-        <button className="btn btn-ghost" onClick={add}><Plus size={16} /></button>
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {list.map((g) => (
-          <span key={g} className="badge badge-muted" style={{ paddingRight: 4 }}>
-            {g}
-            <button className="icon-btn" style={{ width: 20, height: 20, border: 'none', background: 'transparent' }} onClick={() => remove(g)}><X size={13} /></button>
-          </span>
-        ))}
-        {list.length === 0 && <span className="muted">Janr yo'q</span>}
-      </div>
+    <Modal open={open} title="Ommaviy import (CSV)" onClose={close} width={620} footer={<button className="btn btn-primary" onClick={submit} disabled={busy || preview.length === 0}>{busy ? <span className="spinner" /> : `${preview.length} ta kinoni import qilish`}</button>}>
+      <textarea className="textarea mono" style={{ minHeight: 160, fontSize: 12.5 }} value={text} onChange={(e) => { setText(e.target.value); setResult(null); }} placeholder={'101,Titanik,Melodrama,BAACAgI...,Klassik film\n102,Avatar,Fantastika,BAACAgI...,'} />
     </Modal>
   );
 }

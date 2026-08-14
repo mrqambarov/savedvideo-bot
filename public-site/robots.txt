@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /panel/
+Disallow: /adult/
+
+Sitemap: https://xitfilm.uz/sitemap.xml

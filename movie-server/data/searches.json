@@ -1,4 +1,34 @@
 {
+  "324": {
+    "query": "324",
+    "count": 1,
+    "lastResults": 0,
+    "lastAt": "2026-08-08T13:17:30.610Z"
+  },
+  "327": {
+    "query": "327",
+    "count": 2,
+    "lastResults": 0,
+    "lastAt": "2026-08-08T13:16:24.988Z"
+  },
+  "481": {
+    "query": "481",
+    "count": 4,
+    "lastResults": 0,
+    "lastAt": "2026-08-08T12:24:27.362Z"
+  },
+  "485": {
+    "query": "485",
+    "count": 1,
+    "lastResults": 0,
+    "lastAt": "2026-08-08T13:16:44.270Z"
+  },
+  "2803": {
+    "query": "2803",
+    "count": 5,
+    "lastResults": 0,
+    "lastAt": "2026-08-08T13:39:59.813Z"
+  },
   "https://www.instagram.com/reel/dboqiocnnk1/?igsh=ohp4axzlmxruyjq2": {
     "query": "https://www.instagram.com/reel/dboqiocnnk1/?igsh=ohp4axzlmxruyjq2",
     "count": 2,
@@ -16,5 +46,11 @@
     "count": 1,
     "lastResults": 0,
     "lastAt": "2026-07-30T05:25:10.365Z"
+  },
+  "она немнога": {
+    "query": "она немнога",
+    "count": 1,
+    "lastResults": 0,
+    "lastAt": "2026-08-08T13:09:36.372Z"
   }
 }

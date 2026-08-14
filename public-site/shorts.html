@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>XIT FILM Shorts — Qisqa Kino Lavhalari & Premyeralar</title>
+    <meta name="description" content="Eng sara filmlardan qiziqarli lavhalar, poygalar va shiddatli jang sahnalari. To'liq kinoni bir zumda tomosha qiling.">
+
+    <!-- Cache Control -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="XIT FILM Shorts — Qisqa Kino Lavhalari">
+    <meta property="og:description" content="Eng sara kinolardan qiziqarli lavhalar. Tomosha qiling va to'liq filmni oching.">
+    <meta property="og:type" content="video.other">
+    <meta property="og:url" content="https://xitfilm.uz/shorts.html">
+    <meta property="og:image" content="https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=1200">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%238b5cf6'/><text x='50' y='72' font-size='55' font-weight='900' text-anchor='middle' fill='white'>XF</text></svg>">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/shorts.css?v=4.3.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body class="shorts-body">
+
+    <!-- Top Action Bar -->
+    <header class="shorts-topbar">
+        <a href="/" class="shorts-logo">
+            <span>XIT</span>FILM <span class="badge-tag">Shorts</span>
+        </a>
+        <div class="shorts-top-actions">
+            <button class="auto-advance-btn active" id="autoAdvanceBtn" onclick="toggleAutoAdvance()" title="Avtomatik keyingisiga o'tish">
+                <i class="fas fa-forward"></i>
+                <span id="autoAdvanceLabel">Avto</span>
+            </button>
+            <a href="creators.html" class="partner-btn">
+                <i class="fas fa-handshake"></i>
+                <span>Hamkorlik</span>
+            </a>
+            <a href="/" class="top-btn" title="Bosh sahifa">
+                <i class="fas fa-home"></i>
+            </a>
+        </div>
+    </header>
+
+    <!-- Volume Toast Indicator -->
+    <div class="volume-toast" id="volumeToast">
+        <i class="fas fa-volume-up" id="volumeToastIcon"></i>
+        <span id="volumeToastText">Ovoz yoqildi</span>
+    </div>
+
+    <!-- Desktop Keyboard Shortcuts Tooltip -->
+    <div class="desktop-shortcuts-hint">
+        <span><kbd>↑</kbd><kbd>↓</kbd> surish</span>
+        <span><kbd>Space</kbd> pauza</span>
+        <span><kbd>M</kbd> ovoz</span>
+    </div>
+
+    <!-- Fullscreen Vertical Swipe Container -->
+    <main class="shorts-container" id="shortsContainer">
+        <!-- Loading State -->
+        <div class="shorts-loader">
+            <div class="spinner"></div>
+            <p style="font-size: 14px; font-weight: 700; color: #94a3b8;">Shorts yuklanmoqda...</p>
+        </div>
+    </main>
+
+    <!-- Movie Quick Info Modal -->
+    <div class="shorts-modal-overlay" id="movieInfoModal" onclick="closeMovieInfo(event)">
+        <div class="shorts-modal-card movie-info-card" onclick="event.stopPropagation()">
+            <button class="modal-close-btn" onclick="closeMovieInfo()"><i class="fas fa-times"></i></button>
+            <div class="movie-info-header">
+                <img src="" id="mInfoPoster" class="m-info-poster" alt="Film posteri">
+                <div class="m-info-meta">
+                    <span class="m-info-badge" id="mInfoCode">#1001</span>
+                    <h3 id="mInfoTitle">Kino Nomi</h3>
+                    <div class="m-info-tags">
+                        <span id="mInfoGenre"><i class="fas fa-film"></i> Janr</span>
+                        <span id="mInfoRating"><i class="fas fa-star" style="color:#fbbf24;"></i> 8.5</span>
+                    </div>
+                </div>
+            </div>
+            <p class="m-info-desc" id="mInfoDesc">Film tavsifi...</p>
+            <div class="m-info-actions">
+                <button class="m-info-btn primary" id="mInfoWatchBtn">
+                    <i class="fas fa-play"></i> To'liq Filmni Ko'rish
+                </button>
+                <a href="#" target="_blank" class="m-info-btn bot" id="mInfoBotBtn">
+                    <i class="fab fa-telegram"></i> Botda Yuklash
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Comments Modal -->
+    <div class="shorts-modal-overlay" id="commentsModal" onclick="closeComments(event)">
+        <div class="shorts-modal-card comments-card" onclick="event.stopPropagation()">
+            <div class="comments-card-header">
+                <div class="flex-row">
+                    <i class="fas fa-comments" style="color: #ec4899;"></i>
+                    <h4>Izohlar (<span id="commentsCount">0</span>)</h4>
+                </div>
+                <button class="modal-close-btn" onclick="closeComments()"><i class="fas fa-times"></i></button>
+            </div>
+
+            <!-- Quick Reaction Chips -->
+            <div class="quick-reactions">
+                <button class="reaction-chip" onclick="insertReaction('🔥 Juda zo\'r sahna!')">🔥 Zo'r</button>
+                <button class="reaction-chip" onclick="insertReaction('🍿 Kino kodi nechi?')">🍿 Kod?</button>
+                <button class="reaction-chip" onclick="insertReaction('❤️ Tavsiya qilaman')">❤️ 10/10</button>
+                <button class="reaction-chip" onclick="insertReaction('😱 Kutilmagan burilish!')">😱 Dahshat</button>
+            </div>
+
+            <div class="comments-list" id="commentsList">
+                <div class="comments-empty">
+                    <i class="fas fa-comment-dots"></i>
+                    <p>Hozircha izohlar yo'q. Birinchi bo'lib fikr bildiring!</p>
+                </div>
+            </div>
+
+            <form class="comment-input-form" onsubmit="submitComment(event)">
+                <input type="text" id="commentTextInput" placeholder="Izohingizni yozing..." maxlength="200" required>
+                <button type="submit" class="comment-send-btn"><i class="fas fa-paper-plane"></i></button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="shorts-nav-bar">
+        <a href="/" class="nav-item">
+            <i class="fas fa-home"></i>
+            <span>Asosiy</span>
+        </a>
+        <a href="shorts.html" class="nav-item active">
+            <i class="fas fa-bolt"></i>
+            <span>Shorts</span>
+        </a>
+        <a href="/?search=1" class="nav-item">
+            <i class="fas fa-search"></i>
+            <span>Qidiruv</span>
+        </a>
+        <a href="creators.html" class="nav-item">
+            <i class="fas fa-users-cog"></i>
+            <span>Hamkorlik</span>
+        </a>
+        <a href="profile.html" class="nav-item">
+            <i class="fas fa-user"></i>
+            <span>Profil</span>
+        </a>
+    </nav>
+
+    <!-- Interactive Script -->
+    <script src="js/shorts.js?v=4.3.0"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "cre_official",
+    "name": "XIT FILM Rasmiy Kanali",
+    "username": "@xitfilm_uz",
+    "telegramId": 6263659922,
+    "phone": "+998901234567",
+    "refCode": "official",
+    "balance": 250000,
+    "totalViews": 45000,
+    "totalEarned": 750000,
+    "status": "active",
+    "ratePer1kViews": 5000,
+    "dateJoined": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "id": "cre_kinochi",
+    "name": "Kino Master (Instagram / Reels)",
+    "username": "@kinomaster_uz",
+    "telegramId": 5839622003,
+    "phone": "+998935554433",
+    "refCode": "kinomaster",
+    "balance": 85000,
+    "totalViews": 17200,
+    "totalEarned": 120000,
+    "status": "active",
+    "ratePer1kViews": 5000,
+    "dateJoined": "2026-08-10T12:00:00.000Z"
+  }
+]

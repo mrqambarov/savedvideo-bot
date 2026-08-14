@@ -12,7 +12,13 @@ module.exports = {
       },
       autorestart: true,
       watch: false,
-      max_memory_restart: '1G'
+      max_memory_restart: '1G',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      error_file: './logs/vibeconvert-error.log',
+      out_file: './logs/vibeconvert-out.log',
+      merge_logs: true,
+      max_size: '50M',
+      retain: 5
     },
     {
       name: 'movie-bot',
@@ -26,7 +32,13 @@ module.exports = {
       },
       autorestart: true,
       watch: false,
-      max_memory_restart: '1G'
+      max_memory_restart: '1G',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      error_file: './logs/movie-bot-error.log',
+      out_file: './logs/movie-bot-out.log',
+      merge_logs: true,
+      max_size: '50M',
+      retain: 5
     },
     {
       name: 'adult-bot',
@@ -40,9 +52,13 @@ module.exports = {
       },
       autorestart: true,
       watch: false,
-      max_memory_restart: '1G'
+      max_memory_restart: '1G',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      error_file: './logs/adult-bot-error.log',
+      out_file: './logs/adult-bot-out.log',
+      merge_logs: true,
+      max_size: '50M',
+      retain: 5
     }
   ]
 };
-
-

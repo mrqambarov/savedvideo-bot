@@ -1,0 +1,1010 @@
+/* ============================================
+   XIT FILM — Modals Module v4.0
+   Movie Modal + Auth Modal (Professional)
+   ============================================ */
+
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modal.active {
+    display: flex;
+    animation: modalFadeIn 0.3s ease;
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+}
+
+/* ============================================
+   Movie Modal
+   ============================================ */
+.premium-modal-box {
+    background: #08080a;
+    width: 100%;
+    max-width: 1150px;
+    height: 90vh;
+    border-radius: var(--radius-xl);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 0 100px rgba(0, 0, 0, 1), 0 0 40px rgba(139, 92, 246, 0.05);
+    animation: modalBoxIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalBoxIn {
+    from { opacity: 0; transform: scale(0.92) translateY(30px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.p-modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 500px;
+    background-size: cover;
+    background-position: center;
+    mask-image: linear-gradient(to bottom, black 30%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent 100%);
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+.p-modal-body {
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    padding: 0 60px 60px 60px;
+    z-index: 5;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-dark) transparent;
+}
+
+.p-modal-body::-webkit-scrollbar { width: 6px; }
+.p-modal-body::-webkit-scrollbar-thumb { background: var(--primary-dark); border-radius: 10px; }
+
+.p-modal-content-grid {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 50px;
+    margin-top: 180px;
+}
+
+/* Modal Left — Poster */
+.p-modal-left img {
+    width: 100%;
+    border-radius: 24px;
+    border: 2px solid var(--glass-border);
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.9);
+    transition: 0.4s;
+}
+
+.p-modal-left img:hover {
+    transform: scale(1.02);
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+/* Modal Right — Content */
+.p-modal-right h2 {
+    font-size: 50px;
+    font-weight: 950;
+    margin-bottom: 18px;
+    line-height: 1.05;
+    letter-spacing: -1px;
+}
+
+.p-modal-meta {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 25px;
+    font-weight: 800;
+    color: var(--text-muted);
+    font-size: 16px;
+}
+
+.p-rate {
+    color: var(--accent);
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#modalDesc {
+    font-size: 17px;
+    line-height: 1.8;
+    color: #94a3b8;
+    margin-bottom: 35px;
+}
+
+/* Video Box */
+.p-video-box {
+    width: 100%;
+    aspect-ratio: 16/9;
+    border-radius: 24px;
+    overflow: hidden;
+    background: #000;
+    border: 1px solid var(--glass-border);
+    margin-bottom: 40px;
+}
+
+/* Modal Footer Actions */
+.p-modal-footer {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.p-btn-watch {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    text-decoration: none;
+    padding: 18px 45px;
+    border-radius: 18px;
+    font-weight: 800;
+    font-size: 16px;
+    transition: 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 10px 25px rgba(139, 92, 246, 0.3);
+}
+
+.p-btn-watch:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 15px 35px rgba(139, 92, 246, 0.5);
+}
+
+.p-btn-icon {
+    width: 58px;
+    height: 58px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    transition: 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.p-btn-icon:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+.p-btn-icon.active {
+    background: #ef4444;
+    border-color: #ef4444;
+    box-shadow: 0 5px 15px rgba(239, 68, 68, 0.3);
+}
+
+/* Close Button */
+.p-close-btn {
+    position: absolute;
+    top: 25px;
+    right: 35px;
+    font-size: 50px;
+    color: #fff;
+    background: none;
+    border: none;
+    cursor: pointer;
+    z-index: 100;
+    opacity: 0.4;
+    transition: 0.3s;
+    line-height: 1;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.p-close-btn:hover {
+    opacity: 1;
+    transform: rotate(90deg);
+    color: var(--primary);
+}
+
+/* ============================================
+   Auth Modal
+   ============================================ */
+.auth-card {
+    background: linear-gradient(145deg, #0f0f15, #0a0a0f);
+    padding: 50px 40px;
+    border-radius: var(--radius-xl);
+    width: 460px;
+    position: relative;
+    z-index: 10;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 1);
+    text-align: center;
+    animation: modalBoxIn 0.4s ease;
+}
+
+.auth-card h2 {
+    font-size: 28px;
+    font-weight: 900;
+    margin-bottom: 10px;
+}
+
+.auth-subtitle {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 30px;
+    display: block;
+}
+
+.auth-steps {
+    text-align: left;
+    background: rgba(255, 255, 255, 0.02);
+    padding: 20px;
+    border-radius: 20px;
+    border: 1px solid var(--glass-border);
+    margin-bottom: 30px;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: var(--text-dim);
+}
+
+.step:last-child { margin-bottom: 0; }
+
+.step i {
+    color: var(--primary);
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+}
+
+.step a {
+    color: var(--primary-light);
+    text-decoration: none;
+}
+
+.step a:hover {
+    color: #fff;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.auth-form input {
+    background: #000;
+    border: 2px solid var(--glass-border);
+    color: #fff;
+    padding: 22px;
+    border-radius: 20px;
+    font-size: 34px;
+    text-align: center;
+    letter-spacing: 12px;
+    font-weight: 900;
+    outline: none;
+    width: 100%;
+    transition: 0.3s;
+}
+
+.auth-form input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.15);
+}
+
+.btn-auth-submit {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    border: none;
+    padding: 20px;
+    border-radius: 20px;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.btn-auth-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(139, 92, 246, 0.3);
+}
+
+.btn-cancel-link {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 15px;
+    transition: 0.3s;
+}
+
+.btn-cancel-link:hover {
+    color: #fff;
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+@media (max-width: 900px) {
+    .premium-modal-box {
+        border-radius: 24px;
+        height: 95vh;
+        max-width: 100%;
+    }
+
+    .p-modal-content-grid {
+        grid-template-columns: 1fr;
+        margin-top: 80px;
+        text-align: center;
+        gap: 30px;
+    }
+
+    .p-modal-left {
+        display: flex;
+        justify-content: center;
+    }
+
+    .p-modal-left img {
+        max-width: 200px;
+    }
+
+    .p-modal-body {
+        padding: 20px 20px 40px;
+    }
+
+    .p-modal-right h2 {
+        font-size: 28px;
+    }
+
+    .p-modal-meta {
+        justify-content: center;
+    }
+
+    .p-modal-footer {
+        justify-content: center;
+    }
+
+    .p-btn-watch {
+        padding: 16px 35px;
+        font-size: 14px;
+    }
+
+    .p-close-btn {
+        top: 15px;
+        right: 20px;
+        font-size: 40px;
+    }
+
+    .auth-card {
+        width: 95%;
+        max-width: 420px;
+        padding: 35px 25px;
+        border-radius: 28px;
+    }
+}
+
+/* ============================================
+   Custom Video Player
+   ============================================ */
+.custom-player {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.custom-player video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    cursor: pointer;
+}
+
+/* Player Controls Overlay */
+.player-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.6) 60%, transparent 100%);
+    padding: 20px 25px;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: auto;
+}
+
+.custom-player:hover .player-controls,
+.custom-player.paused .player-controls,
+.custom-player.controls-active .player-controls {
+    opacity: 1;
+}
+
+/* Progress Area */
+.progress-area {
+    width: 100%;
+    height: 6px;
+    cursor: pointer;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+}
+
+.progress-bar {
+    position: relative;
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    transition: height 0.1s ease;
+}
+
+.progress-area:hover .progress-bar {
+    height: 6px;
+}
+
+.buffered-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 4px;
+    width: 0%;
+}
+
+.current-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: var(--primary);
+    border-radius: 4px;
+    width: 0%;
+}
+
+.current-bar::after {
+    content: '';
+    position: absolute;
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%) scale(0);
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--primary);
+    transition: transform 0.1s ease;
+}
+
+.progress-area:hover .current-bar::after {
+    transform: translateY(-50%) scale(1);
+}
+
+/* Buttons and Layout */
+.controls-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.controls-left, .controls-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.player-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    opacity: 0.85;
+}
+
+.player-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    opacity: 1;
+    transform: scale(1.08);
+}
+
+.player-time {
+    color: #cbd5e1;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* Volume Slider */
+.volume-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.volume-slider {
+    width: 60px;
+    height: 4px;
+    -webkit-appearance: none;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    outline: none;
+    transition: width 0.2s ease;
+    cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 5px rgba(0,0,0,0.5);
+    cursor: pointer;
+}
+
+/* Custom Dropdown Menus */
+.player-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.player-dropdown-content {
+    display: none;
+    position: absolute;
+    bottom: 45px;
+    right: 0;
+    background: rgba(8, 8, 10, 0.95);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    min-width: 100px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    z-index: 100;
+    overflow: hidden;
+}
+
+.player-dropdown:hover .player-dropdown-content {
+    display: block;
+}
+
+.player-dropdown-content div {
+    color: #cbd5e1;
+    padding: 10px 16px;
+    font-size: 13px;
+    text-decoration: none;
+    display: block;
+    cursor: pointer;
+    text-align: center;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.player-dropdown-content div:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.player-dropdown-content div.active {
+    color: var(--primary-light);
+    font-weight: 700;
+    background: rgba(139, 92, 246, 0.1);
+}
+
+/* ============================================
+   Verification PIN Code & Tabs Styles
+   ============================================ */
+.auth-tabs .auth-tab-btn.active {
+    background: var(--primary) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+}
+
+.pin-code-container {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.pin-digit {
+    width: 46px;
+    height: 54px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    color: #fff;
+    font-size: 22px;
+    font-weight: 800;
+    text-align: center;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.pin-digit:focus {
+    border-color: var(--primary);
+    background: rgba(139, 92, 246, 0.08);
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.25);
+    transform: scale(1.05);
+}
+
+body.light-theme .pin-digit {
+    background: #f1f5f9;
+    color: #0f172a;
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .pin-digit:focus {
+    background: #fff;
+    border-color: var(--primary);
+}
+
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+/* ============================================
+   Ambient Lighting Backdrop (Cinema Effect)
+   ============================================ */
+.ambient-glow-layer {
+    position: absolute;
+    inset: -30px;
+    background: radial-gradient(circle at center, rgba(139, 92, 246, 0.35) 0%, rgba(56, 189, 248, 0.15) 50%, transparent 75%);
+    filter: blur(40px);
+    opacity: 0.7;
+    z-index: 0;
+    pointer-events: none;
+    transition: all 1s ease;
+}
+
+/* Resume Playback Prompt Banner */
+.resume-banner {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 14px;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+    animation: fadeIn 0.4s ease;
+}
+
+.resume-banner-text {
+    font-size: 13px;
+    font-weight: 700;
+    color: #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.resume-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.resume-btn-yes {
+    background: #0ea5e9;
+    border: none;
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.resume-btn-yes:hover {
+    background: #0284c7;
+    transform: scale(1.05);
+}
+
+.resume-btn-no {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--glass-border);
+    color: var(--text-dim);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* ============================================
+   Movie Request Modal (Kino Buyurtma)
+   ============================================ */
+.request-card {
+    background: linear-gradient(145deg, #0d0d12, #07070a);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 35px 30px;
+    width: 100%;
+    max-width: 480px;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(14, 165, 233, 0.15);
+    animation: modalBoxIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.request-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+    text-align: left;
+}
+
+.request-input-group label {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.request-input {
+    width: 100%;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 0 16px;
+    color: #fff;
+    font-size: 14px;
+    outline: none;
+    transition: 0.3s;
+}
+
+.request-input:focus {
+    border-color: #38bdf8;
+    background: rgba(56, 189, 248, 0.05);
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+}
+
+.request-textarea {
+    width: 100%;
+    min-height: 80px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    color: #fff;
+    font-size: 14px;
+    outline: none;
+    resize: vertical;
+    transition: 0.3s;
+}
+
+.request-textarea:focus {
+    border-color: #38bdf8;
+    background: rgba(56, 189, 248, 0.05);
+}
+
+.request-submit-btn {
+    width: 100%;
+    height: 50px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+    border: none;
+    color: #fff;
+    font-weight: 850;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 24px rgba(14, 165, 233, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.request-submit-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(14, 165, 233, 0.5);
+    filter: brightness(1.1);
+}
+
+/* ============================================
+   Mobile Search Modal (App Experience)
+   ============================================ */
+.mobile-search-card {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #08080c;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    animation: modalFadeIn 0.25s ease;
+}
+
+.mobile-search-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.mobile-search-input-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    padding: 0 14px;
+    height: 46px;
+    gap: 10px;
+}
+
+.mobile-search-input-wrap i.fa-search {
+    color: var(--primary-light);
+    font-size: 15px;
+}
+
+.mobile-search-input-wrap input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.mobile-voice-btn {
+    background: none;
+    border: none;
+    color: var(--primary-light);
+    font-size: 15px;
+    cursor: pointer;
+    padding: 6px;
+}
+
+.mobile-search-cancel {
+    background: none;
+    border: none;
+    color: var(--primary-light);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 8px 4px;
+}
+
+.mobile-search-results {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mobile-search-empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 60px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.mobile-search-empty i {
+    font-size: 40px;
+    opacity: 0.3;
+}
+
+/* ============================================
+   Responsive Modals (Mobile & Telegram WebApp)
+   ============================================ */
+@media (max-width: 768px) {
+    .modal {
+        padding: 0;
+        align-items: flex-end;
+    }
+    .premium-modal-box {
+        height: 94vh;
+        max-height: 94vh;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        border-top-left-radius: 24px;
+        border-top-right-radius: 24px;
+    }
+    .p-modal-body {
+        padding: 0 16px 80px 16px;
+    }
+    .p-modal-content-grid {
+        grid-template-columns: 1fr;
+        gap: 18px;
+        margin-top: 50px;
+    }
+    .p-modal-left {
+        display: none;
+    }
+    .p-modal-right h2 {
+        font-size: 24px;
+        margin-bottom: 10px;
+    }
+    .p-modal-meta {
+        gap: 12px;
+        font-size: 13px;
+        margin-bottom: 16px;
+    }
+    #modalDesc {
+        font-size: 14px;
+        line-height: 1.6;
+        margin-bottom: 20px;
+    }
+    .p-video-box {
+        border-radius: 16px;
+        margin-bottom: 20px;
+    }
+    .p-modal-footer {
+        flex-direction: column;
+        gap: 10px;
+    }
+    .p-btn-watch {
+        width: 100%;
+        justify-content: center;
+    }
+    .request-card {
+        padding: 24px 18px;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        border-top-left-radius: 24px;
+        border-top-right-radius: 24px;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+}
+

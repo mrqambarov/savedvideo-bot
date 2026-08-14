@@ -1,0 +1,168 @@
+/* ============================================
+   XIT FILM — Pages Module (Sub-pages Styling)
+   Premium Content Pages, Glass Cards, Info Grid
+   ============================================ */
+
+.premium-content-page {
+    padding-top: 140px;
+    padding-bottom: 100px;
+    min-height: 100vh;
+}
+
+.glass-card {
+    background: linear-gradient(145deg, rgba(18, 18, 23, 0.9), rgba(8, 8, 12, 0.95));
+    border: 1px solid var(--glass-border);
+    border-radius: 40px;
+    padding: 70px 60px;
+    max-width: 900px;
+    margin: 0 auto;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.6);
+    position: relative;
+    overflow: hidden;
+}
+
+.glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--primary-light), transparent);
+    opacity: 0.5;
+}
+
+.premium-subtitle {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: var(--primary);
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    padding: 8px 20px;
+    border-radius: 50px;
+    margin-bottom: 25px;
+}
+
+.premium-title {
+    font-size: 48px;
+    font-weight: 950;
+    line-height: 1.1;
+    margin-bottom: 40px;
+    background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.content-text {
+    color: var(--text-dim);
+    font-size: 16px;
+    line-height: 1.9;
+}
+
+.content-text p {
+    margin-bottom: 20px;
+}
+
+.content-text h3 {
+    color: #fff;
+    font-size: 22px;
+    font-weight: 800;
+    margin: 40px 0 15px 0;
+}
+
+.content-text ul {
+    padding-left: 20px;
+    margin-bottom: 20px;
+}
+
+.content-text ul li {
+    margin-bottom: 8px;
+    color: var(--text-dim);
+}
+
+.content-text a {
+    color: var(--primary-light);
+    text-decoration: none;
+    transition: 0.3s;
+}
+
+.content-text a:hover {
+    color: #fff;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 25px;
+    margin: 40px 0;
+}
+
+.info-item {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 35px 25px;
+    text-align: center;
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.info-item:hover {
+    transform: translateY(-5px);
+    border-color: var(--primary);
+    background: rgba(139, 92, 246, 0.05);
+    box-shadow: 0 20px 40px rgba(139, 92, 246, 0.1);
+}
+
+.info-item i {
+    font-size: 36px;
+    color: var(--primary);
+    margin-bottom: 20px;
+    display: block;
+}
+
+.info-item h4 {
+    color: #fff;
+    font-size: 18px;
+    font-weight: 800;
+    margin-bottom: 10px;
+}
+
+.info-item p {
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 0;
+}
+
+/* Footer bottom for sub-pages */
+.footer-bottom {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 20px 0;
+}
+
+@media (max-width: 768px) {
+    .premium-content-page {
+        padding-top: 110px;
+        padding-bottom: 60px;
+    }
+
+    .glass-card {
+        padding: 40px 25px;
+        border-radius: 28px;
+    }
+
+    .premium-title {
+        font-size: 32px;
+    }
+
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+}
