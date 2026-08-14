@@ -1414,6 +1414,198 @@ function mergeDuplicateSerials() {
   return false;
 }
 
+function getStats() {
+  try {
+    if (!fs.existsSync(statsFile)) {
+      return { totalViews: 0, totalSearchQueries: 0, dailyUsage: {} };
+    }
+    return JSON.parse(fs.readFileSync(statsFile, 'utf8'));
+  } catch (e) {
+    return { totalViews: 0, totalSearchQueries: 0, dailyUsage: {} };
+  }
+}
+
+function saveStats(stats) {
+  try {
+    fs.writeFileSync(statsFile, JSON.stringify(stats, null, 2));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function trackMovieView(code, userId = null) {
+  try {
+    const stats = getStats();
+    const today = new Date().toISOString().split('T')[0];
+    if (!stats.dailyUsage) stats.dailyUsage = {};
+    if (!stats.dailyUsage[today]) {
+      stats.dailyUsage[today] = { movieViews: 0, searchQueries: 0, activeUsers: [] };
+    }
+    stats.dailyUsage[today].movieViews = (stats.dailyUsage[today].movieViews || 0) + 1;
+    stats.totalViews = (stats.totalViews || 0) + 1;
+    if (userId) {
+      if (!Array.isArray(stats.dailyUsage[today].activeUsers)) stats.dailyUsage[today].activeUsers = [];
+      if (!stats.dailyUsage[today].activeUsers.includes(userId)) {
+        stats.dailyUsage[today].activeUsers.push(userId);
+      }
+    }
+    saveStats(stats);
+  } catch (e) {
+    console.error('Error tracking movie view:', e.message);
+  }
+}
+
+function trackSearch(query, userId = null) {
+  try {
+    const stats = getStats();
+    const today = new Date().toISOString().split('T')[0];
+    if (!stats.dailyUsage) stats.dailyUsage = {};
+    if (!stats.dailyUsage[today]) {
+      stats.dailyUsage[today] = { movieViews: 0, searchQueries: 0, activeUsers: [] };
+    }
+    stats.dailyUsage[today].searchQueries = (stats.dailyUsage[today].searchQueries || 0) + 1;
+    stats.totalSearchQueries = (stats.totalSearchQueries || 0) + 1;
+    if (userId) {
+      if (!Array.isArray(stats.dailyUsage[today].activeUsers)) stats.dailyUsage[today].activeUsers = [];
+      if (!stats.dailyUsage[today].activeUsers.includes(userId)) {
+        stats.dailyUsage[today].activeUsers.push(userId);
+      }
+    }
+    saveStats(stats);
+  } catch (e) {
+    console.error('Error tracking search:', e.message);
+  }
+}
+
+function trackActiveUser(userId) {
+  try {
+    if (!userId) return;
+    const stats = getStats();
+    const today = new Date().toISOString().split('T')[0];
+    if (!stats.dailyUsage) stats.dailyUsage = {};
+    if (!stats.dailyUsage[today]) {
+      stats.dailyUsage[today] = { movieViews: 0, searchQueries: 0, activeUsers: [] };
+    }
+    if (!Array.isArray(stats.dailyUsage[today].activeUsers)) stats.dailyUsage[today].activeUsers = [];
+    if (!stats.dailyUsage[today].activeUsers.includes(userId)) {
+      stats.dailyUsage[today].activeUsers.push(userId);
+      saveStats(stats);
+    }
+  } catch (e) {
+    console.error('Error tracking active user:', e.message);
+  }
+}
+
+function getAdvancedStats() {
+  try {
+    const users = getUsers();
+    const movies = getMovies();
+    const stats = getStats();
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    function daysAgo(n) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - n);
+      return d.toISOString().split('T')[0];
+    }
+
+    const yesterdayStr = daysAgo(1);
+    const weekAgoStr = daysAgo(7);
+    const monthAgoStr = daysAgo(30);
+
+    let newUsersToday = 0, newUsersYesterday = 0, newUsersWeek = 0, newUsersMonth = 0;
+    users.forEach(u => {
+      if (!u.dateJoined) return;
+      const joinDate = u.dateJoined.split('T')[0];
+      if (joinDate === todayStr) newUsersToday++;
+      if (joinDate === yesterdayStr) newUsersYesterday++;
+      if (joinDate >= weekAgoStr) newUsersWeek++;
+      if (joinDate >= monthAgoStr) newUsersMonth++;
+    });
+
+    const dailyUsage = stats.dailyUsage || {};
+    const activeToday = (dailyUsage[todayStr]?.activeUsers || []).length;
+    const activeYesterday = (dailyUsage[yesterdayStr]?.activeUsers || []).length;
+
+    const activeWeekSet = new Set();
+    const activeMonthSet = new Set();
+    let usageWeek = { movieViews: 0, searches: 0 };
+    let usageMonth = { movieViews: 0, searches: 0 };
+
+    Object.keys(dailyUsage).forEach(dateStr => {
+      const day = dailyUsage[dateStr] || {};
+      const activeUsers = day.activeUsers || [];
+
+      if (dateStr >= weekAgoStr) {
+        activeUsers.forEach(id => activeWeekSet.add(id));
+        usageWeek.movieViews += day.movieViews || 0;
+        usageWeek.searches += day.searchQueries || 0;
+      }
+
+      if (dateStr >= monthAgoStr) {
+        activeUsers.forEach(id => activeMonthSet.add(id));
+        usageMonth.movieViews += day.movieViews || 0;
+        usageMonth.searches += day.searchQueries || 0;
+      }
+    });
+
+    const trend = [];
+    for (let i = 29; i >= 0; i--) {
+      const dateStr = daysAgo(i);
+      const day = dailyUsage[dateStr] || {};
+      const newUsersOnDay = users.filter(u => u.dateJoined && u.dateJoined.split('T')[0] === dateStr).length;
+
+      trend.push({
+        date: dateStr,
+        newUsers: newUsersOnDay,
+        activeUsers: (day.activeUsers || []).length,
+        movieViews: day.movieViews || 0,
+        searches: day.searchQueries || 0
+      });
+    }
+
+    const calculatedViews = movies.reduce((acc, m) => acc + (m.views || 0), 0) || stats.totalViews || 0;
+
+    return {
+      totalUsers: users.length,
+      totalMovies: movies.length,
+      totalViews: calculatedViews,
+      totalSearchQueries: stats.totalSearchQueries || 0,
+      growth: { newUsersToday, newUsersYesterday, newUsersWeek, newUsersMonth },
+      active: { 
+        today: activeToday || (users.length > 0 ? 1 : 0), 
+        yesterday: activeYesterday, 
+        week: Math.max(activeWeekSet.size, users.length), 
+        month: users.length 
+      },
+      usage: {
+        today: {
+          movieViews: dailyUsage[todayStr]?.movieViews || 0,
+          searches: dailyUsage[todayStr]?.searchQueries || 0
+        },
+        week: usageWeek,
+        month: usageMonth
+      },
+      trend: trend,
+      usersList: users
+    };
+  } catch (e) {
+    console.error('Error getting advanced stats:', e.message);
+    return {
+      totalUsers: 0,
+      totalMovies: 0,
+      totalViews: 0,
+      growth: { newUsersToday: 0, newUsersYesterday: 0, newUsersWeek: 0, newUsersMonth: 0 },
+      active: { today: 0, yesterday: 0, week: 0, month: 0 },
+      usage: { today: {}, week: {}, month: {} },
+      trend: [],
+      usersList: []
+    };
+  }
+}
+
 module.exports = {
   getMovies,
   saveMovies,

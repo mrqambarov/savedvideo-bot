@@ -1,7 +1,8 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { 
   Plus, Play, Eye, Heart, Share2, Trash2, Edit2, Sparkles, 
-  Film, ExternalLink, Clapperboard, CheckCircle, Clock, Video
+  Film, ExternalLink, Clapperboard, CheckCircle, Clock, Video,
+  Upload, Image, Check, AlertCircle
 } from 'lucide-react';
 import { movieApi, safe } from '../lib/api.js';
 import { useApp } from '../context/AppContext.jsx';
@@ -28,12 +29,17 @@ export default function Shorts() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Modals
+  // Modals & form state
   const [form, setForm] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [previewVideo, setPreviewVideo] = useState(null);
   const [delTarget, setDelTarget] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadingPoster, setUploadingPoster] = useState(false);
+
+  const videoInputRef = useRef(null);
+  const posterInputRef = useRef(null);
 
   const reload = useCallback(async () => {
     const { data } = await safe(movieApi.get('/shorts'));
@@ -79,6 +85,72 @@ export default function Shorts() {
       status: short.status || 'active'
     });
     setEditingId(short.id);
+  };
+
+  // Direct Video File Upload to VPS/Server
+  const handleVideoFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('video/')) {
+      return toast('Iltimos faqat video fayl tanlang (MP4, MOV, WEBM)', 'error');
+    }
+
+    const formData = new FormData();
+    formData.append('video', file);
+
+    setUploadingVideo(true);
+    toast('Video yuklanmoqda, kuting...', 'info');
+
+    try {
+      const res = await movieApi.post('/upload-short-video', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      setUploadingVideo(false);
+      if (res.data?.success && res.data?.url) {
+        setForm(prev => ({
+          ...prev,
+          videoUrl: res.data.url,
+          title: prev.title || file.name.replace(/\.[^/.]+$/, "")
+        }));
+        toast('✅ Video fayl serverga yuklandi!');
+      } else {
+        toast('Video yuklashda xatolik yuz berdi', 'error');
+      }
+    } catch (err) {
+      setUploadingVideo(false);
+      toast(err.response?.data?.error || err.message || 'Yuklash xatoligi', 'error');
+    }
+  };
+
+  // Direct Poster Image Upload
+  const handlePosterFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      return toast('Iltimos faqat rasm fayl tanlang (JPG, PNG, WEBP)', 'error');
+    }
+
+    const formData = new FormData();
+    formData.append('poster', file);
+
+    setUploadingPoster(true);
+    try {
+      const res = await movieApi.post('/upload-poster', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      setUploadingPoster(false);
+      if (res.data?.success && res.data?.url) {
+        setForm(prev => ({ ...prev, poster: res.data.url }));
+        toast('✅ Rasm muvaffaqiyatli yuklandi!');
+      }
+    } catch (err) {
+      setUploadingPoster(false);
+      toast('Rasm yuklashda xatolik', 'error');
+    }
   };
 
   const save = async () => {
@@ -304,13 +376,13 @@ export default function Shorts() {
         open={!!form}
         title={editingId ? 'Shorts Videoni Tahrirlash' : 'Yangi Shorts Video Qo\'shish'}
         onClose={() => setForm(null)}
-        width={560}
+        width={580}
         footer={
           <div className="flex gap" style={{ justifyContent: 'flex-end' }}>
-            <button className="btn btn-secondary" onClick={() => setForm(null)} disabled={busy}>
+            <button className="btn btn-secondary" onClick={() => setForm(null)} disabled={busy || uploadingVideo}>
               Bekor qilish
             </button>
-            <button className="btn btn-primary" onClick={save} disabled={busy}>
+            <button className="btn btn-primary" onClick={save} disabled={busy || uploadingVideo}>
               {busy ? 'Saqlanmoqda...' : 'Saqlash'}
             </button>
           </div>
@@ -318,6 +390,76 @@ export default function Shorts() {
       >
         {form && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            
+            {/* Direct Video File Upload Box */}
+            <div style={{
+              border: '2px dashed var(--border)',
+              borderRadius: 14,
+              padding: '16px 20px',
+              background: 'var(--surface-2)',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 8
+            }}>
+              <input 
+                type="file" 
+                ref={videoInputRef} 
+                accept="video/*" 
+                style={{ display: 'none' }} 
+                onChange={handleVideoFileUpload} 
+              />
+              
+              <div style={{
+                width: 44,
+                height: 44,
+                borderRadius: '50%',
+                background: 'rgba(139, 92, 246, 0.15)',
+                color: '#8b5cf6',
+                display: 'grid',
+                placeItems: 'center'
+              }}>
+                <Upload size={20} />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)' }}>
+                  {uploadingVideo ? '⏳ Video serverga yuklanmoqda...' : 'Tayyor Video Faylni Tanlang (MP4)'}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                  Kompyuteringiz yoki telefoningizdan video lavhani to'g'ridan-to'g'ri yuklang
+                </div>
+              </div>
+
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ fontSize: 12, padding: '6px 14px', marginTop: 4 }}
+                onClick={() => videoInputRef.current?.click()}
+                disabled={uploadingVideo}
+              >
+                {uploadingVideo ? 'Yuklanmoqda...' : '📁 Faylni tanlash'}
+              </button>
+
+              {form.videoUrl && (
+                <div style={{ 
+                  marginTop: 6, 
+                  padding: '4px 10px', 
+                  borderRadius: 8, 
+                  background: 'rgba(16,185,129,0.15)', 
+                  color: '#10b981', 
+                  fontSize: 12, 
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}>
+                  <Check size={14} /> Video biriktirildi: {form.videoUrl}
+                </div>
+              )}
+            </div>
+
             <div>
               <label className="form-label">Sarlavha (Jalb qiluvchi nom) *</label>
               <input
@@ -353,22 +495,41 @@ export default function Shorts() {
             </div>
 
             <div>
-              <label className="form-label">Video MP4 Havolasi (URL) *</label>
+              <label className="form-label">Video Havolasi (URL yoki Server Yo'li) *</label>
               <input
                 className="input"
-                type="url"
-                placeholder="https://server.com/shorts/video.mp4"
+                type="text"
+                placeholder="/uploads/shorts/video.mp4 yoki tashqi havola"
                 value={form.videoUrl}
                 onChange={(e) => setForm({ ...form, videoUrl: e.target.value })}
               />
             </div>
 
             <div>
-              <label className="form-label">Poster Rasm Havolasi (Ixtiyoriy)</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <label className="form-label" style={{ marginBottom: 0 }}>Poster Rasmi (Ixtiyoriy)</label>
+                <button 
+                  type="button" 
+                  className="btn btn-ghost" 
+                  style={{ fontSize: 11, padding: '2px 8px' }}
+                  onClick={() => posterInputRef.current?.click()}
+                  disabled={uploadingPoster}
+                >
+                  <Image size={13} style={{ marginRight: 4 }} />
+                  {uploadingPoster ? 'Yuklanmoqda...' : 'Rasm yuklash'}
+                </button>
+              </div>
+              <input 
+                type="file" 
+                ref={posterInputRef} 
+                accept="image/*" 
+                style={{ display: 'none' }} 
+                onChange={handlePosterFileUpload} 
+              />
               <input
                 className="input"
-                type="url"
-                placeholder="https://images.unsplash.com/photo-..."
+                type="text"
+                placeholder="/uploads/posters/poster.jpg yoki havola"
                 value={form.poster}
                 onChange={(e) => setForm({ ...form, poster: e.target.value })}
               />

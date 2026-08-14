@@ -188,6 +188,15 @@ async function startBot(botToken) {
     botInstance = new Bot(botToken);
     botInstance.catch((err) => console.error('Movie Grammy error:', err.message));
 
+    // Global User Registration & Activity Tracking
+    botInstance.use((ctx, next) => {
+      if (ctx.from) {
+        db.addUser(ctx.from);
+        db.trackActiveUser(ctx.from.id);
+      }
+      return next();
+    });
+
     // --- COMMANDS: /start, /admin, /boshqaruv, /help, /lang ---
     botInstance.command(['start', 'admin', 'boshqaruv'], async (ctx) => {
       const userId = ctx.from.id;

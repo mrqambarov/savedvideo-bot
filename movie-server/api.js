@@ -2,16 +2,95 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
+const multer = require('multer');
 const db = require('./db');
 const bot = require('./bot');
 
 const MOVIE_ADMIN_TOKEN = 'movieconvert-secure-token-2026';
+
+// Setup uploads directory for shorts & media
+const localShortsUploads = path.join(__dirname, '../public-site/uploads/shorts');
+const vpsShortsUploads = '/var/www/xitfilm/uploads/shorts';
+const localPostersUploads = path.join(__dirname, '../public-site/uploads/posters');
+const vpsPostersUploads = '/var/www/xitfilm/uploads/posters';
+
+function getTargetUploadDir(type = 'shorts') {
+  const isVps = fs.existsSync('/var/www/xitfilm');
+  const dir = type === 'posters'
+    ? (isVps ? vpsPostersUploads : localPostersUploads)
+    : (isVps ? vpsShortsUploads : localShortsUploads);
+  if (!fs.existsSync(dir)) {
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+  }
+  return dir;
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const isPoster = file.mimetype.startsWith('image/');
+    cb(null, getTargetUploadDir(isPoster ? 'posters' : 'shorts'));
+  },
+  filename: (req, file, cb) => {
+    const isPoster = file.mimetype.startsWith('image/');
+    const ext = path.extname(file.originalname).toLowerCase() || (isPoster ? '.jpg' : '.mp4');
+    const prefix = isPoster ? 'poster_' : 'short_';
+    const cleanName = `${prefix}${Date.now()}_${Math.random().toString(36).substring(2, 7)}${ext}`;
+    cb(null, cleanName);
+  }
+});
+
+const uploadMedia = multer({
+  storage,
+  limits: { fileSize: 250 * 1024 * 1024 } // 250MB
+});
 
 // TMDB server-side proxy cache
 const TMDB_CACHE = new Map();
 const TMDB_API_KEY = process.env.TMDB_API_KEY || '8d927d7222384a86b3e83955d140e698';
 
 router.use(express.json());
+
+// Direct Video & Poster Upload Endpoints
+router.post('/upload-short-video', uploadMedia.single('video'), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Video fayl yuklanmadi!' });
+    const isPoster = req.file.mimetype.startsWith('image/');
+    const fileUrl = isPoster ? `/uploads/posters/${req.file.filename}` : `/uploads/shorts/${req.file.filename}`;
+
+    // Sync to local public-site folder if directory exists
+    const targetLocal = isPoster ? path.join(localPostersUploads, req.file.filename) : path.join(localShortsUploads, req.file.filename);
+    if (req.file.path !== targetLocal) {
+      try {
+        const localDir = isPoster ? localPostersUploads : localShortsUploads;
+        if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true });
+        fs.copyFileSync(req.file.path, targetLocal);
+      } catch (e) {}
+    }
+
+    res.json({
+      success: true,
+      url: fileUrl,
+      filename: req.file.filename,
+      size: req.file.size
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/upload-poster', uploadMedia.single('poster'), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Rasm fayli yuklanmadi!' });
+    const fileUrl = `/uploads/posters/${req.file.filename}`;
+    res.json({
+      success: true,
+      url: fileUrl,
+      filename: req.file.filename
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 router.post('/login', (req, res) => {
   const { password } = req.body || {};
