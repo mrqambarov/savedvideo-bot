@@ -2589,6 +2589,23 @@ function addCreatorViews(creatorId, viewsCount = 1) {
   } catch (e) {}
 }
 
+function getCreatorStats(creatorIdOrRef) {
+  try {
+    const creators = getCreators();
+    const creator = creators.find(c => c.id === creatorIdOrRef || c.refCode === creatorIdOrRef || (c.username && c.username.replace('@', '') === String(creatorIdOrRef).replace('@', '')));
+    if (!creator) return null;
+
+    const allShorts = getShorts().filter(s => s.creatorId === creator.id);
+    return {
+      creator,
+      shortsCount: allShorts.length,
+      shorts: allShorts
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 function getCreatorFullProfile(creatorTagOrId, currentUserId = null) {
   try {
     const cleanTag = String(creatorTagOrId || '').trim().replace('@', '').toLowerCase();
