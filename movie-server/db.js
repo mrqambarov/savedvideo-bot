@@ -1683,6 +1683,11 @@ module.exports = {
   deleteShort,
   incrementShortViews,
   toggleShortLike,
+  toggleShortBookmark,
+  toggleCreatorFollow,
+  recordShortInteraction,
+  getAlgorithmicShorts,
+  getUserBookmarkedShorts,
   addShortComment,
   getShortComments,
   getCreators,
@@ -2324,6 +2329,194 @@ function getShortComments(id) {
     const shorts = getShorts();
     const short = shorts.find(s => String(s.id) === String(id));
     return short && Array.isArray(short.comments) ? short.comments : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function toggleShortBookmark(id, userId) {
+  try {
+    const shorts = getShorts();
+    const short = shorts.find(s => String(s.id) === String(id));
+    if (!short) return { bookmarked: false, totalBookmarks: 0 };
+    if (!Array.isArray(short.bookmarks)) short.bookmarks = [];
+
+    const uidStr = String(userId);
+    const idx = short.bookmarks.indexOf(uidStr);
+    let bookmarked = false;
+    if (idx !== -1) {
+      short.bookmarks.splice(idx, 1);
+      bookmarked = false;
+    } else {
+      short.bookmarks.push(uidStr);
+      bookmarked = true;
+    }
+    saveShorts(shorts);
+    return { bookmarked, totalBookmarks: short.bookmarks.length };
+  } catch (e) {
+    return { bookmarked: false, totalBookmarks: 0 };
+  }
+}
+
+function toggleCreatorFollow(creatorIdOrTag, userId) {
+  try {
+    const creators = getCreators();
+    const clean = String(creatorIdOrTag).replace('@', '').toLowerCase();
+    const creator = creators.find(c => 
+      String(c.id) === clean || 
+      (c.username && c.username.replace('@', '').toLowerCase() === clean) ||
+      (c.tag && c.tag.replace('@', '').toLowerCase() === clean)
+    );
+
+    if (!creator) return { following: true, followers: 1 };
+    if (!Array.isArray(creator.followersList)) creator.followersList = [];
+
+    const uidStr = String(userId);
+    const idx = creator.followersList.indexOf(uidStr);
+    let following = false;
+    if (idx !== -1) {
+      creator.followersList.splice(idx, 1);
+      following = false;
+    } else {
+      creator.followersList.push(uidStr);
+      following = true;
+    }
+    creator.followers = creator.followersList.length;
+    saveCreators(creators);
+    return { following, followers: creator.followers };
+  } catch (e) {
+    return { following: false, followers: 0 };
+  }
+}
+
+function recordShortInteraction(id, data = {}) {
+  try {
+    const shorts = getShorts();
+    const short = shorts.find(s => String(s.id) === String(id));
+    if (!short) return null;
+
+    const watchTime = Number(data.watchTime) || 0;
+    const duration = Number(data.duration) || 30;
+    const completed = !!data.completed;
+
+    if (!short.metrics) {
+      short.metrics = { totalWatchTime: 0, completions: 0, plays: 0, skips: 0 };
+    }
+
+    short.metrics.plays = (short.metrics.plays || 0) + 1;
+    short.metrics.totalWatchTime = (short.metrics.totalWatchTime || 0) + watchTime;
+    if (completed) short.metrics.completions = (short.metrics.completions || 0) + 1;
+    if (watchTime < 2.5 && !completed) short.metrics.skips = (short.metrics.skips || 0) + 1;
+
+    // Calculate retention score (0.0 to 1.0)
+    const totalSessions = Math.max(1, (short.metrics.plays || 1));
+    short.retentionRate = Math.min(1.0, Math.max(0.1, (short.metrics.completions || 0) / totalSessions));
+
+    saveShorts(shorts);
+    return { success: true, retentionRate: short.retentionRate };
+  } catch (e) {
+    return null;
+  }
+}
+
+function calculateViralScore(short) {
+  const views = Number(short.views) || 0;
+  const likesCount = Array.isArray(short.likes) ? short.likes.length : (short.likes || 0);
+  const shares = Number(short.shares) || 0;
+  const commentsCount = Array.isArray(short.comments) ? short.comments.length : 0;
+  const bookmarksCount = Array.isArray(short.bookmarks) ? short.bookmarks.length : 0;
+  const retention = Number(short.retentionRate) || 0.6;
+
+  // Instagram Reels engagement formula
+  const rawScore = (views * 1) + (likesCount * 14) + (shares * 28) + (commentsCount * 18) + (bookmarksCount * 22) + (retention * 60);
+
+  // Time decay gravity: recent videos get boosted
+  const postDate = short.dateAdded ? new Date(short.dateAdded).getTime() : Date.now();
+  const hoursSince = Math.max(0.5, (Date.now() - postDate) / (1000 * 60 * 60));
+  const timeDecay = 1 / Math.pow(hoursSince + 2, 1.25);
+
+  return rawScore * timeDecay;
+}
+
+function getAlgorithmicShorts({ feedType = 'foryou', genre, userId }) {
+  try {
+    let allShorts = getShorts().filter(s => s.status === 'active');
+    if (allShorts.length === 0) return [];
+
+    const movies = getMovies();
+    const moviesMap = new Map();
+    movies.forEach(m => moviesMap.set(String(m.code), m));
+
+    // Attach movie details if missing
+    allShorts = allShorts.map(s => {
+      const m = moviesMap.get(String(s.movieCode));
+      return {
+        ...s,
+        genre: s.genre || (m ? m.genre : 'Tarjima kino'),
+        movieRating: m ? m.rating : '8.6',
+        likesCount: Array.isArray(s.likes) ? s.likes.length : (s.likes || 0),
+        commentsCount: Array.isArray(s.comments) ? s.comments.length : 0,
+        bookmarksCount: Array.isArray(s.bookmarks) ? s.bookmarks.length : 0,
+        viralScore: calculateViralScore(s)
+      };
+    });
+
+    if (genre && genre !== 'all') {
+      const cleanGenre = genre.toLowerCase();
+      return allShorts.filter(s => (s.genre && s.genre.toLowerCase().includes(cleanGenre)) || (s.title && s.title.toLowerCase().includes(cleanGenre)));
+    }
+
+    if (feedType === 'trending') {
+      // Sort strictly by Viral Engagement Score
+      return allShorts.sort((a, b) => (b.viralScore || 0) - (a.viralScore || 0));
+    }
+
+    if (feedType === 'new') {
+      // Sort by newest upload first
+      return allShorts.sort((a, b) => new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0));
+    }
+
+    // Default: 'foryou' (AI Personalized & Engagement Blended Feed)
+    const uidStr = String(userId || '');
+    const userLikedCodes = new Set();
+    const userLikedGenres = new Set();
+
+    if (uidStr) {
+      allShorts.forEach(s => {
+        if (Array.isArray(s.likes) && s.likes.includes(uidStr)) {
+          if (s.movieCode) userLikedCodes.add(String(s.movieCode));
+          if (s.genre) userLikedGenres.add(s.genre.toLowerCase());
+        }
+      });
+    }
+
+    // Rank each short with Personalization Affinity Multiplier
+    const scored = allShorts.map(s => {
+      let affinity = 1.0;
+      if (userLikedCodes.has(String(s.movieCode))) affinity += 1.5;
+      if (s.genre && userLikedGenres.has(s.genre.toLowerCase())) affinity += 1.2;
+
+      // Completion bonus
+      if ((s.retentionRate || 0) > 0.75) affinity += 0.8;
+
+      return {
+        item: s,
+        rank: (s.viralScore || 1) * affinity + Math.random() * 1.5 // subtle exploration jitter
+      };
+    });
+
+    scored.sort((a, b) => b.rank - a.rank);
+    return scored.map(s => s.item);
+  } catch (e) {
+    console.error('Error getting algorithmic shorts:', e.message);
+    return getShorts().filter(s => s.status === 'active');
+  }
+}
+
+function getUserBookmarkedShorts(userId) {
+  try {
+    const uidStr = String(userId);
+    return getShorts().filter(s => Array.isArray(s.bookmarks) && s.bookmarks.includes(uidStr));
   } catch (e) {
     return [];
   }

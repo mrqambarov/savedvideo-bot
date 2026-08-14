@@ -203,12 +203,16 @@ router.get('/public-playback-progress/:userId', (req, res) => {
 });
 
 // ========================================
-// SHORTS & CREATORS PUBLIC API
+// SHORTS & CREATORS PUBLIC API (ALGORITHMIC)
 // ========================================
 router.get('/public-shorts', (req, res) => {
     try {
-        const shorts = (db.getShorts() || []).filter(s => s.status === 'active');
-        res.json({ success: true, shorts });
+        const feedType = req.query.feed || 'foryou';
+        const genre = req.query.genre || null;
+        const userId = req.query.userId || req.headers['x-user-id'] || null;
+
+        const shorts = db.getAlgorithmicShorts({ feedType, genre, userId });
+        res.json({ success: true, shorts, feedType });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -217,6 +221,28 @@ router.get('/public-shorts', (req, res) => {
 router.post('/public-shorts/:id/view', (req, res) => {
     const views = db.incrementShortViews(req.params.id, req.body.ref);
     res.json({ success: true, views });
+});
+
+router.post('/public-shorts/:id/interaction', (req, res) => {
+    const result = db.recordShortInteraction(req.params.id, req.body);
+    res.json({ success: !!result, ...result });
+});
+
+router.post('/public-shorts/:id/bookmark', (req, res) => {
+    const uid = req.body.userId || req.headers['x-user-id'] || 'guest';
+    const result = db.toggleShortBookmark(req.params.id, uid);
+    res.json({ success: true, ...result });
+});
+
+router.post('/public-creator/:tag/follow', (req, res) => {
+    const uid = req.body.userId || req.headers['x-user-id'] || 'guest';
+    const result = db.toggleCreatorFollow(req.params.tag, uid);
+    res.json({ success: true, ...result });
+});
+
+router.get('/public-shorts/bookmarked/:userId', (req, res) => {
+    const items = db.getUserBookmarkedShorts(req.params.userId);
+    res.json({ success: true, shorts: items });
 });
 
 router.post('/public-shorts/:id/like', (req, res) => {

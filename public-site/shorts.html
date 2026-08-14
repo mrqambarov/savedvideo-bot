@@ -51,6 +51,30 @@
         </div>
     </header>
 
+    <!-- Top Feed Selection Tabs (Instagram Reels Style) -->
+    <div class="shorts-feed-tabs-container">
+        <div class="shorts-feed-tabs">
+            <button class="feed-tab active" id="tab_foryou" onclick="switchFeed('foryou')">
+                <span>⚡️ Siz uchun</span>
+            </button>
+            <button class="feed-tab" id="tab_trending" onclick="switchFeed('trending')">
+                <span>🔥 Trendda</span>
+            </button>
+            <button class="feed-tab" id="tab_new" onclick="switchFeed('new')">
+                <span>✨ Yangi</span>
+            </button>
+            <button class="feed-tab" id="tab_saved" onclick="switchFeed('saved')">
+                <span>🔖 Saqlangan</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 2X Speed Indicator Overlay (Press & Hold) -->
+    <div class="speed-indicator-badge" id="speedBadge">
+        <i class="fas fa-bolt"></i>
+        <span>2X TEZLIK</span>
+    </div>
+
     <!-- Volume Toast Indicator -->
     <div class="volume-toast" id="volumeToast">
         <i class="fas fa-volume-up" id="volumeToastIcon"></i>
