@@ -1694,7 +1694,8 @@ module.exports = {
   saveCreators,
   registerCreator,
   addCreatorViews,
-  getCreatorStats
+  getCreatorStats,
+  getCreatorFullProfile
 };
 
 function savePlaybackProgress(userId, code, { currentTime, duration, title, poster, genre }) {
@@ -2588,21 +2589,75 @@ function addCreatorViews(creatorId, viewsCount = 1) {
   } catch (e) {}
 }
 
-function getCreatorStats(creatorIdOrRef) {
+function getCreatorFullProfile(creatorTagOrId, currentUserId = null) {
   try {
+    const cleanTag = String(creatorTagOrId || '').trim().replace('@', '').toLowerCase();
     const creators = getCreators();
-    const creator = creators.find(c => c.id === creatorIdOrRef || c.refCode === creatorIdOrRef || (c.username && c.username.replace('@', '') === String(creatorIdOrRef).replace('@', '')));
-    if (!creator) return null;
+    
+    // Find creator or build dynamic profile for standard channels
+    let creator = creators.find(c => 
+      String(c.id).toLowerCase() === cleanTag || 
+      (c.username && c.username.replace('@', '').toLowerCase() === cleanTag) ||
+      (c.refCode && c.refCode.toLowerCase() === cleanTag) ||
+      (c.tag && c.tag.replace('@', '').toLowerCase() === cleanTag)
+    );
 
-    const allShorts = getShorts().filter(s => s.creatorId === creator.id);
+    const isXitFilm = cleanTag === 'xitfilm_uz' || cleanTag === 'xitfilm' || cleanTag === 'cre_official' || !creator;
+
+    if (!creator) {
+      creator = {
+        id: isXitFilm ? 'cre_official' : `cre_${cleanTag}`,
+        name: isXitFilm ? 'XIT FILM Official' : `@${cleanTag}`,
+        username: `@${cleanTag || 'xitfilm_uz'}`,
+        avatar: isXitFilm ? '/icon-512.png' : '',
+        bio: isXitFilm ? '🎬 XIT FILM — O\'zbekistondagi 1-raqamli onlayn kinoteatr va Telegram kinobot tarmog\'i. Eng sara filmlar va premyeralar.' : 'XIT FILM hamkori va kino ijodkori.',
+        telegramChannel: `https://t.me/${cleanTag || 'xitfilm_uz'}`,
+        isVerified: true,
+        followers: isXitFilm ? 24500 : 120,
+        followersList: []
+      };
+    }
+
+    const allShorts = getShorts().filter(s => {
+      const sTag = String(s.creatorTag || s.creatorId || '').replace('@', '').toLowerCase();
+      return sTag === cleanTag || (isXitFilm && (sTag === 'xitfilm_uz' || sTag === 'xitfilm' || s.creatorId === 'cre_official'));
+    });
+
+    const totalViews = allShorts.reduce((acc, s) => acc + (s.views || 0), 0);
+    const totalLikes = allShorts.reduce((acc, s) => acc + (Array.isArray(s.likes) ? s.likes.length : (s.likes || 0)), 0);
+
+    const uidStr = String(currentUserId || '');
+    const isFollowing = Array.isArray(creator.followersList) && creator.followersList.includes(uidStr);
+
     return {
-      creator,
+      id: creator.id,
+      name: creator.name || 'XIT FILM Official',
+      username: creator.username || '@xitfilm_uz',
+      avatar: creator.avatar || '',
+      bio: creator.bio || 'Eng sara kinolar va qiziqarli epizodlar.',
+      telegramChannel: creator.telegramChannel || `https://t.me/${cleanTag}`,
+      isVerified: creator.isVerified !== false,
+      followers: creator.followers || (isXitFilm ? 24500 : 120),
+      isFollowing: !!isFollowing,
+      totalViews,
+      totalLikes,
       shortsCount: allShorts.length,
-      shorts: allShorts
+      shorts: allShorts.map(s => ({
+        id: s.id,
+        title: s.title,
+        poster: s.poster,
+        videoUrl: s.videoUrl,
+        views: s.views || 0,
+        likesCount: Array.isArray(s.likes) ? s.likes.length : (s.likes || 0),
+        movieCode: s.movieCode,
+        movieTitle: s.movieTitle
+      }))
     };
   } catch (e) {
+    console.error('Error getting creator full profile:', e.message);
     return null;
   }
 }
+
 
 

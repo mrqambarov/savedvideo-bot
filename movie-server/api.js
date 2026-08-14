@@ -234,6 +234,13 @@ router.post('/public-shorts/:id/bookmark', (req, res) => {
     res.json({ success: true, ...result });
 });
 
+router.get('/public-creator/:tag', (req, res) => {
+    const uid = req.query.userId || req.headers['x-user-id'] || null;
+    const profile = db.getCreatorFullProfile(req.params.tag, uid);
+    if (!profile) return res.status(404).json({ error: 'Creator topilmadi' });
+    res.json({ success: true, profile });
+});
+
 router.post('/public-creator/:tag/follow', (req, res) => {
     const uid = req.body.userId || req.headers['x-user-id'] || 'guest';
     const result = db.toggleCreatorFollow(req.params.tag, uid);

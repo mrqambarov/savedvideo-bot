@@ -1,6 +1,6 @@
 /**
- * XIT FILM - Shorts Interactive Video Feed Engine (v5.0.0)
- * Instagram Reels & TikTok Style Algorithmic Recommendation Engine
+ * XIT FILM - Shorts Interactive Video Feed Engine (v5.5.0)
+ * Instagram Reels & TikTok Style Algorithmic Recommendation & Creator Profiles
  */
 
 let shortsData = [];
@@ -9,6 +9,7 @@ let isMuted = true;
 let autoAdvance = true;
 let currentFeedType = 'foryou';
 let activeShortForComments = null;
+let activeCreatorProfile = null;
 let lastTapTime = 0;
 let pressTimer = null;
 let isSpeedingUp = false;
@@ -36,7 +37,7 @@ const FALLBACK_SHORTS = [
     shares: 340,
     bookmarks: [],
     comments: [
-      { id: "c1", userName: "Rustam", text: "Kinoga gap yo'q, ovoz sifati a'lo!", createdAt: "2026-08-14T10:00:00Z" }
+      { id: "c1", userName: "XIT FILM Official", userTag: "@xitfilm_uz", text: "Kinoga gap yo'q, ovoz sifati a'lo! To'liq filmni bot orqali yuklang.", isCreator: true, createdAt: "2026-08-14T10:00:00Z" }
     ]
   },
   {
@@ -226,7 +227,7 @@ function renderShorts() {
               <button class="action-btn ${isLiked ? 'liked' : ''}" id="likeBtn_${idx}" onclick="toggleLike('${item.id}', ${idx})">
                 <i class="fas fa-heart"></i>
               </button>
-              <span class="action-count" id="likeCount_${idx}">${likesCount}</span>
+              <span class="action-count" id="likeCount_${idx}">${shortFmt(likesCount)}</span>
             </div>
 
             <!-- Comments Button -->
@@ -234,7 +235,7 @@ function renderShorts() {
               <button class="action-btn" onclick="openComments('${item.id}', ${idx})">
                 <i class="fas fa-comment-dots"></i>
               </button>
-              <span class="action-count" id="commentCount_${idx}">${commentsCount}</span>
+              <span class="action-count" id="commentCount_${idx}">${shortFmt(commentsCount)}</span>
             </div>
 
             <!-- Bookmark / Saqlash Button -->
@@ -242,7 +243,7 @@ function renderShorts() {
               <button class="action-btn ${isBookmarked ? 'bookmarked' : ''}" id="bookmarkBtn_${idx}" onclick="toggleBookmark('${item.id}', ${idx})" title="Saqlash">
                 <i class="fas fa-bookmark"></i>
               </button>
-              <span class="action-count" id="bookmarkCount_${idx}">${bookmarksCount || ''}</span>
+              <span class="action-count" id="bookmarkCount_${idx}">${bookmarksCount ? shortFmt(bookmarksCount) : ''}</span>
             </div>
 
             <!-- Share Button -->
@@ -250,7 +251,7 @@ function renderShorts() {
               <button class="action-btn" onclick="shareShort('${item.id}', '${escapeJs(item.title)}', '${movieCode}')">
                 <i class="fas fa-share-alt"></i>
               </button>
-              <span class="action-count">${item.shares || 12}</span>
+              <span class="action-count">${shortFmt(item.shares || 12)}</span>
             </div>
 
             <!-- Movie Code Quick Card Button -->
@@ -272,7 +273,7 @@ function renderShorts() {
           <!-- Bottom Content Info -->
           <div class="short-info" onclick="event.stopPropagation()">
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-              <div class="short-creator-tag">
+              <div class="short-creator-tag clickable" onclick="openCreatorProfile('${creatorTag}')" title="Kanal akkauntini ochish">
                 <i class="fas fa-user-circle"></i>
                 <span>${creatorTag}</span>
                 <i class="fas fa-check-circle verified-icon"></i>
@@ -299,11 +300,11 @@ function renderShorts() {
 
             <!-- Soundtrack & Spinning Vinyl Record (Instagram Reels element) -->
             <div class="short-soundtrack-wrap">
-              <div class="short-soundtrack" onclick="showVolumeToast('🎵 Asl Soundtrack • XIT FILM Original', false)">
+              <div class="short-soundtrack" onclick="openCreatorProfile('${creatorTag}')">
                 <i class="fas fa-music"></i>
                 <span>XIT FILM Soundtrack • #${movieCode} ${escapeHtml(movieTitle)}</span>
               </div>
-              <div class="spinning-vinyl" id="vinyl_${idx}" onclick="toggleMute()" title="Ovoz"></div>
+              <div class="spinning-vinyl" id="vinyl_${idx}" onclick="openCreatorProfile('${creatorTag}')" title="Kanal Profili"></div>
             </div>
           </div>
 
@@ -608,7 +609,7 @@ async function toggleLike(id, idx) {
     });
     const data = await res.json();
     if (data.success && countEl) {
-      countEl.innerText = data.totalLikes;
+      countEl.innerText = shortFmt(data.totalLikes);
     }
   } catch (e) {}
 }
@@ -658,6 +659,129 @@ async function toggleFollowCreator(creatorTag, idx) {
 
   try {
     await fetch(`${API_BASE}/public-creator/${encodeURIComponent(creatorTag)}/follow`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: getUserId() })
+    });
+  } catch (e) {}
+}
+
+// Open Instagram-style Creator Profile Modal
+async function openCreatorProfile(creatorTag) {
+  triggerHaptic('medium');
+  const modal = document.getElementById('creatorProfileModal');
+  if (!modal) return;
+
+  const cleanTag = String(creatorTag || '').replace('@', '').trim();
+  activeCreatorProfile = cleanTag;
+
+  modal.classList.add('active');
+
+  // Loading state
+  const grid = document.getElementById('cProfShortsGrid');
+  if (grid) grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: #94a3b8;"><i class="fas fa-spinner fa-spin"></i> Yuklanmoqda...</div>';
+
+  try {
+    const res = await fetch(`${API_BASE}/public-creator/${encodeURIComponent(cleanTag)}?userId=${getUserId()}`);
+    const data = await res.json();
+    const prof = data?.profile;
+
+    if (prof) {
+      document.getElementById('cProfName').innerText = prof.name || `@${cleanTag}`;
+      document.getElementById('cProfTag').innerText = prof.username || `@${cleanTag}`;
+      document.getElementById('cProfBio').innerText = prof.bio || 'Eng sara kinolar va eksklyuziv lavhalar.';
+      document.getElementById('cProfShortsCount').innerText = prof.shortsCount || 0;
+      document.getElementById('cProfFollowers').innerText = shortFmt(prof.followers || 0);
+      document.getElementById('cProfLikes').innerText = shortFmt(prof.totalLikes || 0);
+
+      const avatarImg = document.getElementById('cProfAvatar');
+      const fallback = document.getElementById('cProfAvatarFallback');
+      if (prof.avatar) {
+        avatarImg.src = prof.avatar;
+        avatarImg.style.display = 'block';
+        if (fallback) fallback.style.display = 'none';
+      } else {
+        avatarImg.style.display = 'none';
+        if (fallback) {
+          fallback.style.display = 'grid';
+          fallback.innerText = (prof.name || cleanTag).substring(0, 2).toUpperCase();
+        }
+      }
+
+      const tgBtn = document.getElementById('cProfTgBtn');
+      if (tgBtn) tgBtn.href = prof.telegramChannel || `https://t.me/${cleanTag}`;
+
+      const followBtn = document.getElementById('cProfFollowBtn');
+      if (followBtn) {
+        followBtn.className = `c-action-btn follow ${prof.isFollowing ? 'following' : ''}`;
+        followBtn.innerText = prof.isFollowing ? '✓ Obunadasiz' : '+ Obuna bo\'lish';
+      }
+
+      // Render 3-column Reels grid
+      renderCreatorReelsGrid(prof.shorts || []);
+    }
+  } catch (e) {
+    if (grid) grid.innerHTML = '<div style="grid-column: 1/-1; color: #ef4444; text-align: center; padding: 20px;">Ma\'lumot yuklanmadi</div>';
+  }
+}
+
+function renderCreatorReelsGrid(shorts) {
+  const grid = document.getElementById('cProfShortsGrid');
+  if (!grid) return;
+
+  if (!shorts || shorts.length === 0) {
+    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: #94a3b8; font-size: 13px;">Hozircha videolar yuklanmagan</div>';
+    return;
+  }
+
+  grid.innerHTML = shorts.map(s => `
+    <div class="c-grid-card" onclick="selectShortFromProfile('${s.id}')">
+      <img src="${s.poster || 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=400&q=80'}" alt="">
+      <div class="c-grid-card-overlay">
+        <div class="c-grid-views">
+          <i class="fas fa-play" style="font-size: 9px;"></i>
+          <span>${shortFmt(s.views || 0)}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function selectShortFromProfile(shortId) {
+  closeCreatorProfile();
+  const idx = shortsData.findIndex(s => s.id === shortId);
+  if (idx !== -1) {
+    scrollToShort(idx);
+  } else {
+    // If not in current feed, load and jump
+    window.location.href = `/shorts.html?short=${shortId}`;
+  }
+}
+
+function closeCreatorProfile(e) {
+  const modal = document.getElementById('creatorProfileModal');
+  if (modal) modal.classList.remove('active');
+  activeCreatorProfile = null;
+}
+
+async function toggleFollowCurrentProfile() {
+  if (!activeCreatorProfile) return;
+  triggerHaptic('medium');
+
+  const btn = document.getElementById('cProfFollowBtn');
+  const isFollowing = btn?.classList.contains('following');
+
+  if (isFollowing) {
+    btn?.classList.remove('following');
+    if (btn) btn.innerText = '+ Obuna bo\'lish';
+  } else {
+    btn?.classList.add('following');
+    if (btn) btn.innerText = '✓ Obunadasiz';
+    showVolumeToast(`✅ @${activeCreatorProfile} ga obuna bo'lindi`, false);
+  }
+
+  try {
+    await fetch(`${API_BASE}/public-creator/${encodeURIComponent(activeCreatorProfile)}/follow`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: getUserId() })
@@ -766,18 +890,28 @@ function renderCommentsList(comments) {
     return;
   }
 
-  list.innerHTML = comments.map(c => `
-    <div class="comment-item">
-      <div class="comment-avatar">${(c.userName || 'U').substring(0, 2).toUpperCase()}</div>
-      <div class="comment-body">
-        <div class="comment-user-row">
-          <span class="comment-user-name">${escapeHtml(c.userName || 'Kinochi')}</span>
-          <span>${formatCommentDate(c.createdAt)}</span>
+  list.innerHTML = comments.map(c => {
+    const userTag = c.userTag || (c.isCreator ? '@xitfilm_uz' : '');
+    const isCreator = c.isCreator || userTag === '@xitfilm_uz' || c.userName?.toLowerCase().includes('xit film');
+
+    return `
+      <div class="comment-item">
+        <div class="comment-avatar clickable" onclick="openCreatorProfile('${userTag || c.userName}')" title="Profilni ko'rish">
+          ${(c.userName || 'U').substring(0, 2).toUpperCase()}
         </div>
-        <div class="comment-text">${escapeHtml(c.text)}</div>
+        <div class="comment-body">
+          <div class="comment-user-row">
+            <span class="comment-user-name clickable" onclick="openCreatorProfile('${userTag || c.userName}')">
+              ${escapeHtml(c.userName || 'Kinochi')}
+            </span>
+            ${isCreator ? '<span class="comment-author-badge">Muallif</span>' : ''}
+            <span>${formatCommentDate(c.createdAt)}</span>
+          </div>
+          <div class="comment-text">${escapeHtml(c.text)}</div>
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 function closeComments(e) {
@@ -806,6 +940,7 @@ async function submitComment(e) {
   const payload = {
     userId: getUserId(),
     userName: user.name || 'Kino Muxlisi',
+    userTag: user.username ? `@${user.username}` : '',
     text: text
   };
 
@@ -819,10 +954,14 @@ async function submitComment(e) {
   const newCommentEl = document.createElement('div');
   newCommentEl.className = 'comment-item';
   newCommentEl.innerHTML = `
-    <div class="comment-avatar">${payload.userName.substring(0, 2).toUpperCase()}</div>
+    <div class="comment-avatar clickable" onclick="openCreatorProfile('${payload.userTag || payload.userName}')">
+      ${payload.userName.substring(0, 2).toUpperCase()}
+    </div>
     <div class="comment-body">
       <div class="comment-user-row">
-        <span class="comment-user-name">${escapeHtml(payload.userName)}</span>
+        <span class="comment-user-name clickable" onclick="openCreatorProfile('${payload.userTag || payload.userName}')">
+          ${escapeHtml(payload.userName)}
+        </span>
         <span>Hozirgina</span>
       </div>
       <div class="comment-text">${escapeHtml(payload.text)}</div>
@@ -923,6 +1062,12 @@ function escapeHtml(str) {
 function escapeJs(str) {
   if (!str) return '';
   return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"');
+}
+
+function shortFmt(num) {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+  return num || 0;
 }
 
 function formatCommentDate(dateStr) {

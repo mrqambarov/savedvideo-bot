@@ -157,6 +157,63 @@
         </div>
     </div>
 
+    <!-- Creator / Channel Instagram Profile Modal -->
+    <div class="shorts-modal-overlay" id="creatorProfileModal" onclick="closeCreatorProfile(event)">
+        <div class="shorts-modal-card creator-profile-card" onclick="event.stopPropagation()">
+            <button class="modal-close-btn" onclick="closeCreatorProfile()"><i class="fas fa-times"></i></button>
+            
+            <div class="creator-profile-header">
+                <div class="creator-avatar-wrap">
+                    <img src="" id="cProfAvatar" class="creator-avatar-img" alt="Creator">
+                    <div class="creator-avatar-fallback" id="cProfAvatarFallback">XF</div>
+                </div>
+
+                <div class="creator-profile-stats">
+                    <div class="c-stat-item">
+                        <span class="c-stat-val" id="cProfShortsCount">0</span>
+                        <span class="c-stat-lbl">Videolar</span>
+                    </div>
+                    <div class="c-stat-item">
+                        <span class="c-stat-val" id="cProfFollowers">0</span>
+                        <span class="c-stat-lbl">Obunachilar</span>
+                    </div>
+                    <div class="c-stat-item">
+                        <span class="c-stat-val" id="cProfLikes">0</span>
+                        <span class="c-stat-lbl">Likelar</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="creator-bio-section">
+                <div class="creator-name-row">
+                    <h3 id="cProfName">Kanal Nomi</h3>
+                    <i class="fas fa-check-circle verified-icon" id="cProfVerified"></i>
+                </div>
+                <div class="creator-tag" id="cProfTag">@xitfilm_uz</div>
+                <p class="creator-bio-text" id="cProfBio">Eng sara kinolar va qiziqarli lavhalar kanali.</p>
+            </div>
+
+            <div class="creator-actions-row">
+                <button class="c-action-btn follow" id="cProfFollowBtn" onclick="toggleFollowCurrentProfile()">
+                    + Obuna bo'lish
+                </button>
+                <a href="https://t.me/xitfilm_uz" target="_blank" class="c-action-btn telegram" id="cProfTgBtn">
+                    <i class="fab fa-telegram"></i> Telegram Kanal
+                </a>
+            </div>
+
+            <!-- Creator Reels / Shorts Grid Header -->
+            <div class="creator-grid-header">
+                <i class="fas fa-play-circle"></i>
+                <span>Barcha Lavhalar</span>
+            </div>
+
+            <div class="creator-shorts-grid" id="cProfShortsGrid">
+                <!-- Dynamic 3-column reels grid -->
+            </div>
+        </div>
+    </div>
+
     <!-- Bottom Navigation Bar -->
     <nav class="shorts-nav-bar">
         <a href="/" class="nav-item">
