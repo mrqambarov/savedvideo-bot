@@ -14,6 +14,11 @@ const PORT = process.env.MOVIE_PORT || 5001;
 app.use(cors());
 app.use(express.json());
 
+// Guardian Watchdog health endpoint (auth talab qilmaydi)
+app.get('/movies/api/health', (req, res) => {
+  res.json({ status: 'ok', service: 'movie-bot', uptime: process.uptime(), ts: Date.now() });
+});
+
 // API Routes
 app.use('/api', apiRouter);
 app.use('/movies/api', apiRouter);

@@ -59,6 +59,28 @@ module.exports = {
       merge_logs: true,
       max_size: '50M',
       retain: 5
+    },
+    {
+      name: 'guardian',
+      script: './guardian/index.js',
+      cwd: __dirname,
+      exec_mode: 'fork',
+      instances: 1,
+      env: {
+        NODE_ENV: 'production'
+      },
+      autorestart: true,
+      restart_delay: 5000,       // 5 soniyada qayta tiklaydi
+      max_restarts: 50,          // 50 marta urinadi
+      watch: false,
+      max_memory_restart: '200M',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      error_file: './logs/guardian-error.log',
+      out_file: './logs/guardian-out.log',
+      merge_logs: true,
+      max_size: '20M',
+      retain: 3
     }
   ]
 };
+

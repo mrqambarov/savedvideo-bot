@@ -16,6 +16,11 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+// Guardian Watchdog health endpoint (auth talab qilmaydi)
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', service: 'vibeconvert-bot', uptime: process.uptime(), ts: Date.now() });
+});
+
 // API Routes
 app.use('/api', apiRouter);
 

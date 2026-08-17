@@ -1,0 +1,13 @@
+{
+  "name": "guardian-watchdog",
+  "version": "1.0.0",
+  "description": "Self-healing Guardian Watchdog for SavedVideo platform",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5"
+  }
+}
