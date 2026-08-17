@@ -8,6 +8,7 @@ const processor = require('./processor');
 const db = require('./db');
 const i18n = require('./i18n');
 const sponsorManager = require('./sponsorManager');
+const lyrics = require('./lyrics');
 
 let botInstance = null;
 let isBotRunning = false;
@@ -916,18 +917,42 @@ function startBot(token) {
           if (!url) {
             return await ctx.answerCallbackQuery({ text: 'Havola muddati o\'tgan. Qayta yuboring.', show_alert: true });
           }
-          await ctx.answerCallbackQuery({ text: `${quality}p sifatda yuklanmoqda...` });
+
+          // ⚡ Instant Media Cache check (0.1s response)
+          const cached = db.getMediaFileCache(url, quality);
+          const botUsername = ctx.me.username;
+          const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
+
+          if (cached && cached.fileId) {
+            await ctx.answerCallbackQuery({ text: '⚡️ Bir zumda keshdan yuklandi!' });
+            const captionText = `⚡ @${botUsername} orqali (${quality}p) yuklab olindi 🚀\n\n🍿 Yangi kinolar bepul: @${movieBotUsername}`;
+            try {
+              await ctx.replyWithVideo(cached.fileId, {
+                caption: captionText,
+                supports_streaming: true
+              });
+              db.trackDownload('video');
+              db.trackUserDownload(ctx.from.id, `Video ${quality}p (Instant ⚡)`, 'video', url);
+              return;
+            } catch (_) {}
+          }
+
+          await ctx.answerCallbackQuery({ text: `${quality}p formatda yuklanmoqda...` });
           const statusMsg = await ctx.reply(`📥 Video ${quality}p formatida yuklanmoqda...`);
           try {
             const mediaPath = await downloader.downloadVideo(url, `dl_q_${quality}_${shortId}`, quality);
-            const botUsername = ctx.me.username;
-            const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
             const captionText = `❤️ @${botUsername} orqali (${quality}p) yuklab olindi 🚀\n\n🍿 Yangi kinolar bepul: @${movieBotUsername}`;
             
-            await ctx.replyWithVideo(new InputFile(mediaPath), {
+            const sent = await ctx.replyWithVideo(new InputFile(mediaPath), {
               caption: captionText,
               supports_streaming: true
             });
+
+            // ⚡ Save to Instant Cache
+            if (sent?.video?.file_id) {
+              db.setMediaFileCache(url, quality, sent.video.file_id, 'video');
+            }
+
             db.trackDownload('video');
             db.trackUserDownload(ctx.from.id, `Video ${quality}p`, 'video', url);
             await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
@@ -982,6 +1007,64 @@ function startBot(token) {
             try {
               await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `❌ Musiqani ajratishda xatolik: ${escapeHTML(err.message)}`);
             } catch (e) {}
+          }
+          return;
+        }
+
+        // Lyrics & Shazam MP3 Callback Handlers
+        if (data.startsWith('lyrics_q:')) {
+          const qId = data.split(':')[1];
+          const trackInfo = urlCache.get(`lyr_${qId}`);
+          if (!trackInfo) {
+            return await ctx.answerCallbackQuery({ text: 'Muddati o\'tgan. Qayta urinib ko\'ring.', show_alert: true });
+          }
+          await ctx.answerCallbackQuery({ text: '📜 Qo\'shiq matni qidirilmoqda...' });
+          const statusMsg = await ctx.reply('🔍 <b>Qo\'shiq matni qidirilmoqda...</b>', { parse_mode: 'HTML' });
+          try {
+            const res = await lyrics.getLyrics(trackInfo.title, trackInfo.artist);
+            if (res && res.lyrics) {
+              const truncated = res.lyrics.length > 3500 ? res.lyrics.substring(0, 3450) + '\n\n...' : res.lyrics;
+              await ctx.api.editMessageText(
+                ctx.chat.id,
+                statusMsg.message_id,
+                `📜 <b>${escapeHTML(res.title)} — Qo'shiq Matni</b>\n👤 <i>${escapeHTML(res.artist)}</i>\n\n${escapeHTML(truncated)}`,
+                { parse_mode: 'HTML' }
+              );
+            } else {
+              await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `❌ Kechirasiz, <b>${escapeHTML(trackInfo.title)}</b> uchun matn topilmadi.`, { parse_mode: 'HTML' });
+            }
+          } catch (e) {
+            await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `❌ Matn topishda xatolik: ${e.message}`);
+          }
+          return;
+        }
+
+        if (data.startsWith('dl_shz_mp3:')) {
+          const qId = data.split(':')[1];
+          const trackInfo = urlCache.get(`lyr_${qId}`);
+          if (!trackInfo) {
+            return await ctx.answerCallbackQuery({ text: 'Muddati o\'tgan. Qayta urinib ko\'ring.', show_alert: true });
+          }
+          await ctx.answerCallbackQuery({ text: '🎵 MP3 qidirilmoqda va yuklanmoqda...' });
+          const statusMsg = await ctx.reply(`🎵 <b>«${escapeHTML(trackInfo.title)}»</b> MP3 varianti qidirilmoqda...`, { parse_mode: 'HTML' });
+          try {
+            const results = await downloader.searchMusic(`${trackInfo.artist} ${trackInfo.title}`, 1);
+            if (!results || results.length === 0) {
+              return await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `❌ Qo'shiq topilmadi.`);
+            }
+            const target = results[0];
+            await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `📥 <b>«${escapeHTML(target.title)}»</b> yuklanmoqda...`, { parse_mode: 'HTML' });
+            const audioPath = await downloader.downloadAudio(target.url, `shz_${qId}`);
+            const botUsername = ctx.me.username;
+            await ctx.replyWithAudio(new InputFile(audioPath), {
+              title: trackInfo.title,
+              performer: trackInfo.artist,
+              caption: `🎵 @${botUsername} orqali yuklab olindi 🚀`
+            });
+            await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id).catch(() => {});
+            try { if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath); } catch (_) {}
+          } catch (e) {
+            await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `❌ Musiqani yuklashda xato: ${e.message}`);
           }
           return;
         }
@@ -2288,15 +2371,24 @@ function formatDownloadError(err) {
 
             if (match) {
               await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
-              const captionText = `🔍 <b>Musiqa aniqlandi!</b>\n\n📌 Nomi: <i>${escapeHTML(match.title)}</i>\n👤 Ijrochi: <i>${escapeHTML(match.artist)}</i>\n\n🔗 <a href="${match.shareUrl}">Shazam havolasi</a>`;
-              
+              const captionText = `🔍 <b>Musiqa aniqlandi!</b>\n\n📌 Nomi: <b>${escapeHTML(match.title)}</b>\n👤 Ijrochi: <i>${escapeHTML(match.artist)}</i>\n\n🔗 <a href="${match.shareUrl}">Shazam havolasi</a>`;
+
+              const qId = Math.random().toString(36).substring(2, 8);
+              urlCache.set(`lyr_${qId}`, { title: match.title, artist: match.artist });
+
+              const kb = new InlineKeyboard()
+                .text('🎵 To\'liq MP3 Yuklash', `dl_shz_mp3:${qId}`)
+                .row()
+                .text('📜 Qo\'shiq Matni (Lyrics)', `lyrics_q:${qId}`);
+
               if (match.image) {
                 await ctx.replyWithPhoto(match.image, {
                   caption: captionText,
-                  parse_mode: 'HTML'
+                  parse_mode: 'HTML',
+                  reply_markup: kb
                 });
               } else {
-                await ctx.reply(captionText, { parse_mode: 'HTML' });
+                await ctx.reply(captionText, { parse_mode: 'HTML', reply_markup: kb });
               }
             } else {
               await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '❌ Kechirasiz, bu musiqani aniqlab bo\'lmadi.');

@@ -524,6 +524,55 @@ router.post('/settings', (req, res) => {
   }
 });
 
+async function publishMovieToChannel(movie, targetChannel) {
+  try {
+    const botInstance = bot.getBotInstance();
+    const settings = db.getMovieSettings() || {};
+    const channel = targetChannel || settings.autoPostChannel || process.env.AUTO_POST_CHANNEL || '@XitFilm_uz';
+    if (!botInstance || !channel) return false;
+
+    const cleanChannel = channel.startsWith('@') ? channel : '@' + channel;
+    const botUsername = botInstance.botInfo?.username || process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
+    const mCode = String(movie.code).trim();
+    const miniAppUrl = `https://xitfilm.uz?code=${mCode}&tma=1&v=4.2.0`;
+
+    const { InlineKeyboard } = require('grammy');
+    const kb = new InlineKeyboard()
+      .webApp('🎬 Ilovada Tomosha Qilish (4K)', miniAppUrl)
+      .row()
+      .url('🍿 Bot Orqali Yuklab Olish', `https://t.me/${botUsername}?start=${mCode}`);
+
+    const desc = movie.description
+      ? (movie.description.length > 250 ? movie.description.substring(0, 247) + '...' : movie.description)
+      : 'Eng sara tarjima kinolar va shov-shuvli premyerani yuqori sifatda tomosha qiling!';
+
+    const postCaption =
+      `🔥 <b>YANGI PREMYERA: ${movie.title.toUpperCase()}</b> 🔥\n\n` +
+      `📁 <b>Janr:</b> #${(movie.genre || 'Kino').replace(/[^a-zA-Z0-9\u0400-\u04FF]/g, '_')}\n` +
+      `🔑 <b>Kino Kodi:</b> <code>${mCode}</code>\n\n` +
+      `📝 <i>${desc}</i>\n\n` +
+      `🍿 <b>Ko'rish yoki yuklab olish uchun pastdagi tugmalarni bosing:</b>\n` +
+      `👉 <b>Bizning bot:</b> @${botUsername}`;
+
+    if (movie.poster && movie.poster.startsWith('http')) {
+      await botInstance.api.sendPhoto(cleanChannel, movie.poster, {
+        caption: postCaption,
+        parse_mode: 'HTML',
+        reply_markup: kb
+      });
+    } else {
+      await botInstance.api.sendMessage(cleanChannel, postCaption, {
+        parse_mode: 'HTML',
+        reply_markup: kb
+      });
+    }
+    return true;
+  } catch (err) {
+    console.error('Channel auto-post error:', err.message);
+    return false;
+  }
+}
+
 router.post('/movies', async (req, res) => {
   const { code, title, description, fileId, genre, poster, notify, type, videoUrl } = req.body;
   const movie = db.addMovie({ code, title, description, fileId, genre, poster, type, videoUrl });
@@ -531,6 +580,12 @@ router.post('/movies', async (req, res) => {
   if (movie) {
     if (notify) {
       bot.notifyNewMovie(movie).catch(e => console.error(e));
+    }
+
+    // Auto publish to Telegram channel if enabled
+    const settings = db.getMovieSettings() || {};
+    if (settings.autoPostEnabled) {
+      publishMovieToChannel(movie).catch(e => console.error('Auto channel publish error:', e.message));
     }
 
     // Auto notify Premyera Alert subscribers who were waiting for this movie
@@ -569,6 +624,21 @@ router.post('/movies', async (req, res) => {
   }
 
   res.json({ success: !!movie, movie });
+});
+
+router.post('/movies/:code/publish-channel', async (req, res) => {
+  try {
+    const movie = db.getMovieByCode(req.params.code);
+    if (!movie) return res.status(404).json({ error: 'Kino topilmadi' });
+    const success = await publishMovieToChannel(movie, req.body.channel);
+    if (success) {
+      res.json({ success: true, message: 'Kino kanalga muvaffaqiyatli post qilindi!' });
+    } else {
+      res.status(500).json({ error: 'Kanalga post qilishda xatolik yuz berdi. Kanal username va bot adminligini tekshiring.' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.delete('/movies/:code', (req, res) => res.json({ success: db.deleteMovie(req.params.code) }));

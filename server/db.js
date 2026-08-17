@@ -220,6 +220,71 @@ function logActivity(act) {
   }
 }
 
+function getSessions() {
+  try {
+    const raw = fs.readFileSync(sessionsFile, 'utf8');
+    return JSON.parse(raw);
+  } catch (e) {
+    return [];
+  }
+}
+
+// ─── Instant 0.1s Media Cache System ──────────────────────────────────────────
+const mediaCacheFile = path.join(dataDir, 'media_cache.json');
+if (!fs.existsSync(mediaCacheFile)) {
+  fs.writeFileSync(mediaCacheFile, JSON.stringify({}, null, 2));
+}
+
+function getNormalizedMediaKey(url, quality = 'default') {
+  if (!url) return '';
+  try {
+    const u = new URL(url.trim());
+    const cleanUrl = u.origin + u.pathname;
+    return `${cleanUrl}_${quality}`.toLowerCase();
+  } catch (_) {
+    return `${url.trim()}_${quality}`.toLowerCase();
+  }
+}
+
+function getMediaFileCache(url, quality = 'default') {
+  try {
+    const raw = fs.readFileSync(mediaCacheFile, 'utf8');
+    const cache = JSON.parse(raw);
+    const key = getNormalizedMediaKey(url, quality);
+    const entry = cache[key];
+    if (entry && entry.fileId) {
+      if (Date.now() - (entry.cachedAt || 0) < 14 * 24 * 60 * 60 * 1000) {
+        return entry;
+      }
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function setMediaFileCache(url, quality = 'default', fileId, type = 'video', title = '') {
+  try {
+    const raw = fs.readFileSync(mediaCacheFile, 'utf8');
+    const cache = JSON.parse(raw);
+    const key = getNormalizedMediaKey(url, quality);
+    cache[key] = {
+      fileId,
+      type,
+      title: title || '',
+      cachedAt: Date.now()
+    };
+    const keys = Object.keys(cache);
+    if (keys.length > 10000) {
+      delete cache[keys[0]];
+    }
+    fs.writeFileSync(mediaCacheFile, JSON.stringify(cache, null, 2));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 function getUsers() {
   try {
     const raw = fs.readFileSync(usersFile, 'utf8');
@@ -980,6 +1045,8 @@ module.exports = {
   deleteBackupBot,
   isVip,
   setVip,
-  getVipCount
+  getVipCount,
+  getMediaFileCache,
+  setMediaFileCache
 };
 
