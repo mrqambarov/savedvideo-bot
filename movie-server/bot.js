@@ -737,11 +737,34 @@ async function startBot(botToken) {
       }
     });
 
-    isBotRunning = true;
-    botInstance.start({ onStart: (info) => {
-      console.log(`Movie Bot @${info.username} started.`);
-      initResumeReminderScheduler();
-    }});
+    let reconnectTimer = null;
+    async function launchPolling() {
+      if (!botInstance) return;
+      try {
+        try {
+          await botInstance.api.deleteWebhook({ drop_pending_updates: false });
+        } catch (e) {}
+
+        isBotRunning = true;
+        await botInstance.start({
+          allowed_updates: ['message', 'callback_query', 'inline_query', 'chat_member', 'my_chat_member'],
+          onStart: (info) => {
+            console.log(`Movie Bot @${info.username} started.`);
+            initResumeReminderScheduler();
+          }
+        });
+      } catch (err) {
+        console.error('Movie Bot polling error:', err.message);
+        isBotRunning = false;
+        if (!botInstance) return;
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => {
+          if (botInstance) launchPolling();
+        }, 5000);
+      }
+    }
+
+    launchPolling();
     return true;
   } catch (err) {
     console.error('Movie Bot start error:', err.message);

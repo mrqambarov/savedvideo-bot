@@ -11,6 +11,8 @@ const sponsorManager = require('./sponsorManager');
 
 let botInstance = null;
 let isBotRunning = false;
+let reconnectTimer = null;
+let autoBackupInterval = null;
 
 // URL cache to overcome Telegram's 64-byte callback_data limit
 const urlCache = new Map();
@@ -409,10 +411,10 @@ function startBot(token) {
           return await next();
         }
 
-        // === GURUH XABARLARI: Sponsor tekshiruvisiz o'tkazib yuborish ===
-        // Bot guruhda admin bo'lmasa ham link yuklashi uchun sponsorni skip qilamiz
-        const isGroupChat = chatType === 'group' || chatType === 'supergroup';
-        if (isGroupChat) {
+        // === GURUH VA KANAL XABARLARI: Sponsor tekshiruvisiz o'tkazib yuborish ===
+        // Majburiy kanal obunasi (sponsor gate) FAQAT shaxsiy (private) chatlarda tekshiriladi!
+        // Guruhlarda va Kanallarda (channel) bot hech qachon sponsor xabarini tashlamaydi.
+        if (chatType !== 'private') {
           return await next();
         }
 
@@ -1196,6 +1198,15 @@ function formatDownloadError(err) {
               const isPhoto = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext);
 
               if (isVideo) {
+                try {
+                  const stat = fs.statSync(mediaPath);
+                  if (stat.size > 50 * 1024 * 1024) {
+                    await ctx.reply('⚠️ Video hajmi 50MB dan oshgani sababli Telegram cheklovi tufayli bot orqali yuborib bo\'lmadi.', replyOptions);
+                    try { fs.unlinkSync(mediaPath); } catch (e) {}
+                    return;
+                  }
+                } catch (statErr) {}
+
                 const sentMsg = await ctx.replyWithVideo(new InputFile(mediaPath), {
                   caption: captionText,
                   parse_mode: 'HTML',
@@ -2136,29 +2147,51 @@ function formatDownloadError(err) {
         }
       });
 
-      // Start bot polling safely with error catching
-      // allowed_updates: barcha guruh va shaxsiy xabarlarni olish uchun
-      botInstance.start({
-        allowed_updates: [
-          'message',
-          'edited_message',
-          'callback_query',
-          'inline_query',
-          'chosen_inline_result',
-          'chat_member',
-          'my_chat_member'
-        ],
-        onStart: (botInfo) => {
-          console.log(`Telegram Bot @${botInfo.username} started successfully.`);
-          // Guruh xabarlarini olish uchun Privacy Mode o'chirilganligini tekshir
-          console.log(`[Group Mode] Bot guruh xabarlarini qabul qilish uchun sozlandi.`);
-        }
-      }).catch((err) => {
-        console.error('Telegram Bot polling encountered an error:', err.message);
-        isBotRunning = false;
-      });
+      // Start bot polling safely with error catching and auto-reconnect
+      async function launchPolling() {
+        if (!botInstance) return;
+        try {
+          // Clear any stale webhook before polling
+          try {
+            await botInstance.api.deleteWebhook({ drop_pending_updates: false });
+            console.log('Telegram Webhook cleared successfully before polling.');
+          } catch (e) {
+            console.warn('Notice clearing webhook:', e.message);
+          }
 
-      isBotRunning = true;
+          isBotRunning = true;
+          await botInstance.start({
+            allowed_updates: [
+              'message',
+              'edited_message',
+              'callback_query',
+              'inline_query',
+              'chosen_inline_result',
+              'chat_member',
+              'my_chat_member'
+            ],
+            onStart: (botInfo) => {
+              console.log(`Telegram Bot @${botInfo.username} started successfully.`);
+              console.log(`[Group Mode] Bot guruh xabarlarini qabul qilish uchun sozlandi.`);
+            }
+          });
+        } catch (err) {
+          console.error('Telegram Bot polling encountered an error:', err.message);
+          isBotRunning = false;
+
+          if (!botInstance) return; // stopped intentionally
+
+          if (reconnectTimer) clearTimeout(reconnectTimer);
+          console.log('Telegram Bot will attempt to reconnect polling in 5 seconds...');
+          reconnectTimer = setTimeout(() => {
+            if (botInstance) {
+              launchPolling();
+            }
+          }, 5000);
+        }
+      }
+
+      launchPolling();
       scheduleAutoBackup();
       resolve(true);
     } catch (err) {
@@ -2171,7 +2204,8 @@ function formatDownloadError(err) {
 }
 
 function scheduleAutoBackup() {
-  setInterval(async () => {
+  if (autoBackupInterval) clearInterval(autoBackupInterval);
+  autoBackupInterval = setInterval(async () => {
     if (!botInstance) return;
     const adminIdsStr = process.env.ADMIN_IDS || '';
     const adminIds = adminIdsStr.split(',').map(id => Number(id.trim())).filter(Boolean);
@@ -2201,6 +2235,14 @@ function scheduleAutoBackup() {
  * Stops the Telegram Bot
  */
 async function stopBot() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (autoBackupInterval) {
+    clearInterval(autoBackupInterval);
+    autoBackupInterval = null;
+  }
   if (!isBotRunning || !botInstance) {
     return true;
   }
