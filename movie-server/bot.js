@@ -347,10 +347,12 @@ async function startBot(botToken) {
 
     botInstance.command(['post', 'kanal'], async (ctx) => {
       if (!isAdmin(ctx.from.id)) return;
+      const settings = db.getMovieSettings() || {};
+      const targetChannel = settings.autoPostChannel || '@XitFilm_uz';
       const movies = db.getMovies() || [];
       const latest = movies.slice(-8).reverse();
 
-      let text = `📢 <b>KANALGA POST JOYLASHTIRISH BOSHQARUVI:</b>\n\nQaysi filmni @XitFilm_uz kanaliga chiqarmoqchisiz? Tanlang:`;
+      let text = `📢 <b>KANALGA POST JOYLASHTIRISH BOSHQARUVI:</b>\n\n🎯 <b>Kanal:</b> <code>${targetChannel}</code>\n\nQaysi filmni kanalga chiqarmoqchisiz? Tanlang:`;
       const kb = new InlineKeyboard();
       latest.forEach((m, idx) => {
         kb.text(`🎬 ${m.title.substring(0, 20)} (${m.code})`, `pub_chan_now:${m.code}`);
@@ -358,6 +360,29 @@ async function startBot(botToken) {
       });
 
       await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+    });
+
+    botInstance.command('setchannel', async (ctx) => {
+      if (!isAdmin(ctx.from.id)) return;
+      const text = ctx.message.text.replace('/setchannel', '').trim();
+      if (!text) {
+        const settings = db.getMovieSettings() || {};
+        const current = settings.autoPostChannel || '@XitFilm_uz';
+        return await ctx.reply(
+          `📢 <b>Hozirgi post kanali:</b> <code>${current}</code>\n\n` +
+          `Kanalni o'zgartirish uchun username bilan yuboring:\n` +
+          `Masalan: <code>/setchannel @yangi_kanal</code>`,
+          { parse_mode: 'HTML' }
+        );
+      }
+
+      const cleanCh = text.startsWith('@') ? text : '@' + text;
+      db.updateMovieSettings({ autoPostChannel: cleanCh });
+      await ctx.reply(
+        `✅ <b>Post kanali yangilandi:</b> <code>${cleanCh}</code>\n\n` +
+        `⚠️ <b>Muhim:</b> <code>@${botInstance?.botInfo?.username || 'xitfilm_bot'}</code> botini ushbu kanalga <b>Administrator</b> qilib qo'shing va <i>"Post Messages (Xabarlar yuborish)"</i> huquqini bering!`,
+        { parse_mode: 'HTML' }
+      );
     });
 
     // --- BUTTON / TEXT HANDLERS ---
@@ -689,16 +714,35 @@ async function startBot(botToken) {
       const movie = db.getMovieByCode(code);
       if (!movie) return await ctx.answerCallbackQuery({ text: 'Kino topilmadi', show_alert: true });
 
+      const settings = db.getMovieSettings() || {};
+      const targetChannel = settings.autoPostChannel || process.env.AUTO_POST_CHANNEL || '@XitFilm_uz';
+      const cleanChannel = targetChannel.startsWith('@') ? targetChannel : '@' + targetChannel;
+
       await ctx.answerCallbackQuery({ text: 'Kanalga joylanmoqda...' });
       try {
-        await publishMoviePostToChannel(movie, movie.shortsFileId || null);
+        await publishMoviePostToChannel(movie, movie.shortsFileId || null, cleanChannel);
         await ctx.editMessageText(
           `✅ <b>MUVAFFAQIYATLI JOYLANDI!</b>\n\n` +
-          `🎬 <b>«${escapeHTML(movie.title)}»</b> (Kod: <code>${code}</code>) filmi @XitFilm_uz kanaliga chiroyli post qilib chiqarildi! 🚀`,
+          `🎬 <b>«${escapeHTML(movie.title)}»</b> (Kod: <code>${code}</code>) filmi <b>${cleanChannel}</b> kanaliga chiroyli post qilib chiqarildi! 🚀`,
           { parse_mode: 'HTML' }
         );
       } catch (err) {
-        await ctx.editMessageText(`❌ Kanalga post qilishda xatolik: ${err.message}`);
+        const botName = botInstance?.botInfo?.username || 'xitfilm_bot';
+        if (err.message.includes('403') || err.message.includes('Forbidden') || err.message.includes('chat not found') || err.message.includes('member')) {
+          await ctx.editMessageText(
+            `⚠️ <b>Kanalga post qilib bo'lmadi!</b>\n\n` +
+            `🎯 Maqsadli kanal: <b>${cleanChannel}</b>\n\n` +
+            `💡 <b>Sababi:</b> <code>@${botName}</code> boti ushbu kanalga <b>Administrator</b> qilib qo'shilmagan!\n\n` +
+            `<b>🛠 To'g'rilash bo'yicha qo'llanma:</b>\n` +
+            `1️⃣ Telegramda kanalingizga kiring (<b>${cleanChannel}</b>)\n` +
+            `2️⃣ Kanal sozlamalari ⚙️ → <b>Administrators (Администраторы)</b> bo'limiga o'ting\n` +
+            `3️⃣ <b>@${botName}</b> ni qidirib, admin qilib qo'shing va <i>"Post Messages (Xabarlar yuborish)"</i> huquqini yoqing\n` +
+            `4️⃣ So'ng botga <b>/post</b> buyrug'ini yuboring va qaytadan kanalga chiqaring! ✅`,
+            { parse_mode: 'HTML' }
+          );
+        } else {
+          await ctx.editMessageText(`❌ Kanalga post qilishda xatolik: ${err.message}`);
+        }
       }
     });
 
@@ -882,6 +926,7 @@ async function startBot(botToken) {
         const movie = db.getMovieByCode(code);
         if (movie) {
           movie.shortsFileId = fileId;
+          db.addMovie(movie); // persist shortsFileId
           db.addShort({
             movieCode: code,
             movieTitle: movie.title,
@@ -890,6 +935,9 @@ async function startBot(botToken) {
             views: 0
           });
         }
+
+        const settings = db.getMovieSettings() || {};
+        const targetChannel = settings.autoPostChannel || '@XitFilm_uz';
 
         const kb = new InlineKeyboard()
           .text('🚀 Ha, darhol joylash', `pub_chan_now:${code}`)
@@ -900,7 +948,7 @@ async function startBot(botToken) {
 
         return await ctx.reply(
           `✅ <b>Shorts video qabul qilindi!</b>\n\n` +
-          `📢 <b>Kanalga (@XitFilm_uz) chiroyli post joylansinmi?</b>\n\n` +
+          `📢 <b>Kanalga (${targetChannel}) chiroyli post joylansinmi?</b>\n\n` +
           `🎬 Film: <b>${escapeHTML(movie?.title || code)}</b>\n` +
           `🔑 Kodi: <code>${code}</code>\n\n` +
           `<i>Post bilan birga hozirgina yuklangan Shorts lavhasi ham aylanib turadi!</i>`,
