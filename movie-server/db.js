@@ -160,6 +160,7 @@ function addMovie(movie) {
       title: cleanedTitle,
       description: cleanedDesc,
       fileId: movie.fileId,
+      shortsFileId: movie.shortsFileId !== undefined ? movie.shortsFileId : (existing.shortsFileId || null),
       genre: movie.genre || existing.genre || 'Tarjima kino',
       poster: movie.poster !== undefined ? String(movie.poster || '').trim() : (existing.poster || ''),
       likes: existing.likes || [],
