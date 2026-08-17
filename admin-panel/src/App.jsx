@@ -18,6 +18,7 @@ import SettingsPage from './pages/Settings.jsx';
 import AiPublisher from './pages/AiPublisher.jsx';
 import AdultBotPage from './pages/AdultBot.jsx';
 import Shorts from './pages/Shorts.jsx';
+import GuardianPage from './pages/Guardian.jsx';
 
 export default function App() {
   const { authed } = useApp();
@@ -36,6 +37,7 @@ export default function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/guardian" element={<GuardianPage />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/users" element={<Users />} />
           <Route path="/movies" element={<Movies />} />

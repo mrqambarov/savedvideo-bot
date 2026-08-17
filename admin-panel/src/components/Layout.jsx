@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Film, Inbox, Megaphone, Radio,
-  Download, Bot, Settings, Menu, Moon, Sun, LogOut, Sparkles, Gift, Users as UsersIcon, Clapperboard, X, Tv, ShieldAlert
+  Download, Bot, Settings, Menu, Moon, Sun, LogOut, Sparkles, Gift, Users as UsersIcon, Clapperboard, X, Tv, ShieldAlert, ShieldCheck
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
 import { movieApi, safe } from '../lib/api.js';
@@ -21,6 +21,7 @@ const NAV = [
   { to: '/broadcast', label: 'Broadcast Messenger', icon: Megaphone },
   { to: '/channels', label: 'Homiy Kanallar (CPA)', icon: Radio },
   { section: 'TIZIM & BOTLAR' },
+  { to: '/guardian', label: 'Guardian Watchdog 🛡️', icon: ShieldCheck },
   { to: '/downloader', label: 'Downloader Bot', icon: Download },
   { to: '/movie-bot', label: 'Kino Bot Studio', icon: Bot },
   { to: '/adult-bot', label: '18+ Adult Bot Studio', icon: ShieldAlert },
@@ -29,6 +30,7 @@ const NAV = [
 
 const TITLES = {
   '/': ['Media Studio Dashboard', 'Real-vaqt server va botlar monitoringi'],
+  '/guardian': ['Guardian Pro Watchdog', 'Avtonom xavfsizlik, o\'z-o\'zini tiklash va server nazorati'],
   '/analytics': ['Analitika & Tahlil', 'Foydalanuvchilar va yuklamalar statistikasi'],
   '/users': ['Foydalanuvchilar Ro\'yxati', 'Foydalanuvchilar katalogi va profillari'],
   '/movies': ['Kino Katalogi', 'Kinolar va meta-ma\'lumotlarini boshqarish'],

@@ -264,12 +264,14 @@ router.get('/guardian/status', async (req, res) => {
     const { checkAllSSL } = require('../guardian/checks/sslCheck');
     const { checkAllDatabases } = require('../guardian/checks/dbIntegrityCheck');
     const { checkDownloaderBinaries } = require('../guardian/checks/downloaderCheck');
+    const { getHealingHistory } = require('../guardian/brain/aiDoctor');
 
     const pm2List = await checkPm2Processes(['vibeconvert-bot', 'movie-bot', 'adult-bot', 'guardian']);
     const { disk, ram } = await checkSystemResources();
     const ssl = await checkAllSSL(['xitfilm.uz']);
     const databases = await checkAllDatabases();
     const binaries = await checkDownloaderBinaries();
+    const healingHistory = getHealingHistory(15);
 
     const pm2Obj = {};
     for (const [k, v] of pm2List) pm2Obj[k] = v;
@@ -284,7 +286,8 @@ router.get('/guardian/status', async (req, res) => {
       resources: { disk, ram },
       ssl: ssl.get('xitfilm.uz') || { ok: true },
       databases: dbObj,
-      binaries
+      binaries,
+      healingHistory
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -297,6 +300,7 @@ router.post('/guardian/action', async (req, res) => {
     const { restartProcess, reloadNginx, restartAllProcesses } = require('../guardian/actions/restarter');
     const { performDeepClean, createFullBackupZip } = require('../guardian/actions/cleaner');
     const { updateYtDlp } = require('../guardian/checks/downloaderCheck');
+    const { diagnoseCodeSyntax } = require('../guardian/brain/aiDoctor');
 
     if (action === 'restart') {
       if (target === 'all') await restartAllProcesses();
@@ -313,6 +317,11 @@ router.post('/guardian/action', async (req, res) => {
     if (action === 'update_ytdlp') {
       const out = await updateYtDlp();
       return res.json({ success: true, output: out.output });
+    }
+
+    if (action === 'scan_syntax') {
+      const results = await diagnoseCodeSyntax();
+      return res.json({ success: true, results });
     }
 
     if (action === 'backup') {

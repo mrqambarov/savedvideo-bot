@@ -66,11 +66,14 @@ function recordFailure(key) {
 }
 function getFailureCount(key) { return failureCounts.get(key) || 0; }
 
+// ─── AI Doctor & Auto-Healer ──────────────────────────────────────────────────
+const { diagnoseAndHeal, diagnoseCodeSyntax, getHealingHistory } = require('./brain/aiDoctor');
+
 // ─── Asosiy tekshiruv tsikllari ───────────────────────────────────────────────
 
 /**
  * 1. TEZKOR TSIKL (har 30 soniya)
- * PM2 holati + HTTP health tekshiruvi
+ * PM2 holati + HTTP health tekshiruvi + AI Doctor Auto-Healing
  */
 async function quickCycle() {
   console.log('\n[Guardian] ─── Tezkor tekshiruv boshlandi ───');
@@ -80,8 +83,8 @@ async function quickCycle() {
     if (!result.ok) {
       const count = recordFailure(`pm2_${name}`);
       if (count >= CONFIG.failThreshold) {
-        console.warn(`[Guardian] "${name}" ${count} marta muvaffaqiyatsiz — restart...`);
-        await restartProcess(name);
+        console.warn(`[Guardian AI] "${name}" ${count} marta muvaffaqiyatsiz — AI Doctor ishga tushmoqda...`);
+        await diagnoseAndHeal(name, result.error || 'PM2 process down');
         recordSuccess(`pm2_${name}`);
       }
     } else {
@@ -96,19 +99,15 @@ async function quickCycle() {
 
       if (name === 'website-public') {
         if (count >= CONFIG.failThreshold) {
-          console.warn(`[Guardian] Sayt javob bermadi (${count}x) — nginx reload...`);
-          await sendAlert(
-            `⚠️ <b>Sayt (xitfilm.uz) javob bermayapti</b>\n• Xatolik: ${result.error}\n• Nginx qayta yuklanmoqda...`,
-            'website_down', 'warn'
-          );
-          await reloadNginx();
+          console.warn(`[Guardian AI] Sayt javob bermadi (${count}x) — Nginx AI tiklash...`);
+          await diagnoseAndHeal('website-public', result.error || 'Nginx / Website down');
           recordSuccess(`http_${name}`);
         }
       } else {
         const pm2Name = CONFIG.endpointToPm2[name];
         if (pm2Name && count >= CONFIG.failThreshold) {
-          console.warn(`[Guardian] "${name}" API javob bermadi (${count}x) → "${pm2Name}" restart...`);
-          await restartProcess(pm2Name);
+          console.warn(`[Guardian AI] "${name}" API javob bermadi (${count}x) → AI Doctor [${pm2Name}]...`);
+          await diagnoseAndHeal(pm2Name, result.error || 'HTTP API failure');
           recordSuccess(`http_${name}`);
         }
       }
