@@ -156,8 +156,8 @@ async function networkCycle() {
     const prev = getFailureCount('internet');
     if (prev > 0) {
       await sendAlert(
-        `✅ <b>Internet aloqasi tiklandii!</b>\n` +
-        `• ${count} soniya uzilgan edi\n` +
+        `✅ <b>Internet aloqasi tiklandi!</b>\n` +
+        `• Botlar va servislar faol holatda\n` +
         `• Botlar qayta ulanmoqda...`,
         'internet_restored', 'ok'
       );

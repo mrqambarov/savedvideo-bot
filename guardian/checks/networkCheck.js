@@ -34,13 +34,15 @@ function tcpCheck(host, port, timeoutMs = 5000) {
 }
 
 /**
- * Internetga ulanish borligini tekshiradi (Cloudflare DNS + Google DNS)
+ * Internetga ulanish borligini tekshiradi (Cloudflare + Google HTTPS)
  * @returns {Promise<boolean>}
  */
 async function checkInternetConnectivity() {
   const checks = [
-    tcpCheck('1.1.1.1', 53, 4000),    // Cloudflare DNS
-    tcpCheck('8.8.8.8', 53, 4000),    // Google DNS
+    tcpCheck('1.1.1.1', 443, 4000),    // Cloudflare HTTPS
+    tcpCheck('8.8.8.8', 443, 4000),    // Google HTTPS
+    axios.get('https://cloudflare.com', { timeout: 5000, validateStatus: () => true }).then(() => true).catch(() => false),
+    axios.get('https://www.google.com', { timeout: 5000, validateStatus: () => true }).then(() => true).catch(() => false),
   ];
   const results = await Promise.all(checks);
   return results.some(r => r === true); // Kamida bittasi ishlasa OK
