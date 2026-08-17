@@ -65,6 +65,17 @@ function saveMovieSettings(settings) {
   }
 }
 
+function updateMovieSettings(updates) {
+  try {
+    const current = getMovieSettings();
+    const updated = { ...current, ...updates };
+    saveMovieSettings(updated);
+    return updated;
+  } catch (e) {
+    return null;
+  }
+}
+
 // Movies CRUD
 function getMovies() {
   try {
@@ -1659,6 +1670,7 @@ module.exports = {
   mergeDuplicateSerials,
   getMovieSettings,
   saveMovieSettings,
+  updateMovieSettings,
   saveAuthCode,
   verifyAuthCode,
   isUserPremium,
