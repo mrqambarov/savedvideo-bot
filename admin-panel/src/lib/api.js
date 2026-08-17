@@ -32,24 +32,38 @@ attach(movieApi, 'movie');
 attach(adultApi, 'adult');
 
 export async function login(password) {
-  const [dl, movie, adult] = await Promise.allSettled([
-    dlApi.post('/login', { password }),
-    movieApi.post('/login', { password }),
-    adultApi.post('/login', { password }),
-  ]);
-  
-  let validToken = null;
-  if (dl.status === 'fulfilled' && dl.value.data?.token) validToken = dl.value.data.token;
-  if (movie.status === 'fulfilled' && movie.value.data?.token) validToken = movie.value.data.token;
-  if (adult.status === 'fulfilled' && adult.value.data?.token) validToken = adult.value.data.token;
-
-  if (validToken) {
-    localStorage.setItem(TOKENS.dl, validToken);
-    localStorage.setItem(TOKENS.movie, validToken);
-    localStorage.setItem(TOKENS.adult, validToken);
-    return true;
+  try {
+    const res = await dlApi.post('/login', { password });
+    if (res.data?.require2FA) {
+      return { require2FA: true, tempId: res.data.tempId };
+    }
+    if (res.data?.token) {
+      localStorage.setItem(TOKENS.dl, res.data.token);
+      localStorage.setItem(TOKENS.movie, res.data.token);
+      localStorage.setItem(TOKENS.adult, res.data.token);
+      return { success: true };
+    }
+    return { success: false, error: 'Token topilmadi' };
+  } catch (err) {
+    const msg = err.response?.data?.error || err.message || 'Kirishda xatolik';
+    return { success: false, error: msg };
   }
-  return false;
+}
+
+export async function verifyOtp(tempId, otp) {
+  try {
+    const res = await dlApi.post('/verify-otp', { tempId, otp });
+    if (res.data?.token) {
+      localStorage.setItem(TOKENS.dl, res.data.token);
+      localStorage.setItem(TOKENS.movie, res.data.token);
+      localStorage.setItem(TOKENS.adult, res.data.token);
+      return { success: true };
+    }
+    return { success: false, error: 'Tasdiqlash kodi noto\'g\'ri' };
+  } catch (err) {
+    const msg = err.response?.data?.error || err.message || 'OTP tasdiqlashda xato';
+    return { success: false, error: msg };
+  }
 }
 
 export function logout() {

@@ -310,6 +310,36 @@ function checkMorningReportSchedule() {
   }
 }
 
+/**
+ * 8. HAFTALIK PROFILAKTIKA VA XOTIRA TOZALASH (Har yakshanba soat 04:00 da)
+ */
+let lastWeeklyMaintenanceDate = null;
+function checkWeeklyMaintenanceSchedule() {
+  const now = new Date();
+  const tashkentDay = now.getUTCDay(); // 0 = Sunday
+  const tashkentHour = (now.getUTCHours() + 5) % 24;
+  const dateStr = now.toISOString().split('T')[0];
+
+  if (tashkentDay === 0 && tashkentHour === 4 && lastWeeklyMaintenanceDate !== dateStr) {
+    lastWeeklyMaintenanceDate = dateStr;
+    runSafely('weeklyMaintenance', async () => {
+      console.log('[Guardian] ─── Haftalik profilaktika boshlandi ───');
+      const { totalDeleted, totalFreedMB } = await performDeepClean();
+      await createFullBackupZip();
+
+      await sendAlert(
+        `🧹 <b>HAFTALIK SERVER PROFILAKTIKASI YAKUNLANDI</b>\n\n` +
+        `• Bo'shatilgan joy: <b>${totalFreedMB.toFixed(1)} MB</b> (${totalDeleted} fayl)\n` +
+        `• PM2 loglari tozalandi\n` +
+        `• RAM kesh yangilandi\n` +
+        `• Barcha bazalar to'liq zaxiralandi ✅`,
+        'weekly_maintenance',
+        'ok'
+      );
+    });
+  }
+}
+
 // ─── Xavfsiz tsikl ishga tushiruvchi ─────────────────────────────────────────
 
 async function runSafely(cycleName, cycleFn) {
@@ -343,7 +373,8 @@ async function start() {
       `• 🗄 Baza Auto-Healer: <b>har 10 daqiqa</b>\n` +
       `• 📥 yt-dlp & Dvigatel: <b>har 2 soat</b>\n` +
       `• 🧹 Resurs va Temp tozalash: <b>har 1 soat</b>\n` +
-      `• ☀️ Ertalabki hisobot: <b>har kuni 09:00 da</b>\n\n` +
+      `• ☀️ Ertalabki hisobot: <b>har kuni 09:00 da</b>\n` +
+      `• 🧹 Haftalik profilaktika: <b>har yakshanba 04:00 da</b>\n\n` +
       `<i>💡 Admin Telegram botda /guardian deb yozib interaktiv boshqaruv pultini ochishi mumkin!</i>`,
       'guardian_pro_started',
       'ok',
@@ -362,7 +393,10 @@ async function start() {
   setInterval(() => runSafely('downloaderCycle', downloaderCycle),   CONFIG.intervals.downloader);
   setInterval(() => runSafely('resourceCycle', resourceCycle),       CONFIG.intervals.resource);
   setInterval(() => runSafely('sslCycle', sslCycle),                 CONFIG.intervals.ssl);
-  setInterval(() => checkMorningReportSchedule(),                    60 * 1000); // har daqiqada 09:00 tekshiruvi
+  setInterval(() => {
+    checkMorningReportSchedule();
+    checkWeeklyMaintenanceSchedule();
+  }, 60 * 1000);
 
   process.on('uncaughtException', async (err) => {
     console.error('[Guardian] UncaughtException:', err.message);

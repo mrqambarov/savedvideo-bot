@@ -37,6 +37,9 @@ function getMainKeyboard(lang = 'uz') {
 
 async function checkSponsorSubscription(ctx, userId) {
   try {
+    // VIP foydalanuvchilarga majburiy homiy kanal tekshirilmaydi
+    if (db.isUserPremium && db.isUserPremium(userId)) return { ok: true };
+
     const settings = db.getMovieSettings() || {};
     if (settings.sponsorEnabled === false) return { ok: true };
 

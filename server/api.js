@@ -34,25 +34,85 @@ const upload = multer({
 const envPath = path.join(__dirname, '..', '.env');
 const ADMIN_TOKEN = 'savedvideo-secure-token-2026';
 
-router.post('/login', (req, res) => {
+const pendingOtps = new Map();
+const loginRateLimit = new Map();
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = loginRateLimit.get(ip) || { count: 0, resetAt: now + 15 * 60 * 1000 };
+  if (now > entry.resetAt) {
+    entry.count = 0;
+    entry.resetAt = now + 15 * 60 * 1000;
+  }
+  entry.count++;
+  loginRateLimit.set(ip, entry);
+  return entry.count <= 10;
+}
+
+router.post('/login', async (req, res) => {
+  const ip = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+  if (!checkRateLimit(ip)) {
+    return res.status(429).json({ error: 'Juda ko\'p urinishlar! Iltimos, 15 daqiqadan so\'ng qayta urinib ko\'ring.' });
+  }
+
   const { password } = req.body;
   if (!password) {
     return res.status(400).json({ error: 'Parol kiritilmadi.' });
   }
   const adminPassword = process.env.ADMIN_PASSWORD || 'Anvar06';
   if (password === adminPassword) {
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
-    const userAgent = req.headers['user-agent'] || '';
-    const sessionId = db.addSession(ip, userAgent, ADMIN_TOKEN);
-    res.json({ success: true, token: ADMIN_TOKEN, sessionId });
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const tempId = '2fa_' + Math.random().toString(36).substring(2, 10);
+    pendingOtps.set(tempId, {
+      otp,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+      ip
+    });
+
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const adminId = process.env.ADMIN_ID || '6263659922';
+    if (botToken && adminId) {
+      try {
+        await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          chat_id: adminId,
+          text: `🔐 <b>XIT FILM ADMIN PANELGA KIRISH KODI:</b>\n\n<code>${otp}</code>\n\n⏱ Ushbu kod 5 daqiqa davomida amal qiladi.\n🌐 IP: <code>${ip}</code>`,
+          parse_mode: 'HTML'
+        }, { timeout: 8000 });
+      } catch (err) {
+        console.error('2FA OTP yuborishda xato:', err.message);
+      }
+    }
+
+    res.json({ success: true, require2FA: true, tempId });
   } else {
     res.status(401).json({ error: 'Parol noto\'g\'ri!' });
   }
 });
 
+router.post('/verify-otp', (req, res) => {
+  const { tempId, otp } = req.body;
+  const entry = pendingOtps.get(tempId);
+  if (!entry) {
+    return res.status(400).json({ error: 'Sessiya muddati tugagan. Qaytadan kiring.' });
+  }
+  if (Date.now() > entry.expiresAt) {
+    pendingOtps.delete(tempId);
+    return res.status(400).json({ error: 'Tasdiqlash kodi muddati o\'tgan.' });
+  }
+  if (String(entry.otp).trim() !== String(otp).trim()) {
+    return res.status(400).json({ error: 'Tasdiqlash kodi noto\'g\'ri!' });
+  }
+
+  pendingOtps.delete(tempId);
+  const ip = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+  const userAgent = req.headers['user-agent'] || '';
+  const sessionId = db.addSession(ip, userAgent, ADMIN_TOKEN);
+  res.json({ success: true, token: ADMIN_TOKEN, sessionId });
+});
+
 function authMiddleware(req, res, next) {
   const fullUrl = req.originalUrl || req.url || req.path || '';
-  if (fullUrl.includes('/vps-info') || fullUrl.includes('deploy') || fullUrl.includes('login') || fullUrl.includes('public')) {
+  if (fullUrl.includes('/vps-info') || fullUrl.includes('deploy') || fullUrl.includes('login') || fullUrl.includes('verify-otp') || fullUrl.includes('public')) {
     return next();
   }
   const authHeader = req.headers['authorization'];

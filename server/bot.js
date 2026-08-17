@@ -391,7 +391,7 @@ function startBot(token) {
         }
 
         // Bypass for admin commands & membership check callback
-        if (ctx.callbackQuery && (ctx.callbackQuery.data === 'chk_sub' || ctx.callbackQuery.data.startsWith('adm_') || ctx.callbackQuery.data.startsWith('guard_'))) {
+        if (ctx.callbackQuery && (ctx.callbackQuery.data === 'chk_sub' || ctx.callbackQuery.data.startsWith('adm_') || ctx.callbackQuery.data.startsWith('guard_') || ctx.callbackQuery.data.startsWith('buy_vip_'))) {
           return await next();
         }
         if (ctx.message && ctx.message.text && (
@@ -400,7 +400,11 @@ function startBot(token) {
           ctx.message.text === '❓ Yordam' ||
           ctx.message.text === '📢 Botni Ulashish' ||
           ctx.message.text === '🎁 Do\'stlarni taklif qilish' ||
+          ctx.message.text === '⭐ VIP Obuna' ||
           ctx.message.text.startsWith('/referal') ||
+          ctx.message.text.startsWith('/premium') ||
+          ctx.message.text.startsWith('/vip') ||
+          ctx.message.text.startsWith('/stars') ||
           ctx.message.text.startsWith('/admin') ||
           ctx.message.text.startsWith('/guardian') ||
           ctx.message.text.startsWith('/guard') ||
@@ -410,6 +414,11 @@ function startBot(token) {
           ctx.message.text.startsWith('/ban') ||
           ctx.message.text.startsWith('/unban')
         )) {
+          return await next();
+        }
+
+        // === VIP FOYDALANUVCHILAR: Barcha homiy kanallardan to'liq ozod ===
+        if (ctx.from && db.isVip(ctx.from.id)) {
           return await next();
         }
 
@@ -526,6 +535,51 @@ function startBot(token) {
           parse_mode: 'Markdown',
           reply_markup: keyboard
         });
+      });
+
+      // Telegram Stars VIP Monetization (/premium, /vip, /stars)
+      botInstance.command(['premium', 'vip', 'stars'], async (ctx) => {
+        const isUserVip = db.isVip(ctx.from.id);
+        if (isUserVip) {
+          const u = db.findUser(ctx.from.id);
+          const dateStr = u?.vipUntil ? new Date(u.vipUntil).toLocaleDateString('uz-UZ') : '';
+          return ctx.reply(
+            `⭐ <b>Sizda Premium VIP obuna faol!</b>\n\n` +
+            `📅 Amal qilish muddati: <b>${dateStr}</b> gacha\n` +
+            `✨ Barcha homiy kanallar va cheklovlar o'chirilgan! Rahmat!`,
+            { parse_mode: 'HTML' }
+          );
+        }
+
+        const kb = new InlineKeyboard()
+          .text('⭐ 1 Oylik VIP (50 Stars)', 'buy_vip_1m')
+          .row()
+          .text('⭐ 3 Oylik VIP (120 Stars - 20% Chegirma)', 'buy_vip_3m');
+
+        await ctx.reply(
+          `🌟 <b>SAVEMEDIA PREMIUM VIP OBUNA</b>\n\n` +
+          `VIP obuna afzalliklari:\n` +
+          `• 🚫 <b>Majburiy kanallarsiz</b> to'g'ridan-to'g'ri yuklash\n` +
+          `• ⚡ <b>0.1s bir zumda yuklash</b> (Maksimal kesh tezligi)\n` +
+          `• 🎬 <b>1080p, 2K, 4K</b> yuqori sifatli video formatlar\n` +
+          `• ⭐ Profilingizda VIP belgisi\n\n` +
+          `<i>To'lov rasmiy Telegram Stars (Yulduzlar) orqali xavfsiz amalga oshiriladi:</i>`,
+          { parse_mode: 'HTML', reply_markup: kb }
+        );
+      });
+
+      botInstance.hears(['⭐ VIP Obuna', '⭐ Premium'], async (ctx) => {
+        const isUserVip = db.isVip(ctx.from.id);
+        if (isUserVip) {
+          const u = db.findUser(ctx.from.id);
+          const dateStr = u?.vipUntil ? new Date(u.vipUntil).toLocaleDateString('uz-UZ') : '';
+          return ctx.reply(`⭐ Sizda VIP obuna faol: <b>${dateStr}</b> gacha`, { parse_mode: 'HTML' });
+        }
+        const kb = new InlineKeyboard()
+          .text('⭐ 1 Oylik VIP (50 Stars)', 'buy_vip_1m')
+          .row()
+          .text('⭐ 3 Oylik VIP (120 Stars)', 'buy_vip_3m');
+        await ctx.reply(`🌟 <b>SaveMedia VIP Obuna</b>\n\nHomiy kanallarsiz va tezkor yuklash uchun Stars orqali VIP oling:`, { parse_mode: 'HTML', reply_markup: kb });
       });
 
       // Guardian Pro Interactive Control (/guardian, /guard)
@@ -831,6 +885,29 @@ function startBot(token) {
           return;
         }
 
+        // Telegram Stars VIP Callback Handlers
+        if (data === 'buy_vip_1m' || data === 'buy_vip_3m') {
+          const is3m = data === 'buy_vip_3m';
+          const starsAmount = is3m ? 120 : 50;
+          const months = is3m ? 3 : 1;
+          const days = months * 30;
+
+          await ctx.answerCallbackQuery({ text: 'Stars to\'lovi tayyorlanmoqda...' });
+          try {
+            await ctx.replyWithInvoice(
+              `⭐ VIP Obuna (${months} Oy)`,
+              `SaveMedia botidan barcha majburiy homiy kanallarsiz va eng yuqori tezlikda foydalanish imkoniyati.`,
+              `vip_${days}d_${ctx.from.id}`,
+              'XTR',
+              [{ label: `${months} Oylik VIP`, amount: starsAmount }]
+            );
+          } catch (invErr) {
+            console.error('Invoice error:', invErr);
+            await ctx.reply(`❌ To'lov hisobini yaratishda xato: ${invErr.message}`);
+          }
+          return;
+        }
+
         if (data.startsWith('dl_vid_q:')) {
           const parts = data.split(':');
           const shortId = parts[1];
@@ -1057,6 +1134,39 @@ function startBot(token) {
       // History Command
       botInstance.command('history', async (ctx) => {
         await showHistory(ctx);
+      });
+
+      // Telegram Stars Pre-Checkout Query
+      botInstance.on('pre_checkout_query', async (ctx) => {
+        try {
+          await ctx.answerPreCheckoutQuery(true);
+        } catch (e) {
+          console.error('Pre-checkout error:', e);
+        }
+      });
+
+      // Telegram Stars Successful Payment
+      botInstance.on(':successful_payment', async (ctx) => {
+        try {
+          const payment = ctx.message.successful_payment;
+          const payload = payment.invoice_payload || '';
+          let days = 30;
+          if (payload.includes('90d')) days = 90;
+          else if (payload.includes('30d')) days = 30;
+
+          const newExpiry = db.setVip(ctx.from.id, days);
+          const dateStr = newExpiry ? new Date(newExpiry).toLocaleDateString('uz-UZ') : '';
+
+          await ctx.reply(
+            `🎉 <b>TABRIKLAYMIZ! VIP OBUNA FAOL BO'LDI!</b> ⭐\n\n` +
+            `• To'lov summasi: <b>${payment.total_amount} Stars ⭐</b>\n` +
+            `• VIP muddati: <b>${dateStr}</b> gacha\n\n` +
+            `✨ Endi barcha videolarni hech qanday kanallarga a'zo bo'lmasdan bir zumda yuklab olishingiz mumkin! Rahmat! 🚀`,
+            { parse_mode: 'HTML' }
+          );
+        } catch (payErr) {
+          console.error('Successful payment handle error:', payErr);
+        }
       });
 
       // Inline Query handler (YouTube music search)

@@ -309,6 +309,56 @@ function getUserLang(userId) {
   return u && u.lang ? u.lang : 'uz';
 }
 
+function isVip(userId) {
+  try {
+    const users = getUsers();
+    const u = users.find(x => Number(x.id) === Number(userId));
+    if (!u || !u.vipUntil) return false;
+    return new Date(u.vipUntil).getTime() > Date.now();
+  } catch (e) {
+    return false;
+  }
+}
+
+function setVip(userId, days = 30) {
+  try {
+    const users = getUsers();
+    const u = users.find(x => Number(x.id) === Number(userId));
+    const now = Date.now();
+    const currentExpiry = (u && u.vipUntil && new Date(u.vipUntil).getTime() > now)
+      ? new Date(u.vipUntil).getTime()
+      : now;
+    const newExpiry = new Date(currentExpiry + days * 24 * 60 * 60 * 1000).toISOString();
+
+    if (u) {
+      u.isVip = true;
+      u.vipUntil = newExpiry;
+      saveUsers(users);
+
+      logActivity({
+        bot: 'Downloader Bot',
+        icon: '⭐',
+        text: `Foydalanuvchi ${u.first_name || ''} (@${u.username || u.id}) ${days} kunga VIP obuna sotib oldi`,
+        color: '#f59e0b'
+      });
+    }
+    return newExpiry;
+  } catch (e) {
+    console.error('Error setting VIP:', e.message);
+    return null;
+  }
+}
+
+function getVipCount() {
+  try {
+    const users = getUsers();
+    const now = Date.now();
+    return users.filter(u => u.vipUntil && new Date(u.vipUntil).getTime() > now).length;
+  } catch (e) {
+    return 0;
+  }
+}
+
 function setUserLang(userId, lang) {
   const users = getUsers();
   const u = users.find(x => Number(x.id) === Number(userId));
@@ -927,6 +977,9 @@ module.exports = {
   getBackupBots,
   saveBackupBots,
   addBackupBot,
-  deleteBackupBot
+  deleteBackupBot,
+  isVip,
+  setVip,
+  getVipCount
 };
 
