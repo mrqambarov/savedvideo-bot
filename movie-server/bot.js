@@ -7,6 +7,7 @@ const i18n = require('./i18n');
 let botInstance = null;
 let isBotRunning = false;
 const userStates = new Map(); // userId -> { action: 'search' | 'request', timestamp }
+const tempAdminUploads = new Map(); // userId -> { fileId, title, caption, autoCode }
 
 function isAdmin(userId) {
   const adminIdsStr = process.env.MOVIE_ADMIN_IDS || process.env.ADMIN_ID || '6263659922';
@@ -607,6 +608,50 @@ async function startBot(botToken) {
       await ctx.answerCallbackQuery();
     });
 
+    // --- ADMIN MOVIE CODE CHOICE (AUTO VS MANUAL) ---
+    botInstance.callbackQuery(/^code_auto:(.+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      const upload = tempAdminUploads.get(ctx.from.id);
+      if (!upload) return await ctx.answerCallbackQuery({ text: 'Yuklash muddati o\'tgan. Qayta video yuboring.', show_alert: true });
+
+      db.addMovie({
+        code,
+        title: upload.title,
+        fileId: upload.fileId,
+        genre: 'Tarjima kino',
+        description: 'XIT FILM portalida eng yuqori sifatda tomosha qiling.',
+        dateAdded: new Date().toISOString()
+      });
+
+      const kb = new InlineKeyboard()
+        .text('📹 Ha, Shorts yuklayman', `up_shorts:${code}`)
+        .row()
+        .text('⏩ O\'tkazib yuborish', `skip_shorts:${code}`);
+
+      await ctx.editMessageText(
+        `🎉 <b>YANGI FILM BAZAGA SAQLANDI!</b>\n\n` +
+        `🎬 Nomi: <b>${escapeHTML(upload.title)}</b>\n` +
+        `🔑 Kodi: <code>${code}</code> (Avtomatik berildi)\n\n` +
+        `📹 <b>Kanal uchun Shorts (treyler / qiziqarli lavha) videosini ham yuklaysizmi?</b>\n\n` +
+        `<i>💡 Shorts videosi kanalda odamlarni o'ziga jalb qiladi va ko'rishlar sonini 5 baravarga oshiradi!</i>`,
+        { parse_mode: 'HTML', reply_markup: kb }
+      );
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery('code_manual', async (ctx) => {
+      const upload = tempAdminUploads.get(ctx.from.id);
+      if (!upload) return await ctx.answerCallbackQuery({ text: 'Yuklash muddati o\'tgan. Qayta video yuboring.', show_alert: true });
+
+      userStates.set(ctx.from.id, { action: 'awaiting_movie_code', timestamp: Date.now() });
+      await ctx.editMessageText(
+        `🎬 Film: <b>${escapeHTML(upload.title)}</b>\n\n` +
+        `✏️ Iltimos, ushbu film uchun <b>maxsus kodni (masalan: 125 yoki 777)</b> yozib yuboring:`,
+        { parse_mode: 'HTML' }
+      );
+      await ctx.answerCallbackQuery();
+    });
+
     // --- ADMIN SHORTS & CHANNEL AUTO-POST CALLBACKS ---
     botInstance.callbackQuery(/^up_shorts:(.+)$/, async (ctx) => {
       const code = ctx.match[1];
@@ -865,36 +910,33 @@ async function startBot(botToken) {
 
       // B. Admin is uploading a Full Movie video
       const caption = ctx.message.caption || '';
-      let code = getNextMovieCode();
-      let title = caption || ctx.message.document?.file_name || `Kino #${code}`;
+      let autoCode = getNextMovieCode();
+      let title = caption || ctx.message.document?.file_name || `Kino #${autoCode}`;
       title = title.replace(/\.[^/.]+$/, ''); // remove extension
 
       const codeMatch = caption.match(/#(\d+)|kod[:\s]*(\d+)/i);
       if (codeMatch) {
-        code = codeMatch[1] || codeMatch[2];
+        autoCode = codeMatch[1] || codeMatch[2];
         title = caption.replace(/#\d+|kod[:\s]*\d+/gi, '').trim() || title;
       }
 
-      db.addMovie({
-        code,
-        title,
+      tempAdminUploads.set(userId, {
         fileId,
-        genre: 'Tarjima kino',
-        description: 'XIT FILM portalida eng yuqori sifatda tomosha qiling.',
-        dateAdded: new Date().toISOString()
+        title,
+        caption,
+        autoCode
       });
 
       const kb = new InlineKeyboard()
-        .text('📹 Ha, Shorts yuklayman', `up_shorts:${code}`)
+        .text(`⚡ Avtomatik kod (${autoCode})`, `code_auto:${autoCode}`)
         .row()
-        .text('⏩ O\'tkazib yuborish', `skip_shorts:${code}`);
+        .text(`✏️ O'zim kod kiritaman`, `code_manual`);
 
       await ctx.reply(
-        `🎉 <b>YANGI FILM QABUL QILINDI VA BAZAGA SAQLANDI!</b>\n\n` +
-        `🎬 Nomi: <b>${escapeHTML(title)}</b>\n` +
-        `🔑 Kodi: <code>${code}</code>\n\n` +
-        `📹 <b>Kanal uchun Shorts (treyler / qiziqarli lavha) videosini ham yuklaysizmi?</b>\n\n` +
-        `<i>💡 Shorts videosi kanalda odamlarni o'ziga jalb qiladi va ko'rishlar sonini 5 baravarga oshiradi!</i>`,
+        `🎬 <b>Film qabul qilindi!</b>\n\n` +
+        `📌 Nomi: <b>${escapeHTML(title)}</b>\n\n` +
+        `🔑 <b>Film kodini qanday belgilaymiz?</b>\n` +
+        `<i>Avtomatik kod berilsinmi yoki o'zingiz kiritasizmi?</i>`,
         { parse_mode: 'HTML', reply_markup: kb }
       );
     });
@@ -907,6 +949,43 @@ async function startBot(botToken) {
       const userId = ctx.from.id;
       const userLang = db.getUserLang(userId) || 'uz';
       const state = userStates.get(userId);
+
+      // 0. Handle custom code input from Admin
+      if (isAdmin(userId) && state && state.action === 'awaiting_movie_code') {
+        userStates.delete(userId);
+        const customCode = text.replace(/[^0-9a-zA-Z_-]/g, '').trim();
+        if (!customCode) {
+          return await ctx.reply('⚠️ Kod noto\'g\'ri kiritildi. Iltimos raqam yoki harf kiriting:');
+        }
+
+        const upload = tempAdminUploads.get(userId);
+        if (!upload) {
+          return await ctx.reply('⚠️ Yuklash ma\'lumotlari topilmadi. Qaytadan video yuboring.');
+        }
+
+        db.addMovie({
+          code: customCode,
+          title: upload.title,
+          fileId: upload.fileId,
+          genre: 'Tarjima kino',
+          description: 'XIT FILM portalida eng yuqori sifatda tomosha qiling.',
+          dateAdded: new Date().toISOString()
+        });
+
+        const kb = new InlineKeyboard()
+          .text('📹 Ha, Shorts yuklayman', `up_shorts:${customCode}`)
+          .row()
+          .text('⏩ O\'tkazib yuborish', `skip_shorts:${customCode}`);
+
+        return await ctx.reply(
+          `🎉 <b>YANGI FILM BAZAGA SAQLANDI!</b>\n\n` +
+          `🎬 Nomi: <b>${escapeHTML(upload.title)}</b>\n` +
+          `🔑 Kodi: <code>${customCode}</code> (Qo'lda kiritildi)\n\n` +
+          `📹 <b>Kanal uchun Shorts (treyler / qiziqarli lavha) videosini ham yuklaysizmi?</b>\n\n` +
+          `<i>💡 Shorts videosi kanalda odamlarni o'ziga jalb qiladi va ko'rishlar sonini 5 baravarga oshiradi!</i>`,
+          { parse_mode: 'HTML', reply_markup: kb }
+        );
+      }
 
       // 1. Handle movie order/request state
       if (state && state.action === 'request') {
