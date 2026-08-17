@@ -25,6 +25,67 @@ function escapeHTML(str) {
     .replace(/[\ud800-\udfff]/g, '');
 }
 
+function getNextMovieCode() {
+  try {
+    const movies = db.getMovies() || [];
+    const numericCodes = movies
+      .map(m => parseInt(m.code, 10))
+      .filter(n => !isNaN(n) && n > 0);
+    if (numericCodes.length === 0) return '1001';
+    const maxCode = Math.max(...numericCodes);
+    return String(maxCode + 1);
+  } catch (_) {
+    return String(Math.floor(1000 + Math.random() * 9000));
+  }
+}
+
+async function publishMoviePostToChannel(movie, shortsFileId = null, targetChannel = null) {
+  const settings = db.getMovieSettings() || {};
+  const channel = targetChannel || settings.autoPostChannel || process.env.AUTO_POST_CHANNEL || '@XitFilm_uz';
+  const cleanChannel = channel.startsWith('@') ? channel : '@' + channel;
+  const botUsername = botInstance?.botInfo?.username || process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
+  const mCode = String(movie.code).trim();
+  const miniAppUrl = `https://xitfilm.uz?code=${mCode}&tma=1&v=4.2.0`;
+
+  const kb = new InlineKeyboard()
+    .webApp('🎬 Ilovada Ko\'rish (4K HD)', miniAppUrl)
+    .row()
+    .url('🍿 Bot Orqali Yuklab Olish', `https://t.me/${botUsername}?start=${mCode}`);
+
+  const desc = movie.description
+    ? (movie.description.length > 250 ? movie.description.substring(0, 247) + '...' : movie.description)
+    : 'Eng sara tarjima kinolar va shov-shuvli premyerani yuqori sifatda tomosha qiling!';
+
+  const postCaption =
+    `🔥 <b>YANGI PREMYERA: ${escapeHTML(movie.title.toUpperCase())}</b> 🔥\n\n` +
+    `📁 <b>Janr:</b> #${escapeHTML((movie.genre || 'Kino').replace(/[^a-zA-Z0-9\u0400-\u04FF]/g, '_'))}\n` +
+    `🔑 <b>Kino Kodi:</b> <code>${mCode}</code>\n\n` +
+    `📝 <i>${escapeHTML(desc)}</i>\n\n` +
+    `🍿 <b>Ko'rish yoki yuklab olish uchun pastdagi tugmalarni bosing:</b>\n` +
+    `👉 <b>Bizning bot:</b> @${botUsername}`;
+
+  if (shortsFileId) {
+    await botInstance.api.sendVideo(cleanChannel, shortsFileId, {
+      caption: postCaption,
+      parse_mode: 'HTML',
+      reply_markup: kb,
+      supports_streaming: true
+    });
+  } else if (movie.poster && movie.poster.startsWith('http')) {
+    await botInstance.api.sendPhoto(cleanChannel, movie.poster, {
+      caption: postCaption,
+      parse_mode: 'HTML',
+      reply_markup: kb
+    });
+  } else {
+    await botInstance.api.sendMessage(cleanChannel, postCaption, {
+      parse_mode: 'HTML',
+      reply_markup: kb
+    });
+  }
+  return true;
+}
+
 function getMainKeyboard(lang = 'uz') {
   return new Keyboard()
     .text(i18n.t(lang, 'search_btn')).text('⚡️ Shorts Lavhalar')
@@ -283,6 +344,21 @@ async function startBot(botToken) {
       );
     });
 
+    botInstance.command(['post', 'kanal'], async (ctx) => {
+      if (!isAdmin(ctx.from.id)) return;
+      const movies = db.getMovies() || [];
+      const latest = movies.slice(-8).reverse();
+
+      let text = `📢 <b>KANALGA POST JOYLASHTIRISH BOSHQARUVI:</b>\n\nQaysi filmni @XitFilm_uz kanaliga chiqarmoqchisiz? Tanlang:`;
+      const kb = new InlineKeyboard();
+      latest.forEach((m, idx) => {
+        kb.text(`🎬 ${m.title.substring(0, 20)} (${m.code})`, `pub_chan_now:${m.code}`);
+        if (idx % 2 === 1) kb.row();
+      });
+
+      await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+    });
+
     // --- BUTTON / TEXT HANDLERS ---
     botInstance.hears([/Shorts/i, /Лавхалар/i, /Lavhalar/i], async (ctx) => {
       const kb = new InlineKeyboard()
@@ -531,6 +607,75 @@ async function startBot(botToken) {
       await ctx.answerCallbackQuery();
     });
 
+    // --- ADMIN SHORTS & CHANNEL AUTO-POST CALLBACKS ---
+    botInstance.callbackQuery(/^up_shorts:(.+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      userStates.set(ctx.from.id, { action: 'awaiting_shorts', code });
+      await ctx.editMessageText(
+        `📹 <b>Kino Kodi: <code>${code}</code></b>\n\n` +
+        `Iltimos, ushbu film uchun <b>1-2 daqiqalik qiziqarli Shorts (lavha / treyler) videosini</b> shu chatga yuboring:`,
+        { parse_mode: 'HTML' }
+      );
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery(/^skip_shorts:(.+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      const movie = db.getMovieByCode(code);
+      const kb = new InlineKeyboard()
+        .text('🚀 Ha, darhol joylash', `pub_chan_now:${code}`)
+        .row()
+        .text('⏰ Keyinroq eslat', `remind_chan:${code}`)
+        .row()
+        .text('❌ Kerak emas', `cancel_chan:${code}`);
+
+      await ctx.editMessageText(
+        `📢 <b>Telegram kanalga (@XitFilm_uz) chiroyli post joylansinmi?</b>\n\n` +
+        `🎬 Film: <b>${escapeHTML(movie?.title || code)}</b>\n` +
+        `🔑 Kodi: <code>${code}</code>\n\n` +
+        `<i>Tanlang:</i>`,
+        { parse_mode: 'HTML', reply_markup: kb }
+      );
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery(/^pub_chan_now:(.+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      const movie = db.getMovieByCode(code);
+      if (!movie) return await ctx.answerCallbackQuery({ text: 'Kino topilmadi', show_alert: true });
+
+      await ctx.answerCallbackQuery({ text: 'Kanalga joylanmoqda...' });
+      try {
+        await publishMoviePostToChannel(movie, movie.shortsFileId || null);
+        await ctx.editMessageText(
+          `✅ <b>MUVAFFAQIYATLI JOYLANDI!</b>\n\n` +
+          `🎬 <b>«${escapeHTML(movie.title)}»</b> (Kod: <code>${code}</code>) filmi @XitFilm_uz kanaliga chiroyli post qilib chiqarildi! 🚀`,
+          { parse_mode: 'HTML' }
+        );
+      } catch (err) {
+        await ctx.editMessageText(`❌ Kanalga post qilishda xatolik: ${err.message}`);
+      }
+    });
+
+    botInstance.callbackQuery(/^remind_chan:(.+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      await ctx.editMessageText(
+        `⏰ <b>Eslab qolindi!</b>\n\n` +
+        `Kino kodi: <code>${code}</code>\n` +
+        `Ushbu postni xohlagan vaqtingizda /post buyrug'i orqali kanalga chiqarishingiz mumkin.`,
+        { parse_mode: 'HTML' }
+      );
+      await ctx.answerCallbackQuery({ text: 'Eslatma saqlandi!' });
+    });
+
+    botInstance.callbackQuery(/^cancel_chan:(.+)$/, async (ctx) => {
+      await ctx.editMessageText(
+        `❌ <b>Kanalga post joylanmadi.</b>\n\nFilm faqat bot bazasida saqlandi.`,
+        { parse_mode: 'HTML' }
+      );
+      await ctx.answerCallbackQuery();
+    });
+
     // --- STARS VIP PURCHASE CALLBACKS ---
     botInstance.callbackQuery(/^buy_vip:(1m|3m|1y):(\d+)$/, async (ctx) => {
       const plan = ctx.match[1];
@@ -667,6 +812,91 @@ async function startBot(botToken) {
       } catch (err) {
         console.error('Inline query error:', err.message);
       }
+    });
+
+    // --- ADMIN VIDEO & SHORTS UPLOAD HANDLER ---
+    botInstance.on(['message:video', 'message:document'], async (ctx) => {
+      const userId = ctx.from.id;
+      if (!isAdmin(userId)) return;
+
+      const isVideo = !!ctx.message.video;
+      const isDoc = !!ctx.message.document;
+      const docMime = ctx.message.document?.mime_type || '';
+      if (isDoc && !docMime.startsWith('video/')) return;
+
+      const fileId = ctx.message.video?.file_id || ctx.message.document?.file_id;
+      if (!fileId) return;
+
+      const state = userStates.get(userId);
+
+      // A. Admin is uploading requested Shorts video
+      if (state && state.action === 'awaiting_shorts') {
+        const code = state.code;
+        userStates.delete(userId);
+
+        const movie = db.getMovieByCode(code);
+        if (movie) {
+          movie.shortsFileId = fileId;
+          db.addShort({
+            movieCode: code,
+            movieTitle: movie.title,
+            videoUrl: fileId,
+            title: `${movie.title} (Shorts)`,
+            views: 0
+          });
+        }
+
+        const kb = new InlineKeyboard()
+          .text('🚀 Ha, darhol joylash', `pub_chan_now:${code}`)
+          .row()
+          .text('⏰ Keyinroq eslat', `remind_chan:${code}`)
+          .row()
+          .text('❌ Kerak emas', `cancel_chan:${code}`);
+
+        return await ctx.reply(
+          `✅ <b>Shorts video qabul qilindi!</b>\n\n` +
+          `📢 <b>Kanalga (@XitFilm_uz) chiroyli post joylansinmi?</b>\n\n` +
+          `🎬 Film: <b>${escapeHTML(movie?.title || code)}</b>\n` +
+          `🔑 Kodi: <code>${code}</code>\n\n` +
+          `<i>Post bilan birga hozirgina yuklangan Shorts lavhasi ham aylanib turadi!</i>`,
+          { parse_mode: 'HTML', reply_markup: kb }
+        );
+      }
+
+      // B. Admin is uploading a Full Movie video
+      const caption = ctx.message.caption || '';
+      let code = getNextMovieCode();
+      let title = caption || ctx.message.document?.file_name || `Kino #${code}`;
+      title = title.replace(/\.[^/.]+$/, ''); // remove extension
+
+      const codeMatch = caption.match(/#(\d+)|kod[:\s]*(\d+)/i);
+      if (codeMatch) {
+        code = codeMatch[1] || codeMatch[2];
+        title = caption.replace(/#\d+|kod[:\s]*\d+/gi, '').trim() || title;
+      }
+
+      db.addMovie({
+        code,
+        title,
+        fileId,
+        genre: 'Tarjima kino',
+        description: 'XIT FILM portalida eng yuqori sifatda tomosha qiling.',
+        dateAdded: new Date().toISOString()
+      });
+
+      const kb = new InlineKeyboard()
+        .text('📹 Ha, Shorts yuklayman', `up_shorts:${code}`)
+        .row()
+        .text('⏩ O\'tkazib yuborish', `skip_shorts:${code}`);
+
+      await ctx.reply(
+        `🎉 <b>YANGI FILM QABUL QILINDI VA BAZAGA SAQLANDI!</b>\n\n` +
+        `🎬 Nomi: <b>${escapeHTML(title)}</b>\n` +
+        `🔑 Kodi: <code>${code}</code>\n\n` +
+        `📹 <b>Kanal uchun Shorts (treyler / qiziqarli lavha) videosini ham yuklaysizmi?</b>\n\n` +
+        `<i>💡 Shorts videosi kanalda odamlarni o'ziga jalb qiladi va ko'rishlar sonini 5 baravarga oshiradi!</i>`,
+        { parse_mode: 'HTML', reply_markup: kb }
+      );
     });
 
     // --- MAIN TEXT MESSAGE HANDLER ---
