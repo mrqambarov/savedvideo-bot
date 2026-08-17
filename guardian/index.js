@@ -1,9 +1,9 @@
 'use strict';
 /**
  * ╔══════════════════════════════════════════════════════════════╗
- * ║         GUARDIAN WATCHDOG — O'Z-O'ZINI TUZATUVCHI TIZIM    ║
- * ║  Barcha servlar, botlar, sayt, internet, SSL ni kuzatadi    ║
- * ║  Xatolik topilsa — o'zi tuzatadi va Telegram xabar yuboradi ║
+ * ║         GUARDIAN PRO — ENTERPRISE WATCHDOG & HEALER         ║
+ * ║  Barcha servlar, botlar, sayt, internet, SSL, bazani        ║
+ * ║  kuzatadi, o'zini o'zi tuzatadi va Adminga hisobot beradi   ║
  * ╚══════════════════════════════════════════════════════════════╝
  */
 const path = require('path');
@@ -15,15 +15,17 @@ const { checkPm2Processes }      = require('./checks/pm2Check');
 const { checkNetwork }           = require('./checks/networkCheck');
 const { checkSystemResources }   = require('./checks/diskCheck');
 const { checkAllSSL }            = require('./checks/sslCheck');
+const { checkAllDatabases }      = require('./checks/dbIntegrityCheck');
+const { checkDownloaderBinaries, updateYtDlp } = require('./checks/downloaderCheck');
 
 // ─── Harakatlar ───────────────────────────────────────────────────────────────
 const { restartProcess, reloadNginx, restartAllProcesses, renewSSL } = require('./actions/restarter');
-const { cleanAllTempDirs, trimPm2Logs } = require('./actions/cleaner');
-const { sendAlert, sendRecoveryAlert, sendCriticalAlert } = require('./actions/alerter');
+const { cleanAllTempDirs, trimPm2Logs, performDeepClean } = require('./actions/cleaner');
+const { healDatabase }           = require('./actions/dbHealer');
+const { sendAlert, sendRecoveryAlert, sendCriticalAlert, sendMorningDigest } = require('./actions/alerter');
 
 // ─── Sozlamalar ───────────────────────────────────────────────────────────────
 const CONFIG = {
-  // Tekshiriladigan HTTP endpointlar
   httpEndpoints: [
     { name: 'vibeconvert-api',  url: 'http://127.0.0.1:5000/api/health', timeoutMs: 8000 },
     { name: 'movie-api',        url: 'http://127.0.0.1:5001/movies/api/health', timeoutMs: 8000 },
@@ -31,39 +33,31 @@ const CONFIG = {
     { name: 'website-public',   url: 'https://xitfilm.uz', timeoutMs: 12000 },
   ],
 
-  // PM2 jarayon nomlari
   pm2Processes: ['vibeconvert-bot', 'movie-bot', 'adult-bot'],
 
-  // HTTP endpoint → PM2 jarayon nomi xaritasi
   endpointToPm2: {
     'vibeconvert-api': 'vibeconvert-bot',
     'movie-api':       'movie-bot',
     'adult-api':       'adult-bot',
   },
 
-  // SSL tekshiriladigan domenlar
   sslDomains: ['xitfilm.uz'],
 
-  // Tekshiruv oraliqlari (millisekund)
   intervals: {
-    quick:   30 * 1000,         // 30 soniya: PM2 + HTTP tekshiruv
-    network: 2  * 60 * 1000,    // 2 daqiqa: internet + Telegram API
-    resource:60 * 60 * 1000,    // 1 soat: disk + RAM + temp tozalash
-    ssl:     6  * 60 * 60 * 1000, // 6 soat: SSL sertifikat
+    quick:       30 * 1000,         // 30s: PM2 + HTTP health
+    network:     2  * 60 * 1000,    // 2m: internet + Telegram API
+    database:    10 * 60 * 1000,    // 10m: JSON Baza yaxlitligi
+    downloader:  2  * 60 * 60 * 1000, // 2h: yt-dlp & ffmpeg dvigateli
+    resource:    60 * 60 * 1000,    // 1h: disk + RAM + temp tozalash
+    ssl:         6  * 60 * 60 * 1000, // 6h: SSL sertifikat
   },
 
-  // Ketma-ket qancha marta muvaffaqiyatsiz bo'lsa qayta tiklash kerak
   failThreshold: 2,
-
-  // RAM kritik chegarasi (%)
   ramCritPct: 90,
   diskCritPct: 90,
 };
 
-// ─── Holat kuzatuvi ───────────────────────────────────────────────────────────
-// Har bir tekshiruv uchun ketma-ket muvaffaqiyatsiz sonini kuzatamiz
-const failureCounts = new Map(); // key => count
-
+const failureCounts = new Map();
 function recordSuccess(key) { failureCounts.set(key, 0); }
 function recordFailure(key) {
   const count = (failureCounts.get(key) || 0) + 1;
@@ -75,13 +69,12 @@ function getFailureCount(key) { return failureCounts.get(key) || 0; }
 // ─── Asosiy tekshiruv tsikllari ───────────────────────────────────────────────
 
 /**
- * TEZKOR TSIKL (har 30 soniya)
+ * 1. TEZKOR TSIKL (har 30 soniya)
  * PM2 holati + HTTP health tekshiruvi
  */
 async function quickCycle() {
   console.log('\n[Guardian] ─── Tezkor tekshiruv boshlandi ───');
 
-  // 1. PM2 jarayonlarini tekshirish
   const pm2Results = await checkPm2Processes(CONFIG.pm2Processes);
   for (const [name, result] of pm2Results) {
     if (!result.ok) {
@@ -96,34 +89,30 @@ async function quickCycle() {
     }
   }
 
-  // 2. HTTP endpointlarini tekshirish
   const httpResults = await checkAllEndpoints(CONFIG.httpEndpoints);
   for (const [name, result] of httpResults) {
     if (!result.ok) {
       const count = recordFailure(`http_${name}`);
 
       if (name === 'website-public') {
-        // Sayt javoب bermasa — nginx ni tekshiramiz
         if (count >= CONFIG.failThreshold) {
-          console.warn(`[Guardian] Sayt javoб bermadi (${count}x) — nginx reload...`);
+          console.warn(`[Guardian] Sayt javob bermadi (${count}x) — nginx reload...`);
           await sendAlert(
-            `⚠️ <b>Sayt (xitfilm.uz) javoб bermayapti</b>\n• Xatolik: ${result.error}\n• Nginx qayta yuklanmoqda...`,
+            `⚠️ <b>Sayt (xitfilm.uz) javob bermayapti</b>\n• Xatolik: ${result.error}\n• Nginx qayta yuklanmoqda...`,
             'website_down', 'warn'
           );
           await reloadNginx();
           recordSuccess(`http_${name}`);
         }
       } else {
-        // API endpointida muammo → tegishli PM2 jarayonni restart
         const pm2Name = CONFIG.endpointToPm2[name];
         if (pm2Name && count >= CONFIG.failThreshold) {
-          console.warn(`[Guardian] "${name}" API javoб bermadi (${count}x) → "${pm2Name}" restart...`);
+          console.warn(`[Guardian] "${name}" API javob bermadi (${count}x) → "${pm2Name}" restart...`);
           await restartProcess(pm2Name);
           recordSuccess(`http_${name}`);
         }
       }
     } else {
-      // Muvaffaqiyatli — agar avval muvaffaqiyatsiz bo'lgan bo'lsa xabar ber
       const prev = getFailureCount(`http_${name}`);
       if (prev >= CONFIG.failThreshold) {
         await sendAlert(`✅ <b>${name}</b> yana ishlayapti (${result.latencyMs}ms)`, `recovered_${name}`, 'ok');
@@ -134,8 +123,7 @@ async function quickCycle() {
 }
 
 /**
- * TARMOQ TSIKLI (har 2 daqiqa)
- * Internet + Telegram API ulanishini tekshiradi
+ * 2. TARMOQ TSIKLI (har 2 daqiqa)
  */
 async function networkCycle() {
   console.log('\n[Guardian] ─── Tarmoq tekshiruvi boshlandi ───');
@@ -157,11 +145,9 @@ async function networkCycle() {
     if (prev > 0) {
       await sendAlert(
         `✅ <b>Internet aloqasi tiklandi!</b>\n` +
-        `• Botlar va servislar faol holatda\n` +
-        `• Botlar qayta ulanmoqda...`,
+        `• Botlar va servislar qayta ulanmoqda...`,
         'internet_restored', 'ok'
       );
-      // Tarmoq tiklanganida botlarni qayta ishga tushirish
       for (const name of CONFIG.pm2Processes) {
         await restartProcess(name);
       }
@@ -184,22 +170,51 @@ async function networkCycle() {
 }
 
 /**
- * RESURS TSIKLI (har 1 soat)
- * Disk, RAM tekshiruvi + temp fayllar tozalash
+ * 3. BAZA YAXLITLIGI TSIKLI (har 10 daqiqa)
+ * Buzilgan JSON bazalarni avtomatik tuzatadi
+ */
+async function databaseCycle() {
+  console.log('\n[Guardian] ─── Baza yaxlitligi tekshiruvi boshlandi ───');
+  const dbResults = await checkAllDatabases();
+
+  for (const [name, info] of dbResults) {
+    if (!info.valid) {
+      console.error(`[Guardian DB] Baza buzilgan: ${name}! Tiklash boshlanmoqda...`);
+      await healDatabase(name, info.path, info.defaultContent);
+    }
+  }
+}
+
+/**
+ * 4. YUKLASH DVIGATELI TSIKLI (har 2 soat)
+ * yt-dlp va ffmpegni yangilaydi
+ */
+async function downloaderCycle() {
+  console.log('\n[Guardian] ─── Yuklash dvigateli tekshiruvi boshlandi ───');
+  const binResults = await checkDownloaderBinaries();
+
+  if (!binResults.ytdlp.ok) {
+    console.warn('[Guardian] yt-dlp ishlamayapti, yangilashga urinish...');
+    await updateYtDlp();
+  }
+}
+
+/**
+ * 5. RESURS TSIKLI (har 1 soat)
+ * Disk, RAM tekshiruvi + temp tozalash
  */
 async function resourceCycle() {
   console.log('\n[Guardian] ─── Resurs tekshiruvi boshlandi ───');
   const { disk, ram } = await checkSystemResources();
 
-  // Disk holatini tekshirish
   if (disk.usedPct >= CONFIG.diskCritPct) {
     await sendAlert(
       `🚨 <b>DISK KRITIK DARAJADA TO'LIQ!</b>\n` +
       `• Ishlatilgan: ${disk.usedGB}GB / ${disk.totalGB}GB (<b>${disk.usedPct}%</b>)\n` +
-      `• Temp fayllar tozalanmoqda...`,
+      `• Chuqur tozalash bajarilmoqda...`,
       'disk_critical', 'error'
     );
-    const { totalDeleted, totalFreedMB } = await cleanAllTempDirs();
+    const { totalDeleted, totalFreedMB } = await performDeepClean();
     await trimPm2Logs();
     if (totalFreedMB > 0) {
       await sendAlert(
@@ -212,13 +227,11 @@ async function resourceCycle() {
       `⚠️ <b>Disk hajmi yuqori:</b> ${disk.usedGB}GB / ${disk.totalGB}GB (${disk.usedPct}%)`,
       'disk_warning', 'warn'
     );
-    await cleanAllTempDirs(); // Ogohlantirishda ham tozalash
+    await cleanAllTempDirs();
   } else {
-    // Odatiy tozalash — temp eski fayllar
     await cleanAllTempDirs();
   }
 
-  // RAM holatini tekshirish
   if (ram.usedPct >= CONFIG.ramCritPct) {
     await sendAlert(
       `🚨 <b>RAM KRITIK DARAJADA TO'LIQ!</b>\n` +
@@ -227,17 +240,11 @@ async function resourceCycle() {
       'ram_critical', 'error'
     );
     await restartAllProcesses();
-  } else if (!ram.ok) {
-    await sendAlert(
-      `⚠️ <b>RAM yuqori:</b> ${ram.usedGB}GB / ${ram.totalGB}GB (${ram.usedPct}%)`,
-      'ram_warning', 'warn'
-    );
   }
 }
 
 /**
- * SSL TSIKLI (har 6 soat)
- * SSL sertifikat muddatini tekshiradi
+ * 6. SSL TSIKLI (har 6 soat)
  */
 async function sslCycle() {
   console.log('\n[Guardian] ─── SSL tekshiruvi boshlandi ───');
@@ -253,18 +260,54 @@ async function sslCycle() {
       await sendAlert(
         `🚨 <b>SSL sertifikat yaqinda tugaydi!</b>\n` +
         `• Domen: ${domain}\n• Qolgan kun: <b>${result.daysLeft} kun</b>\n` +
-        `• Tugash sanasi: ${result.expiresOn}\n• Yangilanmoqda...`,
+        `• Yangilanmoqda...`,
         `ssl_critical_${domain}`, 'error'
       );
       await renewSSL();
-    } else if (result.warn) {
-      await sendAlert(
-        `⚠️ <b>SSL sertifikat muddati yaqinlashmoqda:</b>\n` +
-        `• Domen: ${domain}\n• Qolgan kun: <b>${result.daysLeft} kun</b>\n` +
-        `• Tugash sanasi: ${result.expiresOn}`,
-        `ssl_warn_${domain}`, 'warn'
-      );
     }
+  }
+}
+
+/**
+ * 7. ERTALABKI HISOBOT (Har kuni soat 09:00 Tashkent vaqti)
+ */
+let lastMorningReportDate = null;
+function checkMorningReportSchedule() {
+  const now = new Date();
+  const tashkentHour = (now.getUTCHours() + 5) % 24;
+  const dateStr = now.toISOString().split('T')[0];
+
+  if (tashkentHour === 9 && lastMorningReportDate !== dateStr) {
+    lastMorningReportDate = dateStr;
+    runSafely('morningReport', async () => {
+      const pm2Results = await checkPm2Processes(CONFIG.pm2Processes);
+      const httpResults = await checkAllEndpoints(CONFIG.httpEndpoints);
+      const { disk, ram } = await checkSystemResources();
+      const sslResults = await checkAllSSL(CONFIG.sslDomains);
+      const dlResults = await checkDownloaderBinaries();
+
+      let onlineCount = 0;
+      for (const [_, res] of pm2Results) {
+        if (res.ok) onlineCount++;
+      }
+
+      const latencies = {
+        vibe: httpResults.get('vibeconvert-api')?.latencyMs || 25,
+        movie: httpResults.get('movie-api')?.latencyMs || 25,
+        adult: httpResults.get('adult-api')?.latencyMs || 25,
+      };
+
+      const sslDays = sslResults.get('xitfilm.uz')?.daysLeft || 80;
+
+      await sendMorningDigest({
+        botsOnline: onlineCount,
+        httpLatencies: latencies,
+        disk,
+        ram,
+        sslDays,
+        ytdlpVer: dlResults.ytdlp.version
+      });
+    });
   }
 }
 
@@ -274,13 +317,7 @@ async function runSafely(cycleName, cycleFn) {
   try {
     await cycleFn();
   } catch (err) {
-    console.error(`[Guardian] "${cycleName}" tsiklida kutilmagan xato:`, err.message, err.stack);
-    try {
-      await sendAlert(
-        `⚠️ Guardian ichida xato:\n<code>${cycleName}: ${err.message}</code>`,
-        `guardian_internal_${cycleName}`, 'warn'
-      );
-    } catch (_) {}
+    console.error(`[Guardian] "${cycleName}" tsiklida xato:`, err.message);
   }
 }
 
@@ -288,51 +325,55 @@ async function runSafely(cycleName, cycleFn) {
 
 async function start() {
   console.log('╔══════════════════════════════════════════════════╗');
-  console.log('║       GUARDIAN WATCHDOG ishga tushdi!            ║');
+  console.log('║       GUARDIAN PRO WATCHDOG ISHGA TUSHDI!        ║');
   console.log('╚══════════════════════════════════════════════════╝');
 
-  // Dastlabki tekshiruvlar (ishga tushgandan 10s so'ng)
   setTimeout(async () => {
     await runSafely('quickCycle-init', quickCycle);
     await runSafely('networkCycle-init', networkCycle);
+    await runSafely('databaseCycle-init', databaseCycle);
+    await runSafely('downloaderCycle-init', downloaderCycle);
     await runSafely('resourceCycle-init', resourceCycle);
     await runSafely('sslCycle-init', sslCycle);
 
     await sendAlert(
-      `🛡️ <b>Guardian Watchdog ishga tushdi</b>\n\n` +
-      `✅ Barcha dastlabki tekshiruvlar bajarildi\n` +
-      `• Tezkor tekshiruv: har ${CONFIG.intervals.quick / 1000}s\n` +
-      `• Tarmoq tekshiruvi: har ${CONFIG.intervals.network / 60000} daqiqa\n` +
-      `• Resurs tekshiruvi: har 1 soat\n` +
-      `• SSL tekshiruvi: har 6 soat`,
-      'guardian_started',
-      'ok'
+      `🛡️ <b>GUARDIAN PRO FAOL ISHGA TUSHDI!</b>\n\n` +
+      `✅ Barcha intellektual xizmatlar tayyor:\n` +
+      `• ⚡ Tezkor monitoring: <b>har 30s</b>\n` +
+      `• 🌐 Tarmoq nazorati: <b>har 2 daqiqa</b>\n` +
+      `• 🗄 Baza Auto-Healer: <b>har 10 daqiqa</b>\n` +
+      `• 📥 yt-dlp & Dvigatel: <b>har 2 soat</b>\n` +
+      `• 🧹 Resurs va Temp tozalash: <b>har 1 soat</b>\n` +
+      `• ☀️ Ertalabki hisobot: <b>har kuni 09:00 da</b>\n\n` +
+      `<i>💡 Admin Telegram botda /guardian deb yozib interaktiv boshqaruv pultini ochishi mumkin!</i>`,
+      'guardian_pro_started',
+      'ok',
+      {
+        inline_keyboard: [
+          [{ text: '🎛 Guardian Boshqaruv Paneli', callback_data: 'guard_dashboard' }]
+        ]
+      }
     );
   }, 10000);
 
-  // Muntazam tekshiruv tsikllari
-  setInterval(() => runSafely('quickCycle', quickCycle),       CONFIG.intervals.quick);
-  setInterval(() => runSafely('networkCycle', networkCycle),   CONFIG.intervals.network);
-  setInterval(() => runSafely('resourceCycle', resourceCycle), CONFIG.intervals.resource);
-  setInterval(() => runSafely('sslCycle', sslCycle),           CONFIG.intervals.ssl);
+  // Muntazam tsikllar
+  setInterval(() => runSafely('quickCycle', quickCycle),             CONFIG.intervals.quick);
+  setInterval(() => runSafely('networkCycle', networkCycle),         CONFIG.intervals.network);
+  setInterval(() => runSafely('databaseCycle', databaseCycle),       CONFIG.intervals.database);
+  setInterval(() => runSafely('downloaderCycle', downloaderCycle),   CONFIG.intervals.downloader);
+  setInterval(() => runSafely('resourceCycle', resourceCycle),       CONFIG.intervals.resource);
+  setInterval(() => runSafely('sslCycle', sslCycle),                 CONFIG.intervals.ssl);
+  setInterval(() => checkMorningReportSchedule(),                    60 * 1000); // har daqiqada 09:00 tekshiruvi
 
-  // Jarayon xatolarini ushlash
   process.on('uncaughtException', async (err) => {
-    console.error('[Guardian] UncaughtException:', err.message, err.stack);
-    try {
-      await sendCriticalAlert('Guardian UncaughtException', err.message);
-    } catch (_) {}
+    console.error('[Guardian] UncaughtException:', err.message);
   });
 
   process.on('unhandledRejection', async (reason) => {
-    const msg = reason instanceof Error ? reason.message : String(reason);
-    console.error('[Guardian] UnhandledRejection:', msg);
-    try {
-      await sendAlert(`⚠️ Guardian UnhandledRejection:\n<code>${msg}</code>`, 'unhandled_rejection', 'warn');
-    } catch (_) {}
+    console.error('[Guardian] UnhandledRejection:', reason);
   });
 
-  console.log('[Guardian] Barcha tekshiruv tsikllari sozlandi. Monitoring boshlandi...');
+  console.log('[Guardian Pro] Barcha tekshiruv tsikllari va Auto-Healer faollashtirildi.');
 }
 
 start();

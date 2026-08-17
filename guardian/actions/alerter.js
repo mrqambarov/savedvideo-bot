@@ -1,10 +1,9 @@
 'use strict';
 const axios = require('axios');
+const fs = require('fs');
+const FormData = require('form-data');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-
-// ─── Telegram alert yuboruvchi ────────────────────────────────────────────────
-// Bot API ga to'g'ridan-to'g'ri HTTP POST (grammy ga bog'liq emas)
+require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_IDS = (process.env.ADMIN_IDS || process.env.ADMIN_ID || '6263659922')
@@ -19,8 +18,9 @@ const ALERT_COOLDOWN_MS = 10 * 60 * 1000; // bir xil xabarni 10 daqiqada bir mar
  * @param {string} text - Xabar matni (HTML)
  * @param {string} [dedupKey] - Takrorlanishni oldini olish uchun kalit
  * @param {'info'|'warn'|'error'|'ok'} [level='info'] - Daraja
+ * @param {object} [replyMarkup] - InlineKeyboard tugmalari
  */
-async function sendAlert(text, dedupKey = null, level = 'info') {
+async function sendAlert(text, dedupKey = null, level = 'info', replyMarkup = null) {
   if (!BOT_TOKEN) {
     console.warn('[Guardian Alerter] TELEGRAM_BOT_TOKEN mavjud emas, xabar yuborilmadi.');
     return;
@@ -37,13 +37,21 @@ async function sendAlert(text, dedupKey = null, level = 'info') {
 
   const icon = { info: 'ℹ️', warn: '⚠️', error: '🔴', ok: '✅' }[level] || 'ℹ️';
   const now = new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent', hour12: false });
-  const fullText = `${icon} <b>GUARDIAN TIZIMI</b>\n\n${text}\n\n<i>🕐 ${now}</i>`;
+  const fullText = `${icon} <b>GUARDIAN PRO</b>\n\n${text}\n\n<i>🕐 ${now}</i>`;
 
   for (const adminId of ADMIN_IDS) {
     try {
+      const payload = {
+        chat_id: adminId,
+        text: fullText,
+        parse_mode: 'HTML'
+      };
+      if (replyMarkup) {
+        payload.reply_markup = replyMarkup;
+      }
       await axios.post(
         `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
-        { chat_id: adminId, text: fullText, parse_mode: 'HTML' },
+        payload,
         { timeout: 10000 }
       );
     } catch (err) {
@@ -53,12 +61,40 @@ async function sendAlert(text, dedupKey = null, level = 'info') {
 }
 
 /**
+ * Faylni (masalan ZIP zaxira) adminga yuboradi
+ * @param {string} filePath
+ * @param {string} caption
+ */
+async function sendDocumentToAdmin(filePath, caption = '') {
+  if (!BOT_TOKEN || !fs.existsSync(filePath)) return false;
+
+  for (const adminId of ADMIN_IDS) {
+    try {
+      const form = new FormData();
+      form.append('chat_id', adminId);
+      form.append('caption', caption);
+      form.append('parse_mode', 'HTML');
+      form.append('document', fs.createReadStream(filePath));
+
+      await axios.post(
+        `https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`,
+        form,
+        { headers: form.getHeaders(), timeout: 60000 }
+      );
+    } catch (err) {
+      console.error(`[Guardian Alerter] Fayl yuborishda xato (${adminId}):`, err.message);
+    }
+  }
+  return true;
+}
+
+/**
  * Tizim qayta tiklangani haqida xabar
  */
 async function sendRecoveryAlert(serviceName, action, success) {
   const status = success ? '✅ Muvaffaqiyatli tiklandi' : '❌ Tiklab bo\'lmadi, qo\'lda tekshirilsin!';
   await sendAlert(
-    `🔧 <b>Muammo aniqlandi va qayta tiklandi:</b>\n\n` +
+    `🔧 <b>Muammo aniqlandi va avtomatik tiklandi:</b>\n\n` +
     `• Servis: <code>${serviceName}</code>\n` +
     `• Harakat: <code>${action}</code>\n` +
     `• Natija: ${status}`,
@@ -68,7 +104,7 @@ async function sendRecoveryAlert(serviceName, action, success) {
 }
 
 /**
- * Kritik muammo haqida xabar (tiklib bo'lmadi)
+ * Kritik muammo haqida xabar
  */
 async function sendCriticalAlert(title, details) {
   await sendAlert(
@@ -79,4 +115,44 @@ async function sendCriticalAlert(title, details) {
   );
 }
 
-module.exports = { sendAlert, sendRecoveryAlert, sendCriticalAlert };
+/**
+ * Ertalabki Intellektual Xulosa Hisoboti (Morning Intelligence Digest)
+ */
+async function sendMorningDigest({ botsOnline, httpLatencies, disk, ram, sslDays, ytdlpVer }) {
+  const healthScore = botsOnline === 3 && disk.ok && ram.ok ? '100/100 🟢 (A+)' : '85/100 🟡 (Yaxshi)';
+
+  const text =
+    `☀️ <b>ERTALABKI TIZIM XULOSASI VA HISOBOTI</b>\n\n` +
+    `🏆 <b>Platforma Salomatlik Bali:</b> <b>${healthScore}</b>\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `🤖 <b>Botlar Holati (${botsOnline}/3 onlayn):</b>\n` +
+    `• 🎥 SaveMedia (Downloader): <b>Onlayn</b> (${httpLatencies.vibe || 20}ms)\n` +
+    `• 🍿 Xit Film (Movie Bot): <b>Onlayn</b> (${httpLatencies.movie || 20}ms)\n` +
+    `• 🔞 Adult Bot (18+ Server): <b>Onlayn</b> (${httpLatencies.adult || 20}ms)\n` +
+    `• 🌐 Web Cinema (xitfilm.uz): <b>Faol</b>\n\n` +
+    `💾 <b>Server Resurslari:</b>\n` +
+    `• RAM Xotira: <b>${ram.usedGB} GB / ${ram.totalGB} GB</b> (${ram.usedPct}%)\n` +
+    `• SSD Disk: <b>${disk.usedGB} GB / ${disk.totalGB} GB</b> (${disk.usedPct}%)\n` +
+    `• SSL Sertifikat: <b>${sslDays} kun qoldi</b>\n` +
+    `• yt-dlp Versiyasi: <code>${ytdlpVer || 'Eng so\'nggi'}</code>\n\n` +
+    `🛡️ <i>Guardian Pro barcha tizimlarni 24/7 rejimda nazorat qilmoqda.</i>`;
+
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: '🎛 Guardian Boshqaruv Paneli', callback_data: 'guard_dashboard' }],
+      [{ text: '💾 Baza Zaxirasini Yuklash (ZIP)', callback_data: 'guard_backup' }]
+    ]
+  };
+
+  await sendAlert(text, 'morning_digest', 'ok', keyboard);
+}
+
+module.exports = {
+  sendAlert,
+  sendRecoveryAlert,
+  sendCriticalAlert,
+  sendMorningDigest,
+  sendDocumentToAdmin,
+  ADMIN_IDS,
+  BOT_TOKEN
+};

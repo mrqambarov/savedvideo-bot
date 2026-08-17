@@ -391,7 +391,7 @@ function startBot(token) {
         }
 
         // Bypass for admin commands & membership check callback
-        if (ctx.callbackQuery && (ctx.callbackQuery.data === 'chk_sub' || ctx.callbackQuery.data.startsWith('adm_'))) {
+        if (ctx.callbackQuery && (ctx.callbackQuery.data === 'chk_sub' || ctx.callbackQuery.data.startsWith('adm_') || ctx.callbackQuery.data.startsWith('guard_'))) {
           return await next();
         }
         if (ctx.message && ctx.message.text && (
@@ -402,6 +402,8 @@ function startBot(token) {
           ctx.message.text === '🎁 Do\'stlarni taklif qilish' ||
           ctx.message.text.startsWith('/referal') ||
           ctx.message.text.startsWith('/admin') ||
+          ctx.message.text.startsWith('/guardian') ||
+          ctx.message.text.startsWith('/guard') ||
           ctx.message.text.startsWith('/stats') ||
           ctx.message.text.startsWith('/analytics') ||
           ctx.message.text.startsWith('/user') ||
@@ -524,6 +526,24 @@ function startBot(token) {
           parse_mode: 'Markdown',
           reply_markup: keyboard
         });
+      });
+
+      // Guardian Pro Interactive Control (/guardian, /guard)
+      const guardianControl = require('../guardian/bot/telegramControl');
+
+      botInstance.command(['guardian', 'guard'], async (ctx) => {
+        if (!isAdmin(ctx.from.id)) {
+          return ctx.reply('⚠️ **Siz admin emassiz!**', { parse_mode: 'Markdown' });
+        }
+        try {
+          const dash = await guardianControl.getGuardianDashboardData();
+          await ctx.reply(dash.text, {
+            parse_mode: 'HTML',
+            reply_markup: dash.keyboard
+          });
+        } catch (e) {
+          await ctx.reply(`❌ Guardian xatosi: ${e.message}`);
+        }
       });
 
       // Admin commands (/admin, /stats, /analytics, /user, /ban, /unban)
@@ -775,6 +795,41 @@ function startBot(token) {
       // Handle Admin & Quality Callback Queries
       botInstance.on('callback_query:data', async (ctx, next) => {
         const data = ctx.callbackQuery.data;
+
+        // Guardian Pro Interaktiv Callback Handler
+        if (data.startsWith('guard_')) {
+          if (!isAdmin(ctx.from.id)) {
+            return await ctx.answerCallbackQuery({ text: '⚠️ Siz admin emassiz!', show_alert: true });
+          }
+          try {
+            const res = await guardianControl.handleGuardianCallback(data, ctx.from.id);
+            if (res.alertText) {
+              await ctx.answerCallbackQuery({ text: res.alertText, show_alert: true });
+            } else {
+              await ctx.answerCallbackQuery();
+            }
+
+            if (res.refreshDashboard) {
+              const freshDash = await guardianControl.getGuardianDashboardData();
+              try {
+                await ctx.editMessageText(freshDash.text, {
+                  parse_mode: 'HTML',
+                  reply_markup: freshDash.keyboard
+                });
+              } catch (_) {}
+            } else if (res.text && res.keyboard) {
+              try {
+                await ctx.editMessageText(res.text, {
+                  parse_mode: 'HTML',
+                  reply_markup: res.keyboard
+                });
+              } catch (_) {}
+            }
+          } catch (guardErr) {
+            await ctx.answerCallbackQuery({ text: `Xato: ${guardErr.message}`, show_alert: true });
+          }
+          return;
+        }
 
         if (data.startsWith('dl_vid_q:')) {
           const parts = data.split(':');

@@ -256,4 +256,74 @@ router.post('/upload-cookies', upload.single('cookies'), (req, res) => {
   }
 });
 
+// ─── Guardian Pro Web API ───────────────────────────────────────────────────
+router.get('/guardian/status', async (req, res) => {
+  try {
+    const { checkPm2Processes } = require('../guardian/checks/pm2Check');
+    const { checkSystemResources } = require('../guardian/checks/diskCheck');
+    const { checkAllSSL } = require('../guardian/checks/sslCheck');
+    const { checkAllDatabases } = require('../guardian/checks/dbIntegrityCheck');
+    const { checkDownloaderBinaries } = require('../guardian/checks/downloaderCheck');
+
+    const pm2List = await checkPm2Processes(['vibeconvert-bot', 'movie-bot', 'adult-bot', 'guardian']);
+    const { disk, ram } = await checkSystemResources();
+    const ssl = await checkAllSSL(['xitfilm.uz']);
+    const databases = await checkAllDatabases();
+    const binaries = await checkDownloaderBinaries();
+
+    const pm2Obj = {};
+    for (const [k, v] of pm2List) pm2Obj[k] = v;
+
+    const dbObj = {};
+    for (const [k, v] of databases) dbObj[k] = { valid: v.valid, sizeBytes: v.sizeBytes, error: v.error };
+
+    res.json({
+      status: 'active',
+      guardian: 'online',
+      processes: pm2Obj,
+      resources: { disk, ram },
+      ssl: ssl.get('xitfilm.uz') || { ok: true },
+      databases: dbObj,
+      binaries
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/guardian/action', async (req, res) => {
+  const { action, target } = req.body;
+  try {
+    const { restartProcess, reloadNginx, restartAllProcesses } = require('../guardian/actions/restarter');
+    const { performDeepClean, createFullBackupZip } = require('../guardian/actions/cleaner');
+    const { updateYtDlp } = require('../guardian/checks/downloaderCheck');
+
+    if (action === 'restart') {
+      if (target === 'all') await restartAllProcesses();
+      else if (target === 'nginx') await reloadNginx();
+      else await restartProcess(target || 'vibeconvert-bot', true);
+      return res.json({ success: true, message: `"${target || 'all'}" qayta ishga tushirildi!` });
+    }
+
+    if (action === 'deep_clean') {
+      const { totalDeleted, totalFreedMB } = await performDeepClean();
+      return res.json({ success: true, message: `Tozalandi: ${totalDeleted} ta fayl (${totalFreedMB}MB)` });
+    }
+
+    if (action === 'update_ytdlp') {
+      const out = await updateYtDlp();
+      return res.json({ success: true, output: out.output });
+    }
+
+    if (action === 'backup') {
+      const zipPath = await createFullBackupZip();
+      return res.json({ success: true, zipPath });
+    }
+
+    res.status(400).json({ error: 'Noma\'lum amaliyot' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
