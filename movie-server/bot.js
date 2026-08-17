@@ -46,10 +46,10 @@ async function publishMoviePostToChannel(movie, shortsFileId = null, targetChann
   const cleanChannel = channel.startsWith('@') ? channel : '@' + channel;
   const botUsername = botInstance?.botInfo?.username || process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
   const mCode = String(movie.code).trim();
-  const miniAppUrl = `https://xitfilm.uz?code=${mCode}&tma=1&v=4.2.0`;
 
+  // Telegram kanallarda faqat url tugmalari qabul qilinadi (webApp xatolik beradi)
   const kb = new InlineKeyboard()
-    .webApp('🎬 Ilovada Ko\'rish (4K HD)', miniAppUrl)
+    .url('🎬 Kinoni Ko\'rish (4K HD)', `https://t.me/${botUsername}?start=${mCode}`)
     .row()
     .url('🍿 Bot Orqali Yuklab Olish', `https://t.me/${botUsername}?start=${mCode}`);
 
