@@ -94,6 +94,36 @@ export default function Analytics() {
     })).sort((a, b) => b.value - a.value).slice(0, 6);
   }, [movieCatalog.data, adultCatalog.data]);
 
+  const combinedTrend = useMemo(() => {
+    const map = new Map();
+    // Initialize continuous 30-day timeline
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000).toISOString().split('T')[0];
+      map.set(d, { date: d, newUsers: 0, activeUsers: 0, views: 0, downloadsVideo: 0, downloadsAudio: 0, searches: 0 });
+    }
+
+    const mergeTrends = (trendList = []) => {
+      if (!Array.isArray(trendList)) return;
+      trendList.forEach(t => {
+        if (!t || !t.date) return;
+        const entry = map.get(t.date) || { date: t.date, newUsers: 0, activeUsers: 0, views: 0, downloadsVideo: 0, downloadsAudio: 0, searches: 0 };
+        entry.newUsers += (t.newUsers || 0);
+        entry.activeUsers += (t.activeUsers || 0);
+        entry.views += (t.views || t.movieViews || 0);
+        entry.downloadsVideo += (t.downloadsVideo || 0);
+        entry.downloadsAudio += (t.downloadsAudio || 0);
+        entry.searches += (t.searches || 0);
+        map.set(t.date, entry);
+      });
+    };
+
+    mergeTrends(dl?.trend);
+    mergeTrends(movie?.trend);
+    mergeTrends(adult?.trend);
+
+    return Array.from(map.values());
+  }, [dl?.trend, movie?.trend, adult?.trend]);
+
   const src = useMemo(() => {
     if (bot === 'dl') return dl;
     if (bot === 'movie') return movie;
@@ -110,9 +140,10 @@ export default function Analytics() {
         week: combinedActiveWeek,
         month: combinedActiveMonth
       },
+      trend: combinedTrend,
       usersList: combinedUsersList
     };
-  }, [bot, dl, movie, adult, combinedTotalUsers, combinedNewUsersToday, combinedNewUsersWeek, combinedNewUsersMonth, combinedActiveToday, combinedActiveWeek, combinedActiveMonth, combinedUsersList]);
+  }, [bot, dl, movie, adult, combinedTotalUsers, combinedNewUsersToday, combinedNewUsersWeek, combinedNewUsersMonth, combinedActiveToday, combinedActiveWeek, combinedActiveMonth, combinedTrend, combinedUsersList]);
 
   const users = useMemo(() => {
     const list = src?.usersList || [];

@@ -684,4 +684,13 @@ router.get('/creators', (req, res) => {
   res.json({ success: true, creators: db.getCreators() });
 });
 
+router.get('/search-analytics', (req, res) => {
+  try {
+    const data = db.getSearchAnalytics ? db.getSearchAnalytics() : { totalUnique: 0, top: [], noResults: [] };
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

@@ -1204,7 +1204,7 @@ function getAdvancedStats() {
   activeMonth = activeMonthSet.size;
 
   const trend = [];
-  for (let i = 13; i >= 0; i--) {
+  for (let i = 29; i >= 0; i--) {
     const dateStr = daysAgo(i);
     const day = dailyUsage[dateStr] || {};
     const newUsersOnDay = users.filter(u => u.dateJoined && u.dateJoined.split('T')[0] === dateStr).length;
@@ -1213,6 +1213,7 @@ function getAdvancedStats() {
       date: dateStr,
       newUsers: newUsersOnDay,
       activeUsers: (day.activeUsers || []).length,
+      views: day.movieViews || 0,
       movieViews: day.movieViews || 0,
       searches: day.searchQueries || 0
     });
@@ -1225,6 +1226,7 @@ function getAdvancedStats() {
     active: { today: activeToday, week: activeWeek, month: activeMonth },
     usage: { today: usageToday, week: usageWeek, month: usageMonth },
     trend,
+    usersList: users,
     stats
   };
 }
