@@ -145,73 +145,73 @@ export default function GuardianPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
         {/* Quick Action Buttons */}
         <div className="card">
-          <h3 style={{ margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <h3 style={{ margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f8fafc' }}>
             <Zap size={18} color="#f59e0b" />
             Guardian Tezkor Boshqaruv
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             <button
-              className="btn btn-secondary"
+              className="guardian-action-btn"
               onClick={() => handleAction('restart', 'vibeconvert-bot')}
               disabled={!!actionLoading}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
             >
-              <RefreshCw size={14} className={actionLoading === 'restart_vibeconvert-bot' ? 'spin' : ''} />
-              Restart Downloader
+              <RefreshCw size={15} color="#3b82f6" className={actionLoading === 'restart_vibeconvert-bot' ? 'spin' : ''} />
+              <span>Restart Downloader</span>
             </button>
             <button
-              className="btn btn-secondary"
+              className="guardian-action-btn"
               onClick={() => handleAction('restart', 'movie-bot')}
               disabled={!!actionLoading}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
             >
-              <RefreshCw size={14} className={actionLoading === 'restart_movie-bot' ? 'spin' : ''} />
-              Restart Kino Bot
+              <RefreshCw size={15} color="#10b981" className={actionLoading === 'restart_movie-bot' ? 'spin' : ''} />
+              <span>Restart Kino Bot</span>
             </button>
             <button
-              className="btn btn-secondary"
+              className="guardian-action-btn"
               onClick={() => handleAction('restart', 'adult-bot')}
               disabled={!!actionLoading}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
             >
-              <RefreshCw size={14} className={actionLoading === 'restart_adult-bot' ? 'spin' : ''} />
-              Restart Adult Bot
+              <RefreshCw size={15} color="#ef4444" className={actionLoading === 'restart_adult-bot' ? 'spin' : ''} />
+              <span>Restart Adult Bot</span>
             </button>
             <button
-              className="btn btn-secondary"
+              className="guardian-action-btn"
               onClick={() => handleAction('restart', 'nginx')}
               disabled={!!actionLoading}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
             >
-              <RefreshCw size={14} className={actionLoading === 'restart_nginx' ? 'spin' : ''} />
-              Reload Nginx
+              <RefreshCw size={15} color="#06b6d4" className={actionLoading === 'restart_nginx' ? 'spin' : ''} />
+              <span>Reload Nginx</span>
             </button>
             <button
-              className="btn btn-secondary"
+              className="guardian-action-btn"
               onClick={() => handleAction('deep_clean')}
               disabled={!!actionLoading}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
             >
-              <Trash2 size={14} className={actionLoading === 'deep_clean_' ? 'spin' : ''} />
-              Chuqur Tozalash
+              <Trash2 size={15} color="#f97316" className={actionLoading === 'deep_clean_' ? 'spin' : ''} />
+              <span>Chuqur Tozalash</span>
             </button>
             <button
-              className="btn btn-secondary"
+              className="guardian-action-btn"
               onClick={() => handleAction('update_ytdlp')}
               disabled={!!actionLoading}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
             >
-              <Download size={14} className={actionLoading === 'update_ytdlp_' ? 'spin' : ''} />
-              yt-dlp Yangilash
+              <Download size={15} color="#8b5cf6" className={actionLoading === 'update_ytdlp_' ? 'spin' : ''} />
+              <span>yt-dlp Yangilash</span>
             </button>
             <button
-              className="btn btn-secondary"
+              className="guardian-action-btn"
               onClick={() => handleAction('scan_syntax')}
               disabled={!!actionLoading}
-              style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', background: 'rgba(99,102,241,0.1)', color: '#6366f1', borderColor: 'rgba(99,102,241,0.3)' }}
+              style={{
+                gridColumn: 'span 2',
+                background: 'rgba(99, 102, 241, 0.18)',
+                color: '#ffffff',
+                borderColor: 'rgba(99, 102, 241, 0.5)',
+                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.25)'
+              }}
             >
-              <FileCode size={14} className={actionLoading === 'scan_syntax_' ? 'spin' : ''} />
-              🔍 AI Kod & Sintaksis Salomatligini Skanerlash
+              <FileCode size={16} color="#a5b4fc" className={actionLoading === 'scan_syntax_' ? 'spin' : ''} />
+              <span style={{ fontWeight: 700 }}>🔍 AI Kod & Sintaksis Salomatligini Skanerlash</span>
             </button>
           </div>
         </div>
