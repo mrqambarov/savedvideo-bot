@@ -1344,9 +1344,13 @@ function addEpisode(code, episodeNumber, fileId, title, seasonNumber = 1, serial
     if (index !== -1) {
       movieData = movies[index];
       movieData.isSerial = true;
-      movieData.genre = 'Serial';
+      movieData.type = 'serial';
+      movieData.genre = movieData.genre || 'Serial';
       if (!movieData.episodes) {
         movieData.episodes = [];
+      }
+      if (!movieData.seasons) {
+        movieData.seasons = [];
       }
     } else {
       movieData = {
@@ -1360,7 +1364,9 @@ function addEpisode(code, episodeNumber, fileId, title, seasonNumber = 1, serial
         dislikes: [],
         views: 0,
         isSerial: true,
+        type: 'serial',
         episodes: [],
+        seasons: [],
         dateAdded: new Date().toISOString()
       };
       movies.push(movieData);
@@ -1368,11 +1374,13 @@ function addEpisode(code, episodeNumber, fileId, title, seasonNumber = 1, serial
 
     const epNum = Number(episodeNumber);
     const season = Number(seasonNumber) || 1;
-    const epIndex = movieData.episodes.findIndex(e => Number(e.episode) === epNum && (Number(e.season) || 1) === season);
+    const epIndex = movieData.episodes.findIndex(e => Number(e.episode || e.episodeNumber) === epNum && (Number(e.season || e.seasonNumber) || 1) === season);
     
     const episodeData = {
       episode: epNum,
+      episodeNumber: epNum,
       season: season,
+      seasonNumber: season,
       fileId: fileId,
       title: title || `${season > 1 ? season + '-Mavsum ' : ''}${epNum}-qism`,
       dateAdded: new Date().toISOString()
@@ -1384,9 +1392,27 @@ function addEpisode(code, episodeNumber, fileId, title, seasonNumber = 1, serial
       movieData.episodes.push(episodeData);
     }
 
+    // Keep seasons array in sync for web / app player
+    if (!Array.isArray(movieData.seasons)) movieData.seasons = [];
+    let sObj = movieData.seasons.find(s => Number(s.seasonNumber) === season);
+    if (!sObj) {
+      sObj = { seasonNumber: season, title: `${season}-Mavsum`, episodes: [] };
+      movieData.seasons.push(sObj);
+    }
+    const sEpIdx = sObj.episodes.findIndex(e => Number(e.episodeNumber || e.episode) === epNum);
+    if (sEpIdx !== -1) {
+      sObj.episodes[sEpIdx] = episodeData;
+    } else {
+      sObj.episodes.push(episodeData);
+    }
+    sObj.episodes.sort((a, b) => Number(a.episodeNumber || a.episode) - Number(b.episodeNumber || b.episode));
+    movieData.seasons.sort((a, b) => Number(a.seasonNumber) - Number(b.seasonNumber));
+
     movieData.episodes.sort((a, b) => {
-      if ((a.season || 1) !== (b.season || 1)) return (a.season || 1) - (b.season || 1);
-      return a.episode - b.episode;
+      const sA = Number(a.season || a.seasonNumber || 1);
+      const sB = Number(b.season || b.seasonNumber || 1);
+      if (sA !== sB) return sA - sB;
+      return Number(a.episode || a.episodeNumber) - Number(b.episode || b.episodeNumber);
     });
 
     saveMovies(movies);

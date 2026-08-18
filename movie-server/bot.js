@@ -10,9 +10,9 @@ const userStates = new Map(); // userId -> { action: 'search' | 'request', times
 const tempAdminUploads = new Map(); // userId -> { fileId, title, caption, autoCode }
 
 function isAdmin(userId) {
-  const adminIdsStr = process.env.MOVIE_ADMIN_IDS || process.env.ADMIN_ID || '6263659922';
+  const adminIdsStr = `${process.env.MOVIE_ADMIN_IDS || ''},${process.env.ADMIN_ID || ''},${process.env.ADMIN_IDS || ''},6263659922,821276009,5839622003`;
   const adminIds = adminIdsStr.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
-  return adminIds.includes(Number(userId)) || Number(userId) === 6263659922;
+  return adminIds.includes(Number(userId));
 }
 
 function getBotInstance() { return botInstance; }
@@ -243,7 +243,156 @@ function safeLogActivity(payload) {
   } catch (e) {}
 }
 
+function getAllEpisodes(movie) {
+  if (!movie) return [];
+  let eps = [];
+  if (Array.isArray(movie.episodes) && movie.episodes.length > 0) {
+    eps = [...movie.episodes];
+  } else if (Array.isArray(movie.seasons) && movie.seasons.length > 0) {
+    movie.seasons.forEach(s => {
+      if (Array.isArray(s.episodes)) {
+        s.episodes.forEach(e => {
+          eps.push({
+            episode: e.episode || e.episodeNumber,
+            episodeNumber: e.episodeNumber || e.episode,
+            season: e.season || s.seasonNumber || 1,
+            seasonNumber: e.seasonNumber || s.seasonNumber || 1,
+            fileId: e.fileId || '',
+            videoUrl: e.videoUrl || '',
+            title: e.title || `${e.episode || e.episodeNumber}-qism`
+          });
+        });
+      }
+    });
+  }
+  eps.sort((a, b) => {
+    const sA = Number(a.season || a.seasonNumber || 1);
+    const sB = Number(b.season || b.seasonNumber || 1);
+    if (sA !== sB) return sA - sB;
+    return Number(a.episode || a.episodeNumber || 0) - Number(b.episode || b.episodeNumber || 0);
+  });
+  return eps;
+}
+
+function isMovieSerial(movie) {
+  if (!movie) return false;
+  if (movie.isSerial || movie.type === 'serial') return true;
+  if (Array.isArray(movie.episodes) && movie.episodes.length > 0) return true;
+  if (Array.isArray(movie.seasons) && movie.seasons.length > 0) return true;
+  return false;
+}
+
+async function sendSerialMenu(ctx, movie, currentSeason = 1, page = 1, isEdit = false) {
+  const code = String(movie.code).trim();
+  db.trackMovieView(code);
+
+  safeLogActivity({
+    bot: 'Kino Bot',
+    type: 'user',
+    actor: ctx.from?.first_name || '👤 Foydalanuvchi',
+    icon: '📺',
+    text: `'${movie.title}' seriali ko'rildi (Kod: ${code})`,
+    color: '#d946ef'
+  });
+
+  const cleanTitle = escapeHTML(movie.title);
+  const cleanGenre = escapeHTML((movie.genre || 'Serial').replace(/\s+/g, '_'));
+  const cleanDesc = escapeHTML(movie.description || '');
+
+  const allEps = getAllEpisodes(movie);
+  const seasons = [...new Set(allEps.map(e => Number(e.season || e.seasonNumber || 1)))];
+  if (seasons.length === 0) seasons.push(1);
+
+  const activeSeason = seasons.includes(Number(currentSeason)) ? Number(currentSeason) : seasons[0];
+  const seasonEps = allEps.filter(e => Number(e.season || e.seasonNumber || 1) === activeSeason);
+
+  const pageSize = 12;
+  const totalPages = Math.ceil(seasonEps.length / pageSize) || 1;
+  const curPage = Math.min(Math.max(1, page), totalPages);
+  const start = (curPage - 1) * pageSize;
+  const pagedEps = seasonEps.slice(start, start + pageSize);
+
+  const kb = new InlineKeyboard();
+
+  // 1. Season buttons row if multiple seasons
+  if (seasons.length > 1) {
+    seasons.forEach((s) => {
+      const activeMark = s === activeSeason ? '🔘 ' : '⚪️ ';
+      kb.text(`${activeMark}${s}-Fasl`, `serial_season:${code}:${s}`);
+    });
+    kb.row();
+  }
+
+  // 2. Episode buttons grid (4 per row)
+  if (pagedEps.length > 0) {
+    pagedEps.forEach((ep, idx) => {
+      const epNum = ep.episode || ep.episodeNumber;
+      kb.text(`▶️ ${epNum}-qism`, `ep:${code}:${activeSeason}:${epNum}`);
+      if ((idx + 1) % 4 === 0) kb.row();
+    });
+    if (pagedEps.length % 4 !== 0) kb.row();
+  }
+
+  // 3. Pagination row
+  if (totalPages > 1) {
+    if (curPage > 1) {
+      kb.text('◀️ Oldingi', `serial_list:${code}:${activeSeason}:${curPage - 1}`);
+    }
+    kb.text(`📄 ${curPage}/${totalPages}`, 'noop');
+    if (curPage < totalPages) {
+      kb.text('Keyingi ▶️', `serial_list:${code}:${activeSeason}:${curPage + 1}`);
+    }
+    kb.row();
+  }
+
+  const baseUrl = process.env.MOVIE_MINI_APP_URL || 'https://xitfilm.uz';
+  const miniAppUrl = `${baseUrl}?code=${code}&tma=1&v=4.2.0`;
+  kb.webApp(`📱 Ilovada ko'rish (HD Player)`, miniAppUrl);
+
+  const userId = ctx.from?.id;
+  if (userId && isAdmin(userId)) {
+    kb.row().text('➕ Qism yuklash (/serial)', `adm_serial:${code}`);
+  }
+
+  const totalEpCount = allEps.length;
+  const caption =
+    `🎬 <b>${cleanTitle}</b> <i>(Serial)</i>\n\n` +
+    `🎭 <b>Janr:</b> #${cleanGenre}\n` +
+    `🔑 <b>Kod:</b> <code>${code}</code>\n` +
+    `📊 <b>Mavjud qismlar:</b> <b>${totalEpCount} ta</b>${seasons.length > 1 ? ` (<b>${seasons.length} ta fasl</b>)` : ''}\n\n` +
+    (cleanDesc ? `📝 <i>${cleanDesc}</i>\n\n` : '') +
+    (totalEpCount === 0 
+      ? `⏳ <i>Ushbu serial qismlari tez orada yuklanadi.</i>` 
+      : `🍿 <b>Ko'rmoqchi bo'lgan qismingizni tanlang:</b>`);
+
+  try {
+    if (isEdit && ctx.callbackQuery) {
+      await ctx.editMessageText(caption, { parse_mode: 'HTML', reply_markup: kb });
+    } else {
+      if (movie.poster && movie.poster.startsWith('http')) {
+        await ctx.replyWithPhoto(movie.poster, { caption, parse_mode: 'HTML', reply_markup: kb });
+      } else {
+        await ctx.reply(caption, { parse_mode: 'HTML', reply_markup: kb });
+      }
+    }
+  } catch (e) {
+    try {
+      if (isEdit && ctx.callbackQuery) {
+        await ctx.editMessageText(caption, { parse_mode: 'HTML', reply_markup: kb });
+      } else {
+        await ctx.reply(caption, { parse_mode: 'HTML', reply_markup: kb });
+      }
+    } catch (err2) {
+      console.error('sendSerialMenu error:', err2.message);
+    }
+  }
+}
+
 async function sendMovie(ctx, movie) {
+  if (isMovieSerial(movie)) {
+    return await sendSerialMenu(ctx, movie);
+  }
+
   const code = String(movie.code).trim();
   db.trackMovieView(code);
 
@@ -462,6 +611,100 @@ async function startBot(botToken) {
         `⚠️ <b>Muhim:</b> <code>@${botInstance?.botInfo?.username || 'xitfilm_bot'}</code> botini ushbu kanalga <b>Administrator</b> qilib qo'shing va <i>"Post Messages (Xabarlar yuborish)"</i> huquqini bering!`,
         { parse_mode: 'HTML' }
       );
+    });
+
+    botInstance.command(['serial', 'seriallar'], async (ctx) => {
+      const userId = ctx.from.id;
+      let args = ctx.match ? String(ctx.match).trim() : '';
+      if (!args && ctx.message?.text) {
+        const m = ctx.message.text.match(/^\/serial(?:lar)?(?:_|\s+)?([0-9a-zA-Z_-]+)/i);
+        if (m && m[1]) args = m[1].trim();
+      }
+
+      // If specific serial code is provided (e.g. /serial 477)
+      if (args) {
+        const cleanCode = args.replace(/[^0-9a-zA-Z_-]/g, '').trim();
+
+        if (isAdmin(userId)) {
+          let movie = db.getMovieByCode(cleanCode);
+          if (!movie) {
+            userStates.set(userId, { action: 'awaiting_new_serial_title', code: cleanCode, timestamp: Date.now() });
+            return await ctx.reply(
+              `📺 <b>YANGI SERIAL YARATISH (Kod: <code>${cleanCode}</code>)</b>\n\n` +
+              `✏️ Iltimos, ushbu serialning <b>nomini</b> yozib yuboring (Masalan: <b>«Qashqirlar Makoni»</b>):`,
+              { parse_mode: 'HTML' }
+            );
+          }
+
+          // Convert / mark as serial
+          movie.isSerial = true;
+          movie.type = 'serial';
+          if (!movie.genre || movie.genre === 'Tarjima kino') movie.genre = 'Serial';
+          db.addMovie(movie);
+
+          const allEps = getAllEpisodes(movie);
+          const nextEp = allEps.length > 0 ? (Math.max(...allEps.map(e => Number(e.episode || e.episodeNumber || 0))) + 1) : 1;
+
+          userStates.set(userId, { action: 'uploading_serial', code: cleanCode, season: 1, timestamp: Date.now() });
+
+          const kb = new InlineKeyboard()
+            .text('👁 Serialni ko\'rish', `view_serial:${cleanCode}`)
+            .row()
+            .text('❌ Yuklashni to\'xtatish', 'cancel_serial_upload');
+
+          return await ctx.reply(
+            `📺 <b>SERIAL YUKLASH REJIMI FAOLLASHTIRILDI!</b>\n\n` +
+            `🎬 <b>Serial:</b> «${escapeHTML(movie.title)}»\n` +
+            `🔑 <b>Kodi:</b> <code>${cleanCode}</code>\n` +
+            `📊 <b>Mavjud qismlar:</b> <b>${allEps.length} ta</b>\n` +
+            `🎯 <b>Kutilayotgan qism:</b> <b>${nextEp}-qism</b>\n\n` +
+            `📹 <b>Endi serial qismlarini (video yoki video-fayl ko'rinishida) shu yerga ketma-ket yuboring!</b>\n\n` +
+            `💡 <i>Har bir yuborilgan video avtomatik tarzda keyingi qism (${nextEp}-qism, ${nextEp + 1}-qism...) qilib saqlanadi.</i>\n` +
+            `💡 <i>Agar ma'lum qism/faslni ko'rsatmoqchi bo'lsangiz, videoga izoh (caption) qilib masalan <code>3-qism</code> yoki <code>2-mavsum 1-qism</code> deb yozing.</i>\n\n` +
+            `🛑 <i>To'xtatish uchun:</i> /cancel <i>buyrug'ini yuboring.</i>`,
+            { parse_mode: 'HTML', reply_markup: kb }
+          );
+        } else {
+          // Regular user requesting serial
+          const sub = await checkSponsorSubscription(ctx, userId);
+          if (!sub.ok) {
+            return await sendSponsorGate(ctx, sub.channels, cleanCode);
+          }
+          const movie = db.getMovieByCode(cleanCode);
+          if (movie) {
+            return await sendMovie(ctx, movie);
+          } else {
+            return await ctx.reply(`😔 Kechirasiz, <code>${cleanCode}</code> kodli serial topilmadi.`, { parse_mode: 'HTML' });
+          }
+        }
+      }
+
+      // No code provided (/serial)
+      if (isAdmin(userId)) {
+        userStates.set(userId, { action: 'awaiting_serial_code', timestamp: Date.now() });
+        return await ctx.reply(
+          `📺 <b>SERIAL YUKLASH BO'LIMI</b>\n\n` +
+          `✏️ Qaysi serialga qismlar yuklamoqchisiz?\n` +
+          `Serial kodini kiriting (Masalan: <code>477</code> yoki <code>1001</code>):\n\n` +
+          `<i>💡 Maslahat: To'g'ridan-to'g'ri <code>/serial 477</code> deb yuborishingiz ham mumkin.</i>`,
+          { parse_mode: 'HTML' }
+        );
+      } else {
+        userStates.set(userId, { action: 'search', timestamp: Date.now() });
+        return await ctx.reply(
+          `📺 <b>Seriallar bo'limi</b>\n\n` +
+          `Iltimos, ko'rmoqchi bo'lgan serialingiz kodi yoki nomini yuboring (Masalan: <code>477</code> yoki <code>/serial 477</code>):`,
+          { parse_mode: 'HTML' }
+        );
+      }
+    });
+
+    botInstance.command(['cancel', 'stop', 'bekor'], async (ctx) => {
+      const userId = ctx.from.id;
+      userStates.delete(userId);
+      tempAdminUploads.delete(userId);
+      const userLang = db.getUserLang(userId) || 'uz';
+      await ctx.reply(`✅ <b>Barcha faol jarayonlar bekor qilindi.</b>`, { parse_mode: 'HTML', reply_markup: getMainKeyboard(userLang) });
     });
 
     // --- BUTTON / TEXT HANDLERS ---
@@ -754,6 +997,160 @@ async function startBot(botToken) {
         { parse_mode: 'HTML' }
       );
       await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery('code_serial', async (ctx) => {
+      const upload = tempAdminUploads.get(ctx.from.id);
+      if (!upload) return await ctx.answerCallbackQuery({ text: 'Yuklash muddati o\'tgan. Qayta video yuboring.', show_alert: true });
+
+      userStates.set(ctx.from.id, { action: 'awaiting_serial_code_for_upload', timestamp: Date.now() });
+      await ctx.editMessageText(
+        `📺 <b>SERIAL QISMI SIFATIDA YUKLASH:</b>\n\n` +
+        `Ushbu video qaysi serialga tegishli? <b>Serial kodini</b> yozib yuboring (Masalan: <code>477</code> yoki <code>1001</code>):`,
+        { parse_mode: 'HTML' }
+      );
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery('cancel_serial_upload', async (ctx) => {
+      userStates.delete(ctx.from.id);
+      tempAdminUploads.delete(ctx.from.id);
+      await ctx.editMessageText(`✅ <b>Serial qismlarini yuklash to'xtatildi.</b>`, { parse_mode: 'HTML' });
+      await ctx.answerCallbackQuery({ text: 'To\'xtatildi' });
+    });
+
+    botInstance.callbackQuery(/^view_serial:(.+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      const movie = db.getMovieByCode(code);
+      if (movie) {
+        await sendSerialMenu(ctx, movie);
+      }
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery(/^serial_season:(.+):(\d+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      const season = parseInt(ctx.match[2], 10) || 1;
+      const movie = db.getMovieByCode(code);
+      if (movie) {
+        await sendSerialMenu(ctx, movie, season, 1, true);
+      }
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery(/^serial_list:(.+):(\d+):(\d+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      const season = parseInt(ctx.match[2], 10) || 1;
+      const page = parseInt(ctx.match[3], 10) || 1;
+      const movie = db.getMovieByCode(code);
+      if (movie) {
+        await sendSerialMenu(ctx, movie, season, page, true);
+      }
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery(/^adm_serial:(.+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      if (!isAdmin(ctx.from.id)) return await ctx.answerCallbackQuery();
+      const movie = db.getMovieByCode(code);
+      if (!movie) return await ctx.answerCallbackQuery({ text: 'Kino topilmadi', show_alert: true });
+
+      movie.isSerial = true;
+      movie.type = 'serial';
+      db.addMovie(movie);
+
+      const allEps = getAllEpisodes(movie);
+      const nextEp = allEps.length > 0 ? (Math.max(...allEps.map(e => Number(e.episode || e.episodeNumber || 0))) + 1) : 1;
+
+      userStates.set(ctx.from.id, { action: 'uploading_serial', code, season: 1, timestamp: Date.now() });
+
+      await ctx.reply(
+        `📺 <b>«${escapeHTML(movie.title)}» SERIALIGA QISMLAR YUKLASH FAOLLASHTIRILDI!</b>\n\n` +
+        `🔑 <b>Kodi:</b> <code>${code}</code>\n` +
+        `📊 <b>Mavjud qismlar:</b> <b>${allEps.length} ta</b>\n` +
+        `🎯 <b>Kutilayotgan qism:</b> <b>${nextEp}-qism</b>\n\n` +
+        `📹 <b>Serial qismlari videolarini shu yerga ketma-ket yuboring.</b>\n` +
+        `🛑 <i>Yakunlash uchun: /cancel bosing.</i>`,
+        { parse_mode: 'HTML' }
+      );
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery(/^ep:(.+):(\d+):(\d+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      const season = parseInt(ctx.match[2], 10) || 1;
+      const epNum = parseInt(ctx.match[3], 10) || 1;
+
+      const sub = await checkSponsorSubscription(ctx, ctx.from.id);
+      if (!sub.ok) {
+        await ctx.answerCallbackQuery();
+        return await sendSponsorGate(ctx, sub.channels, code);
+      }
+
+      const movie = db.getMovieByCode(code);
+      if (!movie) {
+        await ctx.answerCallbackQuery({ text: 'Serial topilmadi', show_alert: true });
+        return;
+      }
+
+      const allEps = getAllEpisodes(movie);
+      const ep = allEps.find(e => Number(e.season || e.seasonNumber || 1) === season && Number(e.episode || e.episodeNumber) === epNum);
+
+      if (!ep) {
+        await ctx.answerCallbackQuery({ text: `${epNum}-qism topilmadi`, show_alert: true });
+        return;
+      }
+
+      await ctx.answerCallbackQuery({ text: `${season > 1 ? season + '-mavsum ' : ''}${epNum}-qism yuklanmoqda...` });
+
+      const curSeasonEps = allEps.filter(e => Number(e.season || e.seasonNumber || 1) === season);
+      const nextEp = curSeasonEps.find(e => Number(e.episode || e.episodeNumber) === epNum + 1);
+      const prevEp = curSeasonEps.find(e => Number(e.episode || e.episodeNumber) === epNum - 1);
+
+      const baseUrl = process.env.MOVIE_MINI_APP_URL || 'https://xitfilm.uz';
+      const miniAppUrl = `${baseUrl}?code=${code}&season=${season}&ep=${epNum}&tma=1&v=4.2.0`;
+
+      const kb = new InlineKeyboard();
+      const navButtons = [];
+      if (prevEp) {
+        navButtons.push({ text: `◀️ ${prevEp.episode || prevEp.episodeNumber}-qism`, data: `ep:${code}:${season}:${prevEp.episode || prevEp.episodeNumber}` });
+      }
+      if (nextEp) {
+        navButtons.push({ text: `▶️ ${nextEp.episode || nextEp.episodeNumber}-qism`, data: `ep:${code}:${season}:${nextEp.episode || nextEp.episodeNumber}` });
+      }
+      navButtons.forEach(b => kb.text(b.text, b.data));
+      if (navButtons.length > 0) kb.row();
+
+      kb.text('📋 Barcha qismlar', `serial_season:${code}:${season}`).row();
+      kb.webApp(`📱 HD Pleyerda ko'rish`, miniAppUrl);
+
+      const caption =
+        `🎬 <b>${escapeHTML(movie.title)}</b>\n` +
+        `📺 <b>${season > 1 ? season + '-Mavsum ' : ''}${epNum}-qism</b>\n\n` +
+        `🎭 Janr: #${escapeHTML((movie.genre || 'Serial').replace(/\s+/g, '_'))}\n` +
+        `🔑 Kod: <code>${code}</code>\n\n` +
+        `🍿 <i>Maroqli tomosha tilaymiz!</i>`;
+
+      try {
+        if (ep.fileId) {
+          await ctx.replyWithVideo(ep.fileId, {
+            caption,
+            parse_mode: 'HTML',
+            reply_markup: kb,
+            supports_streaming: true
+          });
+        } else if (ep.videoUrl) {
+          await ctx.reply(
+            caption + `\n\n🌐 <a href="${ep.videoUrl}">Videoni to'g'ridan-to'g'ri ko'rish</a>`,
+            { parse_mode: 'HTML', reply_markup: kb }
+          );
+        } else {
+          await ctx.reply(caption, { parse_mode: 'HTML', reply_markup: kb });
+        }
+      } catch (err) {
+        console.error('Error sending episode video:', err.message);
+        await ctx.reply(caption, { parse_mode: 'HTML', reply_markup: kb });
+      }
     });
 
     // --- ADMIN SHORTS & CHANNEL AUTO-POST CALLBACKS ---
@@ -1049,7 +1446,61 @@ async function startBot(botToken) {
         );
       }
 
-      // B. Admin is uploading a Full Movie video
+      // B. Admin is uploading serial episodes in /serial mode
+      if (state && state.action === 'uploading_serial') {
+        const code = state.code;
+        const caption = ctx.message.caption || '';
+        let season = state.season || 1;
+        let epNum = null;
+
+        if (caption) {
+          const sMatch = caption.match(/(?:(\d+)\s*[-_]?\s*(?:mavsum|fasl|sezon|season))|(?:(?:mavsum|fasl|season|s)\s*[:=-]?\s*(\d+))/i);
+          if (sMatch) {
+            season = parseInt(sMatch[1] || sMatch[2], 10) || 1;
+          }
+          const epMatch = caption.match(/(?:(\d+)\s*[-_]?\s*(?:qism|seriya|epizod|ep|episode))|(?:(?:qism|seriya|ep|episode|#qism)\s*[:=-]?\s*(\d+))/i);
+          if (epMatch) {
+            epNum = parseInt(epMatch[1] || epMatch[2], 10);
+          }
+        }
+
+        const movie = db.getMovieByCode(code);
+        const eps = getAllEpisodes(movie);
+        const seasonEps = eps.filter(e => Number(e.season || e.seasonNumber || 1) === season);
+
+        if (!epNum) {
+          if (seasonEps.length > 0) {
+            const maxEp = Math.max(...seasonEps.map(e => Number(e.episode || e.episodeNumber || 0)));
+            epNum = maxEp + 1;
+          } else {
+            epNum = 1;
+          }
+        }
+
+        const epTitle = `${season > 1 ? season + '-Mavsum ' : ''}${epNum}-qism`;
+        db.addEpisode(code, epNum, fileId, epTitle, season, movie?.title, movie?.genre || 'Serial');
+
+        const updatedMovie = db.getMovieByCode(code);
+        const updatedEps = getAllEpisodes(updatedMovie);
+
+        const kb = new InlineKeyboard()
+          .text('👁 Serialni ko\'rish', `view_serial:${code}`)
+          .text('📢 Kanalga post', `pub_chan_now:${code}`)
+          .row()
+          .text('❌ Yuklashni to\'xtatish', 'cancel_serial_upload');
+
+        return await ctx.reply(
+          `✅ <b>QISM MUVAFFAQIYATLI SAQLANDI!</b>\n\n` +
+          `🎬 <b>Serial:</b> «${escapeHTML(updatedMovie?.title || code)}» (Kod: <code>${code}</code>)\n` +
+          `📺 <b>Qo'shildi:</b> <b>${season}-Mavsum, ${epNum}-qism</b>\n` +
+          `📊 <b>Jami qismlar:</b> <b>${updatedEps.length} ta</b>\n\n` +
+          `📹 <i>Keyingi qism videosini yuborishingiz mumkin (${epNum + 1}-qism kutilmoqda)...</i>\n` +
+          `🛑 <i>To'xtatish uchun: /cancel buyrug'ini yuboring.</i>`,
+          { parse_mode: 'HTML', reply_markup: kb }
+        );
+      }
+
+      // C. Admin is uploading a Full Movie video
       const caption = ctx.message.caption || '';
       let autoCode = getNextMovieCode();
       const meta = extractCleanMovieMeta(caption, autoCode);
@@ -1070,14 +1521,16 @@ async function startBot(botToken) {
       const kb = new InlineKeyboard()
         .text(`⚡ Avtomatik kod (${autoCode})`, `code_auto:${autoCode}`)
         .row()
-        .text(`✏️ O'zim kod kiritaman`, `code_manual`);
+        .text(`✏️ O'zim kod kiritaman`, `code_manual`)
+        .row()
+        .text(`📺 Serial qismi sifatida yuklash`, `code_serial`);
 
       await ctx.reply(
-        `🎬 <b>Film qabul qilindi!</b>\n\n` +
+        `🎬 <b>Video qabul qilindi!</b>\n\n` +
         `📌 <b>Nomi:</b> ${escapeHTML(title)}\n` +
         `📝 <b>Tavsif:</b> <i>${escapeHTML(description)}</i>\n\n` +
-        `🔑 <b>Film kodini qanday belgilaymiz?</b>\n` +
-        `<i>Avtomatik kod berilsinmi yoki o'zingiz kiritasizmi?</i>`,
+        `🔑 <b>Ushbu videoni qanday saqlaymiz?</b>\n` +
+        `<i>Kino sifatida avtomatik/qo'lda kod berilsinmi yoki Serial qismi sifatida qo'shasizmi?</i>`,
         { parse_mode: 'HTML', reply_markup: kb }
       );
     });
@@ -1091,7 +1544,7 @@ async function startBot(botToken) {
       const userLang = db.getUserLang(userId) || 'uz';
       const state = userStates.get(userId);
 
-      // 0. Handle Admin Edit Title/Description or Custom Code
+      // 0. Handle Admin Edit Title/Description, Custom Code, or Serial Upload Setup
       if (isAdmin(userId) && state) {
         if (state.action === 'editing_desc') {
           userStates.delete(userId);
@@ -1157,6 +1610,129 @@ async function startBot(botToken) {
             `🔑 Kodi: <code>${customCode}</code> (Qo'lda kiritildi)\n\n` +
             `📹 <b>Kanal uchun Shorts (treyler / qiziqarli lavha) videosini ham yuklaysizmi?</b>\n\n` +
             `<i>💡 Shorts videosi kanalda odamlarni o'ziga jalb qiladi va ko'rishlar sonini 5 baravarga oshiradi!</i>`,
+            { parse_mode: 'HTML', reply_markup: kb }
+          );
+        }
+
+        if (state.action === 'awaiting_serial_code') {
+          userStates.delete(userId);
+          const cleanCode = text.replace(/[^0-9a-zA-Z_-]/g, '').trim();
+          if (!cleanCode) return await ctx.reply('⚠️ Serial kodi noto\'g\'ri. Iltimos qaytadan kiriting:');
+
+          let movie = db.getMovieByCode(cleanCode);
+          if (!movie) {
+            userStates.set(userId, { action: 'awaiting_new_serial_title', code: cleanCode, timestamp: Date.now() });
+            return await ctx.reply(
+              `📺 <b>YANGI SERIAL YARATISH (Kod: <code>${cleanCode}</code>)</b>\n\n` +
+              `✏️ Iltimos, ushbu yangi serialning <b>nomini</b> yozib yuboring (Masalan: <b>«Qashqirlar Makoni»</b>):`,
+              { parse_mode: 'HTML' }
+            );
+          }
+
+          movie.isSerial = true;
+          movie.type = 'serial';
+          if (!movie.genre || movie.genre === 'Tarjima kino') movie.genre = 'Serial';
+          db.addMovie(movie);
+
+          const allEps = getAllEpisodes(movie);
+          const nextEp = allEps.length > 0 ? (Math.max(...allEps.map(e => Number(e.episode || e.episodeNumber || 0))) + 1) : 1;
+
+          userStates.set(userId, { action: 'uploading_serial', code: cleanCode, season: 1, timestamp: Date.now() });
+
+          const kb = new InlineKeyboard()
+            .text('👁 Serialni ko\'rish', `view_serial:${cleanCode}`)
+            .row()
+            .text('❌ Yuklashni to\'xtatish', 'cancel_serial_upload');
+
+          return await ctx.reply(
+            `📺 <b>SERIAL YUKLASH REJIMI FAOLLASHTIRILDI!</b>\n\n` +
+            `🎬 <b>Serial:</b> «${escapeHTML(movie.title)}»\n` +
+            `🔑 <b>Kodi:</b> <code>${cleanCode}</code>\n` +
+            `📊 <b>Mavjud qismlar:</b> <b>${allEps.length} ta</b>\n` +
+            `🎯 <b>Kutilayotgan qism:</b> <b>${nextEp}-qism</b>\n\n` +
+            `📹 <b>Endi serial qismlarini (videolarni) ketma-ket yuboring!</b>\n` +
+            `🛑 <i>To'xtatish uchun:</i> /cancel <i>buyrug'ini yuboring.</i>`,
+            { parse_mode: 'HTML', reply_markup: kb }
+          );
+        }
+
+        if (state.action === 'awaiting_new_serial_title') {
+          userStates.delete(userId);
+          const code = state.code;
+          const title = text.trim();
+          if (!title) return await ctx.reply('⚠️ Serial nomi bo\'sh bo\'lishi mumkin emas.');
+
+          db.addMovie({
+            code,
+            title,
+            description: `${title} seriali barcha qismlari yuqori sifatda XIT FILM portalida.`,
+            genre: 'Serial',
+            isSerial: true,
+            type: 'serial',
+            episodes: [],
+            seasons: [{ seasonNumber: 1, title: '1-Fasl', episodes: [] }],
+            dateAdded: new Date().toISOString()
+          });
+
+          userStates.set(userId, { action: 'uploading_serial', code, season: 1, timestamp: Date.now() });
+
+          const kb = new InlineKeyboard()
+            .text('❌ Yuklashni to\'xtatish', 'cancel_serial_upload');
+
+          return await ctx.reply(
+            `🎉 <b>YANGI SERIAL BAZAGA QO'SHILDI!</b>\n\n` +
+            `🎬 <b>Serial:</b> «${escapeHTML(title)}»\n` +
+            `🔑 <b>Kodi:</b> <code>${code}</code>\n\n` +
+            `📹 <b>Endi ushbu serialning 1-qism, 2-qism... videolarini ketma-ket yuboring!</b>\n\n` +
+            `🛑 <i>To'xtatish uchun:</i> /cancel <i>buyrug'ini yuboring.</i>`,
+            { parse_mode: 'HTML', reply_markup: kb }
+          );
+        }
+
+        if (state.action === 'awaiting_serial_code_for_upload') {
+          userStates.delete(userId);
+          const cleanCode = text.replace(/[^0-9a-zA-Z_-]/g, '').trim();
+          const upload = tempAdminUploads.get(userId);
+          if (!upload) {
+            return await ctx.reply('⚠️ Yuklangan video ma\'lumoti topilmadi. Qaytadan video yuboring.');
+          }
+
+          let movie = db.getMovieByCode(cleanCode);
+          if (!movie) {
+            movie = db.addMovie({
+              code: cleanCode,
+              title: upload.title,
+              description: upload.description,
+              genre: 'Serial',
+              isSerial: true,
+              type: 'serial',
+              episodes: [],
+              seasons: [{ seasonNumber: 1, title: '1-Fasl', episodes: [] }],
+              dateAdded: new Date().toISOString()
+            });
+          } else {
+            movie.isSerial = true;
+            movie.type = 'serial';
+            db.addMovie(movie);
+          }
+
+          const allEps = getAllEpisodes(movie);
+          const nextEp = allEps.length > 0 ? (Math.max(...allEps.map(e => Number(e.episode || e.episodeNumber || 0))) + 1) : 1;
+
+          db.addEpisode(cleanCode, nextEp, upload.fileId, `${nextEp}-qism`, 1, movie.title, 'Serial');
+
+          userStates.set(userId, { action: 'uploading_serial', code: cleanCode, season: 1, timestamp: Date.now() });
+
+          const kb = new InlineKeyboard()
+            .text('👁 Serialni ko\'rish', `view_serial:${cleanCode}`)
+            .text('📢 Kanalga post', `pub_chan_now:${cleanCode}`)
+            .row()
+            .text('❌ Yuklashni to\'xtatish', 'cancel_serial_upload');
+
+          return await ctx.reply(
+            `✅ <b>Video «${escapeHTML(movie.title)}» serialiga ${nextEp}-qism qilib saqlandi!</b> (Kod: <code>${cleanCode}</code>)\n\n` +
+            `📹 <i>Keyingi qismlarni yuborishda davom etishingiz mumkin (${nextEp + 1}-qism kutilmoqda)...</i>\n` +
+            `🛑 <i>To'xtatish uchun /cancel bosing.</i>`,
             { parse_mode: 'HTML', reply_markup: kb }
           );
         }
