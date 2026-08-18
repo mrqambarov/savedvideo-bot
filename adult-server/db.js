@@ -237,30 +237,171 @@ function saveUsers(users) {
   return safeSaveJSON(usersFile, users);
 }
 
-function addUser(id, username, firstName, referrerId = null) {
+function getStats() {
+  try {
+    if (!fs.existsSync(statsFile)) {
+      return { totalViews: 0, totalSearchQueries: 0, dailyUsage: {} };
+    }
+    return JSON.parse(fs.readFileSync(statsFile, 'utf8'));
+  } catch (e) {
+    return { totalViews: 0, totalSearchQueries: 0, dailyUsage: {} };
+  }
+}
+
+function saveStats(stats) {
+  return safeSaveJSON(statsFile, stats);
+}
+
+function trackActiveUser(userId) {
+  try {
+    if (!userId) return;
+    const stats = getStats();
+    const today = new Date().toISOString().split('T')[0];
+    if (!stats.dailyUsage) stats.dailyUsage = {};
+    if (!stats.dailyUsage[today]) {
+      stats.dailyUsage[today] = { movieViews: 0, searchQueries: 0, activeUsers: [] };
+    }
+    if (!Array.isArray(stats.dailyUsage[today].activeUsers)) stats.dailyUsage[today].activeUsers = [];
+    const numId = Number(userId);
+    if (!stats.dailyUsage[today].activeUsers.includes(numId)) {
+      stats.dailyUsage[today].activeUsers.push(numId);
+      saveStats(stats);
+    }
+  } catch (e) {
+    console.error('Error tracking adult active user:', e.message);
+  }
+}
+
+function trackMovieView(code, userId = null) {
+  try {
+    const movies = getMovies();
+    const movieIdx = movies.findIndex(m => String(m.code).trim() === String(code).trim());
+    if (movieIdx !== -1) {
+      movies[movieIdx].views = (movies[movieIdx].views || 0) + 1;
+      saveMovies(movies);
+    }
+
+    const stats = getStats();
+    stats.totalViews = (stats.totalViews || 0) + 1;
+    const today = new Date().toISOString().split('T')[0];
+    if (!stats.dailyUsage) stats.dailyUsage = {};
+    if (!stats.dailyUsage[today]) {
+      stats.dailyUsage[today] = { movieViews: 0, searchQueries: 0, activeUsers: [] };
+    }
+    stats.dailyUsage[today].movieViews = (stats.dailyUsage[today].movieViews || 0) + 1;
+
+    if (userId) {
+      const numId = Number(userId);
+      if (!Array.isArray(stats.dailyUsage[today].activeUsers)) stats.dailyUsage[today].activeUsers = [];
+      if (!stats.dailyUsage[today].activeUsers.includes(numId)) {
+        stats.dailyUsage[today].activeUsers.push(numId);
+      }
+    }
+    saveStats(stats);
+  } catch (e) {
+    console.error('Error tracking adult movie view:', e.message);
+  }
+}
+
+function trackSearch(query, userId = null) {
+  try {
+    const stats = getStats();
+    const today = new Date().toISOString().split('T')[0];
+    if (!stats.dailyUsage) stats.dailyUsage = {};
+    if (!stats.dailyUsage[today]) {
+      stats.dailyUsage[today] = { movieViews: 0, searchQueries: 0, activeUsers: [] };
+    }
+    stats.dailyUsage[today].searchQueries = (stats.dailyUsage[today].searchQueries || 0) + 1;
+    stats.totalSearchQueries = (stats.totalSearchQueries || 0) + 1;
+
+    if (userId) {
+      const numId = Number(userId);
+      if (!Array.isArray(stats.dailyUsage[today].activeUsers)) stats.dailyUsage[today].activeUsers = [];
+      if (!stats.dailyUsage[today].activeUsers.includes(numId)) {
+        stats.dailyUsage[today].activeUsers.push(numId);
+      }
+    }
+    saveStats(stats);
+  } catch (e) {
+    console.error('Error tracking adult search:', e.message);
+  }
+}
+
+const authCodes = new Map();
+function saveAuthCode(userId, code, userObj = null) {
+  authCodes.set(String(code).trim(), {
+    userId: Number(userId),
+    userObj: userObj || null,
+    expires: Date.now() + 10 * 60 * 1000
+  });
+}
+
+function verifyAuthCode(code) {
+  const cleanCode = String(code || '').trim();
+  const entry = authCodes.get(cleanCode);
+  if (!entry) return null;
+  if (Date.now() > entry.expires) {
+    authCodes.delete(cleanCode);
+    return null;
+  }
+  authCodes.delete(cleanCode);
   const users = getUsers();
-  let user = users.find(u => u.id === id);
+  let user = users.find(u => Number(u.id) === Number(entry.userId));
+  if (!user && entry.userObj) {
+    addUser(entry.userObj);
+    user = entry.userObj;
+  }
+  return user || { id: entry.userId, first_name: 'Foydalanuvchi' };
+}
+
+function addUser(userOrId, usernameOrRef = null, firstName = '', referrerId = null) {
+  let id, username, first, refId;
+  if (typeof userOrId === 'object' && userOrId !== null) {
+    id = userOrId.id;
+    username = userOrId.username || '';
+    first = userOrId.first_name || userOrId.firstName || '';
+    refId = usernameOrRef;
+  } else {
+    id = userOrId;
+    username = typeof usernameOrRef === 'string' ? usernameOrRef : '';
+    first = firstName || '';
+    refId = referrerId;
+  }
+  if (!id) return null;
+  const numId = Number(id);
+  const users = getUsers();
+  let user = users.find(u => Number(u.id) === numId);
   const now = new Date().toISOString();
 
   if (!user) {
     user = {
-      id,
+      id: numId,
       username: username || '',
-      firstName: firstName || '',
+      firstName: first || '',
       favorites: [],
       searchHistory: [],
       joinedDate: now,
-      referredBy: referrerId ? parseInt(referrerId, 10) : null,
+      dateJoined: now,
+      lastActive: now,
+      referredBy: refId ? parseInt(refId, 10) : null,
       referralCount: 0,
       referralRewardsCount: 0
     };
     users.push(user);
-    if (referrerId) {
-      const refUser = users.find(u => u.id === parseInt(referrerId, 10));
-      if (refUser && refUser.id !== id) {
+    if (refId) {
+      const refUser = users.find(u => Number(u.id) === parseInt(refId, 10));
+      if (refUser && Number(refUser.id) !== numId) {
         refUser.referralCount = (refUser.referralCount || 0) + 1;
       }
     }
+    saveUsers(users);
+  } else {
+    let updated = false;
+    if (username && user.username !== username) { user.username = username; updated = true; }
+    if (first && user.firstName !== first) { user.firstName = first; updated = true; }
+    user.lastActive = now;
+    if (!user.joinedDate) { user.joinedDate = user.dateJoined || now; updated = true; }
+    if (!user.dateJoined) { user.dateJoined = user.joinedDate || now; updated = true; }
     saveUsers(users);
   }
   return user;
@@ -605,42 +746,117 @@ function hasJoinedOrRequested(userId, channelObj) {
 }
 
 function getAdvancedStats() {
-  const users = getUsers();
-  const movies = getMovies();
-  const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
+  try {
+    const users = getUsers();
+    const movies = getMovies();
+    const stats = getStats();
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
 
-  function daysAgo(n) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - n);
-    return d.toISOString().split('T')[0];
-  }
+    function daysAgo(n) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - n);
+      return d.toISOString().split('T')[0];
+    }
 
-  const weekAgoStr = daysAgo(7);
-  const monthAgoStr = daysAgo(30);
+    const yesterdayStr = daysAgo(1);
+    const weekAgoStr = daysAgo(7);
+    const monthAgoStr = daysAgo(30);
 
-  let newUsersToday = 0, newUsersWeek = 0, newUsersMonth = 0;
-
-  users.forEach(u => {
-    if (u.joinedDate) {
-      const joinDate = u.joinedDate.split('T')[0];
+    let newUsersToday = 0, newUsersYesterday = 0, newUsersWeek = 0, newUsersMonth = 0;
+    users.forEach(u => {
+      const joinDateStr = u.dateJoined || u.joinedDate;
+      if (!joinDateStr) return;
+      const joinDate = joinDateStr.split('T')[0];
       if (joinDate === todayStr) newUsersToday++;
+      if (joinDate === yesterdayStr) newUsersYesterday++;
       if (joinDate >= weekAgoStr) newUsersWeek++;
       if (joinDate >= monthAgoStr) newUsersMonth++;
+    });
+
+    const dailyUsage = stats.dailyUsage || {};
+    const activeToday = (dailyUsage[todayStr]?.activeUsers || []).length;
+    const activeYesterday = (dailyUsage[yesterdayStr]?.activeUsers || []).length;
+
+    const activeWeekSet = new Set();
+    const activeMonthSet = new Set();
+    let usageWeek = { movieViews: 0, searches: 0 };
+    let usageMonth = { movieViews: 0, searches: 0 };
+
+    Object.keys(dailyUsage).forEach(dateStr => {
+      const day = dailyUsage[dateStr] || {};
+      const activeUsers = day.activeUsers || [];
+
+      if (dateStr >= weekAgoStr) {
+        activeUsers.forEach(id => activeWeekSet.add(id));
+        usageWeek.movieViews += day.movieViews || 0;
+        usageWeek.searches += day.searchQueries || 0;
+      }
+
+      if (dateStr >= monthAgoStr) {
+        activeUsers.forEach(id => activeMonthSet.add(id));
+        usageMonth.movieViews += day.movieViews || 0;
+        usageMonth.searches += day.searchQueries || 0;
+      }
+    });
+
+    const trend = [];
+    for (let i = 29; i >= 0; i--) {
+      const dateStr = daysAgo(i);
+      const day = dailyUsage[dateStr] || {};
+      const newUsersOnDay = users.filter(u => {
+        const d = u.dateJoined || u.joinedDate;
+        return d && d.split('T')[0] === dateStr;
+      }).length;
+
+      trend.push({
+        date: dateStr,
+        newUsers: newUsersOnDay,
+        activeUsers: (day.activeUsers || []).length,
+        movieViews: day.movieViews || 0,
+        searches: day.searchQueries || 0
+      });
     }
-  });
 
-  const totalViews = movies.reduce((sum, m) => sum + (m.views || 0), 0);
+    const calculatedViews = movies.reduce((acc, m) => acc + (m.views || 0), 0) || stats.totalViews || 0;
 
-  return {
-    totalUsers: users.length,
-    totalMovies: movies.length,
-    totalViews: totalViews,
-    growth: { newUsersToday, newUsersWeek, newUsersMonth },
-    active: { today: Math.min(users.length, 2), week: users.length, month: users.length },
-    usage: { today: { movieViews: 0, searches: 0 }, week: { movieViews: 0, searches: 0 }, month: { movieViews: 0, searches: 0 } },
-    trend: []
-  };
+    return {
+      totalUsers: users.length,
+      totalMovies: movies.length,
+      totalViews: calculatedViews,
+      totalSearchQueries: stats.totalSearchQueries || 0,
+      growth: { newUsersToday, newUsersYesterday, newUsersWeek, newUsersMonth },
+      active: {
+        today: activeToday || (users.length > 0 ? 1 : 0),
+        yesterday: activeYesterday,
+        week: Math.max(activeWeekSet.size, activeToday || 1),
+        month: Math.max(activeMonthSet.size, activeToday || 1)
+      },
+      usage: {
+        today: { movieViews: dailyUsage[todayStr]?.movieViews || 0, searches: dailyUsage[todayStr]?.searchQueries || 0 },
+        yesterday: { movieViews: dailyUsage[yesterdayStr]?.movieViews || 0, searches: dailyUsage[yesterdayStr]?.searchQueries || 0 },
+        week: usageWeek,
+        month: usageMonth
+      },
+      trend,
+      usersList: users
+    };
+  } catch (e) {
+    console.error('Error in getAdvancedStats:', e.message);
+    const users = getUsers();
+    const movies = getMovies();
+    return {
+      totalUsers: users.length,
+      totalMovies: movies.length,
+      totalViews: 0,
+      totalSearchQueries: 0,
+      growth: { newUsersToday: 0, newUsersYesterday: 0, newUsersWeek: 0, newUsersMonth: 0 },
+      active: { today: 0, yesterday: 0, week: 0, month: 0 },
+      usage: { today: { movieViews: 0, searches: 0 }, yesterday: { movieViews: 0, searches: 0 }, week: { movieViews: 0, searches: 0 }, month: { movieViews: 0, searches: 0 } },
+      trend: [],
+      usersList: users
+    };
+  }
 }
 
 module.exports = {
@@ -675,6 +891,13 @@ module.exports = {
   removeAdminId,
   recordJoinRequest,
   hasJoinedOrRequested,
+  getStats,
+  saveStats,
+  trackActiveUser,
+  trackMovieView,
+  trackSearch,
+  saveAuthCode,
+  verifyAuthCode,
   getAdvancedStats
 };
 

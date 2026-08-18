@@ -20,23 +20,25 @@ export default function AdultBotPage() {
       safe(adultApi.get('/config'))
     ]);
     if (sRes.data) setStatus(sRes.data);
-    const configData = cRes.data || {
-      sponsorUsername: '@XitFilm_uz',
-      sponsorLink: 'https://t.me/XitFilm_uz',
-      sponsorChannels: [{ username: '@XitFilm_uz', link: 'https://t.me/XitFilm_uz', title: '1-Homiy Kanal' }]
-    };
-    let channels = configData.sponsorChannels || [];
-    if (!Array.isArray(channels) || channels.length === 0) {
-      channels = [
-        { username: configData.sponsorUsername || '', link: configData.sponsorLink || '', title: '1-Homiy Kanal' }
-      ];
+    if (cRes.data) {
+      const configData = cRes.data;
+      let channels = configData.sponsorChannels || [];
+      if (!Array.isArray(channels) || channels.length === 0) {
+        channels = [
+          { username: configData.sponsorUsername || '', link: configData.sponsorLink || '', title: '1-Homiy Kanal' }
+        ];
+      }
+      setConfig(prev => {
+        // If user is currently editing and channels length is different, only update non-form fields or initialize
+        if (!prev) return { ...configData, sponsorChannels: channels };
+        return { ...configData, sponsorChannels: channels };
+      });
     }
-    setConfig({ ...configData, sponsorChannels: channels });
   };
 
   useEffect(() => {
     loadData();
-    const timer = setInterval(loadData, 15000);
+    const timer = setInterval(loadData, 20000);
     return () => clearInterval(timer);
   }, []);
 

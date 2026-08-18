@@ -47,24 +47,65 @@ async function checkSponsorSubscription(ctx, userId) {
     const isEnabled = process.env.ADULT_SPONSOR_CHANNEL_ENABLED !== 'false';
     if (!isEnabled) return { ok: true };
 
-    const channelUsername = process.env.ADULT_SPONSOR_CHANNEL_USERNAME || '@ehtiroslikodlar';
-    const channelLink = process.env.ADULT_SPONSOR_CHANNEL_LINK || 'https://t.me/ehtiroslikodlar';
-
-    if (!channelUsername) return { ok: true };
-
-    const uname = channelUsername.startsWith('@') ? channelUsername : `@${channelUsername}`;
-    try {
-      const member = await ctx.api.getChatMember(uname, userId);
-      if (['left', 'kicked'].includes(member.status)) {
-        return { ok: false, channel: { username: uname, link: channelLink, title: 'Kanalga A\'zo Bo\'ling' } };
+    let channels = db.getChannels();
+    if (!Array.isArray(channels) || channels.length === 0) {
+      const channelUsername = process.env.ADULT_SPONSOR_CHANNEL_USERNAME || '@ehtiroslikodlar';
+      const channelLink = process.env.ADULT_SPONSOR_CHANNEL_LINK || 'https://t.me/ehtiroslikodlar';
+      if (channelUsername) {
+        channels = [{ id: '1', title: 'Homiy Kanal', username: channelUsername, link: channelLink }];
       }
-    } catch (err) {
-      // If bot is not admin, don't block
+    }
+
+    if (!channels || channels.length === 0) return { ok: true };
+
+    const notJoined = [];
+    for (const ch of channels) {
+      if (!ch || (!ch.username && !ch.link && !ch.chatId)) continue;
+
+      if (db.hasJoinedOrRequested && db.hasJoinedOrRequested(userId, ch)) {
+        continue;
+      }
+
+      const rawUname = ch.username ? String(ch.username).trim() : '';
+      if (!rawUname) {
+        continue;
+      }
+
+      const uname = rawUname.startsWith('@') ? rawUname : `@${rawUname}`;
+      try {
+        const member = await ctx.api.getChatMember(uname, userId);
+        if (['left', 'kicked'].includes(member.status)) {
+          notJoined.push(ch);
+        }
+      } catch (err) {
+        // If bot is not admin in channel, don't block
+      }
+    }
+
+    if (notJoined.length > 0) {
+      return { ok: false, channels: notJoined };
     }
     return { ok: true };
   } catch (e) {
     return { ok: true };
   }
+}
+
+async function sendSponsorGate(ctx, notJoinedChannels, targetCode = '') {
+  let text = `⚠️ <b>Videoni ko'rish uchun quyidagi kanallarga a'zo bo'ling:</b>\n\n`;
+  const kb = new InlineKeyboard();
+
+  (notJoinedChannels || []).forEach((ch, idx) => {
+    const title = ch.title || `${idx + 1}-Kanal`;
+    const link = ch.link || `https://t.me/${ch.username?.replace('@', '')}`;
+    text += `${idx + 1}. <a href="${link}">${escapeHTML(title)}</a>\n`;
+    kb.url(`➕ ${title}`, link).row();
+  });
+
+  text += `\n<i>A'zo bo'lib, pastdagi «✅ Obunani tekshirish» tugmasini bosing:</i>`;
+  kb.text('✅ Obunani tekshirish', targetCode ? `chk_sub:${targetCode}` : 'chk_sub:home');
+
+  await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb, disable_web_page_preview: true });
 }
 
 function safeLogActivity(payload) {
@@ -78,6 +119,7 @@ function safeLogActivity(payload) {
 
 async function sendMovie(ctx, movie) {
   const code = String(movie.code).trim();
+  db.trackMovieView(code, ctx.from?.id);
 
   safeLogActivity({
     bot: '18+ Adult Bot',
@@ -124,6 +166,15 @@ async function startBot(botToken) {
   try {
     botInstance = new Bot(botToken);
     botInstance.catch((err) => console.error('Adult Grammy error:', err.message));
+
+    // Global User Registration & Activity Tracking
+    botInstance.use((ctx, next) => {
+      if (ctx.from) {
+        db.addUser(ctx.from);
+        db.trackActiveUser(ctx.from.id);
+      }
+      return next();
+    });
 
     // 1. Admin buyruqlari
     botInstance.hears('⚡️ Boshqaruv', async (ctx) => {
@@ -193,11 +244,7 @@ async function startBot(botToken) {
       if (args && args !== 'login') {
         const sub = await checkSponsorSubscription(ctx, userId);
         if (!sub.ok) {
-          const kb = new InlineKeyboard()
-            .url('➕ Kanalga a\'zo bo\'lish', sub.channel.link)
-            .row()
-            .text('✅ Obunani tekshirish', `chk_sub:${args}`);
-          return await ctx.reply(`⚠️ <b>Videoni ko'rish uchun kanalimizga a'zo bo'ling:</b>`, { parse_mode: 'HTML', reply_markup: kb });
+          return await sendSponsorGate(ctx, sub.channels, args);
         }
         const movie = db.findMovieByCode(args);
         if (movie) return await sendMovie(ctx, movie);
@@ -255,8 +302,10 @@ async function startBot(botToken) {
       if (sub.ok) {
         await ctx.answerCallbackQuery({ text: 'Tasdiqlandi! ✅' });
         try { await ctx.deleteMessage(); } catch (e) {}
-        const movie = db.findMovieByCode(code);
-        if (movie) return await sendMovie(ctx, movie);
+        if (code && code !== 'home') {
+          const movie = db.findMovieByCode(code);
+          if (movie) return await sendMovie(ctx, movie);
+        }
         await ctx.reply('✅ Obuna tasdiqlandi. Kodni yuboring:');
       } else {
         await ctx.answerCallbackQuery({ text: 'Kanalga a\'zo bo\'lmadingiz! ❌', show_alert: true });
@@ -311,14 +360,11 @@ async function startBot(botToken) {
       // Sponsor check
       const sub = await checkSponsorSubscription(ctx, ctx.from.id);
       if (!sub.ok) {
-        const kb = new InlineKeyboard()
-          .url('➕ Kanalga a\'zo bo\'lish', sub.channel.link)
-          .row()
-          .text('✅ Obunani tekshirish', `chk_sub:${text}`);
-        return await ctx.reply(`⚠️ <b>Videoni ko'rish uchun kanalimizga a'zo bo'ling:</b>`, { parse_mode: 'HTML', reply_markup: kb });
+        return await sendSponsorGate(ctx, sub.channels, text);
       }
 
       // Oddiy kod qidirish
+      db.trackSearch(text, ctx.from.id);
       const movie = db.findMovieByCode(text);
       if (movie) return await sendMovie(ctx, movie);
 
