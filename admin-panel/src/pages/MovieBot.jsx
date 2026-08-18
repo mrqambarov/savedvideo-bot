@@ -19,6 +19,11 @@ export default function MovieBot() {
   const [autoPostBusy, setAutoPostBusy] = useState(false);
   const [msg, setMsg] = useState(null);
 
+  const loadStatus = async () => {
+    const { data } = await safe(movieApi.get('/bot-status'));
+    if (data) setStatus(data);
+  };
+
   const loadData = async () => {
     const [sRes, cRes, setRes] = await Promise.all([
       safe(movieApi.get('/bot-status')),
@@ -48,7 +53,7 @@ export default function MovieBot() {
 
   useEffect(() => {
     loadData();
-    const timer = setInterval(loadData, 15000);
+    const timer = setInterval(loadStatus, 10000);
     return () => clearInterval(timer);
   }, []);
 

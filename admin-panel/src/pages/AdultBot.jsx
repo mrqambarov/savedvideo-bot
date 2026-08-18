@@ -14,6 +14,11 @@ export default function AdultBotPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
 
+  const loadStatus = async () => {
+    const { data } = await safe(adultApi.get('/bot-status'));
+    if (data) setStatus(data);
+  };
+
   const loadData = async () => {
     const [sRes, cRes] = await Promise.all([
       safe(adultApi.get('/bot-status')),
@@ -28,17 +33,13 @@ export default function AdultBotPage() {
           { username: configData.sponsorUsername || '', link: configData.sponsorLink || '', title: '1-Homiy Kanal' }
         ];
       }
-      setConfig(prev => {
-        // If user is currently editing and channels length is different, only update non-form fields or initialize
-        if (!prev) return { ...configData, sponsorChannels: channels };
-        return { ...configData, sponsorChannels: channels };
-      });
+      setConfig({ ...configData, sponsorChannels: channels });
     }
   };
 
   useEffect(() => {
     loadData();
-    const timer = setInterval(loadData, 20000);
+    const timer = setInterval(loadStatus, 10000);
     return () => clearInterval(timer);
   }, []);
 
