@@ -82,13 +82,14 @@ function updateEnv(botToken, adminIds, sponsorEnabled, sponsorUsername, sponsorL
     content = fs.readFileSync(envPath, 'utf8');
   }
 
-  if (botToken !== undefined) {
+  if (botToken !== undefined && typeof botToken === 'string' && botToken.trim().length > 0 && !botToken.includes('...') && botToken.includes(':')) {
+    const cleanToken = botToken.trim();
     if (content.includes('ADULT_BOT_TOKEN=')) {
-      content = content.replace(/ADULT_BOT_TOKEN=.*/, `ADULT_BOT_TOKEN=${botToken}`);
+      content = content.replace(/ADULT_BOT_TOKEN=.*/, `ADULT_BOT_TOKEN=${cleanToken}`);
     } else {
-      content += `\nADULT_BOT_TOKEN=${botToken}`;
+      content += `\nADULT_BOT_TOKEN=${cleanToken}`;
     }
-    process.env.ADULT_BOT_TOKEN = botToken;
+    process.env.ADULT_BOT_TOKEN = cleanToken;
   }
 
   if (adminIds !== undefined) {
