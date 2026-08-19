@@ -159,21 +159,41 @@ async function checkSponsorSubscription(ctx, userId) {
   }
 }
 
+function getSponsorTitle(ch, idx) {
+  const isBot = isBotSponsor(ch);
+  const rawTitle = String(ch.title || '').trim();
+  const uname = extractChannelUsername(ch.username);
+
+  if (isBot) {
+    if (!rawTitle || rawTitle.toLowerCase().includes('kanal')) {
+      if (uname) return `@${uname}`;
+      return `${idx + 1}-Homiy Bot`;
+    }
+    return rawTitle;
+  } else {
+    if (!rawTitle) {
+      if (uname) return `@${uname}`;
+      return `${idx + 1}-Kanal`;
+    }
+    return rawTitle;
+  }
+}
+
 async function sendSponsorGate(ctx, notJoinedChannels, targetCode = '') {
   const userId = ctx.from?.id;
-  let text = `⚠️ <b>Botdan to'liq foydalanish va videoni olish uchun quyidagilarni bajaring:</b>\n\n`;
+  let text = `⚠️ <b>Botdan to'liq foydalanish va videoni olish uchun quyidagi kanallarga a'zo bo'ling va botlarga START bosing:</b>\n\n`;
   const kb = new InlineKeyboard();
 
   (notJoinedChannels || []).forEach((ch, idx) => {
     const isBot = isBotSponsor(ch);
-    const title = ch.title || (isBot ? `Homiy Bot #${idx + 1}` : `${idx + 1}-Kanal`);
+    const title = getSponsorTitle(ch, idx);
     const link = getSponsorLink(ch, userId);
 
     if (isBot) {
-      text += `${idx + 1}. 🤖 <a href="${link}">${escapeHTML(title)}</a> <i>(Botga kirib START bosing)</i>\n`;
+      text += `${idx + 1}. 🤖 <a href="${link}"><b>${escapeHTML(title)}</b></a> <i>(Botga kirib START bosing)</i>\n`;
       kb.url(`🤖 ${title} (START)`, link).row();
     } else {
-      text += `${idx + 1}. 📢 <a href="${link}">${escapeHTML(title)}</a> <i>(Kanalga a'zo bo'ling)</i>\n`;
+      text += `${idx + 1}. 📢 <a href="${link}"><b>${escapeHTML(title)}</b></a> <i>(Kanalga a'zo bo'ling)</i>\n`;
       kb.url(`➕ ${title}`, link).row();
     }
   });

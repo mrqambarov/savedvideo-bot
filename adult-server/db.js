@@ -791,35 +791,7 @@ function hasStartedBot(userId, botObjOrUsername) {
 
   if (!botUname) return true;
 
-  // 1. Check if user exists in server/data/users.json (Music / Downloader Bot)
-  try {
-    const mainUsersPath = path.resolve(__dirname, '../server/data/users.json');
-    if (fs.existsSync(mainUsersPath)) {
-      const mainUsers = JSON.parse(fs.readFileSync(mainUsersPath, 'utf8'));
-      if (Array.isArray(mainUsers) && mainUsers.some(u => String(u.id) === uId)) {
-        const mainBotUname = (process.env.DOWNLOADER_BOT_USERNAME || 'savemedia_music_bot').toLowerCase().replace('@', '');
-        if (botUname.includes(mainBotUname) || mainBotUname.includes(botUname)) {
-          return true;
-        }
-      }
-    }
-  } catch (e) {}
-
-  // 2. Check if user exists in movie-server/data/users.json (Movie Bot)
-  try {
-    const movieUsersPath = path.resolve(__dirname, '../movie-server/data/users.json');
-    if (fs.existsSync(movieUsersPath)) {
-      const movieUsers = JSON.parse(fs.readFileSync(movieUsersPath, 'utf8'));
-      if (Array.isArray(movieUsers) && movieUsers.some(u => String(u.id) === uId)) {
-        const movieBotUname = (process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot').toLowerCase().replace('@', '');
-        if (botUname.includes(movieBotUname) || movieBotUname.includes(botUname)) {
-          return true;
-        }
-      }
-    }
-  } catch (e) {}
-
-  // 3. Check started_bots.json
+  // Check started_bots.json
   const list = getStartedBots();
   for (const item of list) {
     if (item.startsWith(uId + '_')) {
