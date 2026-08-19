@@ -7,7 +7,7 @@
     "server": "node server/index.js",
     "client": "npm --prefix client run dev",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "install:all": "npm install && npm install --prefix server && npm install --prefix client && npm install --prefix movie-server && npm install --prefix movie-client",
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client && npm install --prefix movie-server && npm install --prefix movie-client && npm install --prefix adult-server && npm install --prefix guardian",
     "build": "npm install --prefix server && npm install --prefix client && npm run build --prefix client",
     "start": "node server/index.js",
     "movie:server": "node movie-server/index.js",

@@ -6,13 +6,14 @@ const i18n = require('./i18n');
 
 let botInstance = null;
 let isBotRunning = false;
+let reconnectTimer = null;
 const userPendingActions = new Map();
 
-// Sizning Telegram ID raqamingiz
+// Birlamchi Telegram ID raqami
 const PRIMARY_ADMIN = 6263659922;
 
 function isAdmin(userId) {
-  const adminIdsStr = process.env.ADULT_ADMIN_IDS || '';
+  const adminIdsStr = process.env.ADULT_ADMIN_IDS || process.env.ADMIN_ID || '';
   const adminIds = adminIdsStr.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
   return adminIds.includes(Number(userId)) || Number(userId) === PRIMARY_ADMIN;
 }
@@ -26,8 +27,40 @@ function escapeHTML(str) {
     .replace(/[\ud800-\udfff]/g, '');
 }
 
+function extractChannelUsername(raw) {
+  if (!raw) return '';
+  let str = String(raw).trim();
+  str = str.replace(/https?:\/\/t\.me\//i, '');
+  str = str.replace(/https?:\/\/telegram\.me\//i, '');
+  str = str.replace(/^@/, '');
+  return str.split('/')[0].trim();
+}
+
+function getChannelLink(ch) {
+  if (ch && ch.link && String(ch.link).startsWith('http')) {
+    return String(ch.link).trim();
+  }
+  const uname = extractChannelUsername(ch?.username);
+  if (uname) {
+    return `https://t.me/${uname}`;
+  }
+  return 'https://t.me';
+}
+
+function getUserKeyboard() {
+  return new Keyboard()
+    .text('🔍 Video Qidirish').text('📂 Janrlar')
+    .row()
+    .text('🔥 Top Videolar').text('❓ Yordam')
+    .resized();
+}
+
 function getSingleBoshqaruvKeyboard() {
-  return new Keyboard().text('⚡️ Boshqaruv').resized();
+  return new Keyboard()
+    .text('🔍 Video Qidirish').text('📂 Janrlar')
+    .row()
+    .text('🔥 Top Videolar').text('⚡️ Boshqaruv')
+    .resized();
 }
 
 function getFullAdminKeyboard() {
@@ -60,32 +93,28 @@ async function checkSponsorSubscription(ctx, userId) {
 
     const notJoined = [];
     for (const ch of channels) {
-      if (!ch || (!ch.username && !ch.link && !ch.chatId)) continue;
-
+      if (!ch) continue;
       if (db.hasJoinedOrRequested && db.hasJoinedOrRequested(userId, ch)) {
         continue;
       }
 
-      const rawUname = ch.username ? String(ch.username).trim() : '';
-      if (!rawUname) {
-        continue;
-      }
+      const uname = extractChannelUsername(ch.username);
+      if (!uname) continue;
 
-      const uname = rawUname.startsWith('@') ? rawUname : `@${rawUname}`;
       try {
         const sm = require(path.resolve(__dirname, '../server/sponsorManager'));
         if (sm && typeof sm.recordChannelCheck === 'function') {
-          sm.recordChannelCheck(uname);
+          sm.recordChannelCheck('@' + uname);
         }
       } catch (e) {}
 
       try {
-        const member = await ctx.api.getChatMember(uname, userId);
+        const member = await ctx.api.getChatMember('@' + uname, userId);
         if (['left', 'kicked'].includes(member.status)) {
           notJoined.push(ch);
         }
       } catch (err) {
-        // If bot is not admin in channel, don't block
+        // Agar bot kanalda admin bo'lmasa, foydalanuvchini bloklamaymiz
       }
     }
 
@@ -104,7 +133,7 @@ async function sendSponsorGate(ctx, notJoinedChannels, targetCode = '') {
 
   (notJoinedChannels || []).forEach((ch, idx) => {
     const title = ch.title || `${idx + 1}-Kanal`;
-    const link = ch.link || `https://t.me/${ch.username?.replace('@', '')}`;
+    const link = getChannelLink(ch);
     text += `${idx + 1}. <a href="${link}">${escapeHTML(title)}</a>\n`;
     kb.url(`➕ ${title}`, link).row();
   });
@@ -169,13 +198,32 @@ async function sendMovie(ctx, movie) {
 }
 
 async function startBot(botToken) {
-  if (isBotRunning && botInstance) return true;
+  if (!botToken) return false;
+
+  // Agar mavjud bot bo'lsa, to'xtatamiz
+  if (botInstance) {
+    try {
+      await botInstance.stop();
+    } catch (e) {}
+    botInstance = null;
+    isBotRunning = false;
+  }
+
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
   try {
     botInstance = new Bot(botToken);
-    botInstance.catch((err) => console.error('Adult Grammy error:', err.message));
+
+    // Xatoliklarni ushlab qolish — bot to'xtab qolmasligi uchun
+    botInstance.catch((err) => {
+      console.error('Adult Grammy error:', err.message || err);
+    });
 
     // Global User Registration & Activity Tracking
-    botInstance.use((ctx, next) => {
+    botInstance.use(async (ctx, next) => {
       if (ctx.from) {
         db.addUser(ctx.from);
         db.trackActiveUser(ctx.from.id);
@@ -234,7 +282,48 @@ async function startBot(botToken) {
       await ctx.reply('Bosh menyu', { reply_markup: getSingleBoshqaruvKeyboard() });
     });
 
-    // 2. Start buyrug'i
+    // 2. Foydalanuvchi asosiy menyu tugmalari
+    botInstance.hears(['🔍 Video Qidirish', '/search'], async (ctx) => {
+      await ctx.reply('🔍 <b>Video kodini yoki nomini yuboring:</b>\n\n<i>Masalan: 27 yoki video nomi</i>', { parse_mode: 'HTML' });
+    });
+
+    botInstance.hears(['📂 Janrlar', '/janrlar'], async (ctx) => {
+      const genres = db.getGenres() || [];
+      const kb = new InlineKeyboard();
+      genres.forEach((g, idx) => {
+        kb.text(g, `genre:${g}`);
+        if ((idx + 1) % 2 === 0) kb.row();
+      });
+      await ctx.reply('📂 <b>Kerakli janrni tanlang:</b>', { parse_mode: 'HTML', reply_markup: kb });
+    });
+
+    botInstance.hears(['🔥 Top Videolar', '/top'], async (ctx) => {
+      const movies = db.getMovies() || [];
+      const topMovies = [...movies].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 8);
+      if (topMovies.length === 0) {
+        return await ctx.reply('Hozircha videolar mavjud emas.');
+      }
+      let text = `🔥 <b>Eng ko'p ko'rilgan 18+ videolar:</b>\n\n`;
+      const kb = new InlineKeyboard();
+      topMovies.forEach((m, i) => {
+        text += `${i + 1}. <b>${escapeHTML(m.title)}</b> (👁 ${m.views || 0} ko'rish | Kod: <code>${m.code}</code>)\n`;
+        kb.text(`🎬 ${m.title.substring(0, 20)}`, `get_movie:${m.code}`);
+        if ((i + 1) % 2 === 0) kb.row();
+      });
+      await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+    });
+
+    botInstance.hears(['❓ Yordam', '/help'], async (ctx) => {
+      const helpText =
+        `❓ <b>Qanday qilib videolarni ko'rish mumkin?</b>\n\n` +
+        `1️⃣ Videoning <b>KODINI</b> botga yuboring (Masalan: <code>27</code>)\n` +
+        `2️⃣ Yoki video nomini yozib qidiring\n` +
+        `3️⃣ Bot sizga videoni darhol yuboradi!\n\n` +
+        `<i>Taklif va murojaatlar uchun admin bilan bog'laning.</i>`;
+      await ctx.reply(helpText, { parse_mode: 'HTML' });
+    });
+
+    // 3. Start buyrug'i
     botInstance.command('start', async (ctx) => {
       const userId = ctx.from.id;
       const args = ctx.match ? String(ctx.match).trim() : '';
@@ -259,11 +348,42 @@ async function startBot(botToken) {
 
       await ctx.reply(i18n.t(userLang, 'welcome', { name: escapeHTML(ctx.from.first_name) }), {
         parse_mode: 'HTML',
-        reply_markup: isAdmin(userId) ? getSingleBoshqaruvKeyboard() : { remove_keyboard: true }
+        reply_markup: isAdmin(userId) ? getSingleBoshqaruvKeyboard() : getUserKeyboard()
       });
     });
 
-    // 3. Likes & Dislikes Callbacks
+    // 4. Callback Queries
+    // Movie tanlash callback
+    botInstance.callbackQuery(/^get_movie:(.+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      await ctx.answerCallbackQuery();
+      const sub = await checkSponsorSubscription(ctx, ctx.from.id);
+      if (!sub.ok) {
+        return await sendSponsorGate(ctx, sub.channels, code);
+      }
+      const movie = db.findMovieByCode(code);
+      if (movie) await sendMovie(ctx, movie);
+    });
+
+    // Janr bo'yicha videolar callback
+    botInstance.callbackQuery(/^genre:(.+)$/, async (ctx) => {
+      const genre = ctx.match[1];
+      await ctx.answerCallbackQuery();
+      const movies = (db.getMovies() || []).filter(m => (m.genre || '').toLowerCase().includes(genre.toLowerCase()));
+      if (movies.length === 0) {
+        return await ctx.reply(`«${escapeHTML(genre)}» janrida hozircha videolar yo'q.`);
+      }
+      let text = `📂 <b>«${escapeHTML(genre)}» janridagi videolar:</b>\n\n`;
+      const kb = new InlineKeyboard();
+      movies.slice(0, 10).forEach((m, i) => {
+        text += `${i + 1}. <b>${escapeHTML(m.title)}</b> (Kod: <code>${m.code}</code>)\n`;
+        kb.text(`🎬 ${m.title.substring(0, 20)}`, `get_movie:${m.code}`);
+        if ((i + 1) % 2 === 0) kb.row();
+      });
+      await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+    });
+
+    // Likes & Dislikes Callbacks
     botInstance.callbackQuery(/^(like|dislike):(.+)$/, async (ctx) => {
       const action = ctx.match[1];
       const code = ctx.match[2];
@@ -309,11 +429,11 @@ async function startBot(botToken) {
       if (sub.ok) {
         try {
           const sm = require(path.resolve(__dirname, '../server/sponsorManager'));
-          const settings = db.getSettings() || {};
-          const channels = settings.sponsorChannels || [{ username: settings.sponsorUsername || '@XitFilm_uz' }];
+          const channels = db.getChannels();
           channels.forEach(ch => {
-            if (ch.username && sm && typeof sm.recordMemberJoin === 'function') {
-              sm.recordMemberJoin(ch.username, ctx.from.id);
+            const uname = extractChannelUsername(ch.username);
+            if (uname && sm && typeof sm.recordMemberJoin === 'function') {
+              sm.recordMemberJoin('@' + uname, ctx.from.id);
             }
           });
         } catch (e) {}
@@ -324,20 +444,26 @@ async function startBot(botToken) {
           const movie = db.findMovieByCode(code);
           if (movie) return await sendMovie(ctx, movie);
         }
-        await ctx.reply('✅ Obuna tasdiqlandi. Kodni yuboring:');
+        await ctx.reply('✅ Obuna tasdiqlandi. Video kodini yuboring:', {
+          reply_markup: isAdmin(ctx.from.id) ? getSingleBoshqaruvKeyboard() : getUserKeyboard()
+        });
       } else {
         await ctx.answerCallbackQuery({ text: 'Kanalga a\'zo bo\'lmadingiz! ❌', show_alert: true });
       }
     });
 
-    // 4. Video qo'shish jarayoni
+    // 5. Video qo'shish jarayoni (Admin uchun)
     botInstance.on(['message:video', 'message:document'], async (ctx) => {
       if (!isAdmin(ctx.from.id)) return;
       const video = ctx.message.video || (ctx.message.document && ctx.message.document.mime_type?.startsWith('video/') ? ctx.message.document : null);
       if (!video) return;
 
-      userPendingActions.set(ctx.from.id, { action: 'waiting_for_code', fileId: video.file_id, caption: ctx.message.caption || '' });
-      await ctx.reply('📹 <b>Video qabul qilindi. Ushbu video uchun KOD yuboring:</b>', { parse_mode: 'HTML' });
+      userPendingActions.set(ctx.from.id, {
+        action: 'waiting_for_code',
+        fileId: video.file_id,
+        caption: ctx.message.caption || ''
+      });
+      await ctx.reply('📹 <b>Video qabul qilindi. Ushbu video uchun KOD yuboring:</b>\n\n<i>(Masalan: 28)</i>', { parse_mode: 'HTML' });
     });
 
     botInstance.on('message:photo', async (ctx) => {
@@ -358,21 +484,49 @@ async function startBot(botToken) {
         if (result) {
           await ctx.reply('⚡️ <b>Video bazaga qo\'shildi. Kanalga post yuborilmoqda...</b>', { parse_mode: 'HTML' });
           await publishAutoPost(result);
-          await ctx.reply('✅ <b>Kanalga muvaffaqiyatli joylandi!</b>', { parse_mode: 'HTML' });
+          await ctx.reply('✅ <b>Kanalga muvaffaqiyatli joylandi!</b>', {
+            parse_mode: 'HTML',
+            reply_markup: getSingleBoshqaruvKeyboard()
+          });
         }
       }
     });
 
-    // 5. Matnli xabarlar va Kodlar
+    // 6. Matnli xabarlar va Kodlar
     botInstance.on('message:text', async (ctx) => {
       const text = ctx.message.text.trim();
-      if (text.startsWith('/')) return;
+      if (text.startsWith('/')) {
+        // Start, help, search buyruqlari alohida handlerda
+        return;
+      }
 
       // Admin kod kiritayotgan bo'lsa
       const pending = userPendingActions.get(ctx.from.id);
       if (isAdmin(ctx.from.id) && pending && pending.action === 'waiting_for_code') {
         userPendingActions.set(ctx.from.id, { ...pending, action: 'waiting_for_poster', code: text });
-        return await ctx.reply(`✅ Kod qabul qilindi: <b>${escapeHTML(text)}</b>\n\n🖼 <b>Endi video uchun POSTER (RASM) yuboring:</b>`, { parse_mode: 'HTML' });
+        return await ctx.reply(
+          `✅ Kod qabul qilindi: <b>${escapeHTML(text)}</b>\n\n` +
+          `🖼 <b>Endi video uchun POSTER (RASM) yuboring:</b>\n` +
+          `<i>(Rasm yuborishni xohlamasangiz «O'tkazib yuborish» deb yozing)</i>`,
+          { parse_mode: 'HTML' }
+        );
+      }
+
+      // Admin poster o'tkazib yuborishni tanlasa
+      if (isAdmin(ctx.from.id) && pending && pending.action === 'waiting_for_poster' && text.toLowerCase().includes('o\'tkazib')) {
+        userPendingActions.delete(ctx.from.id);
+        const result = db.addMovie({
+          code: pending.code,
+          title: `Video #${pending.code}`,
+          description: pending.caption,
+          fileId: pending.fileId,
+          poster: ''
+        });
+        if (result) {
+          await ctx.reply('⚡️ <b>Video rasmisiz saqlandi.</b>', { parse_mode: 'HTML', reply_markup: getSingleBoshqaruvKeyboard() });
+          await publishAutoPost(result);
+        }
+        return;
       }
 
       // Sponsor check
@@ -381,16 +535,45 @@ async function startBot(botToken) {
         return await sendSponsorGate(ctx, sub.channels, text);
       }
 
-      // Oddiy kod qidirish
-      db.trackSearch(text, ctx.from.id);
-      const movie = db.findMovieByCode(text);
-      if (movie) return await sendMovie(ctx, movie);
+      // 1. To'g'ridan-to'g'ri kod bo'yicha qidirish
+      let movie = db.findMovieByCode(text);
+      if (movie) {
+        db.trackSearch(text, ctx.from.id);
+        return await sendMovie(ctx, movie);
+      }
 
+      // 2. Nomi bo'yicha qidirish
+      const searchResults = db.searchMoviesByTitle(text);
+      if (searchResults && searchResults.length > 0) {
+        db.trackSearch(text, ctx.from.id);
+        if (searchResults.length === 1) {
+          return await sendMovie(ctx, searchResults[0]);
+        }
+        let listText = `🔍 <b>«${escapeHTML(text)}» bo'yicha topilgan videolar:</b>\n\n`;
+        const kb = new InlineKeyboard();
+        searchResults.slice(0, 10).forEach((m, idx) => {
+          listText += `${idx + 1}. <b>${escapeHTML(m.title)}</b> (Kod: <code>${m.code}</code>)\n`;
+          kb.text(`🎬 ${m.title.substring(0, 25)}`, `get_movie:${m.code}`);
+          if ((idx + 1) % 2 === 0) kb.row();
+        });
+        listText += `\n<i>Kerakli videoni ko'rish uchun quyidagi tugmani bosing yoki kodini yuboring.</i>`;
+        return await ctx.reply(listText, { parse_mode: 'HTML', reply_markup: kb });
+      }
+
+      // 3. Hech narsa topilmasa
+      db.trackSearch(text, ctx.from.id);
       const userLang = db.getUserLang(ctx.from.id) || 'uz';
-      await ctx.reply(i18n.t(userLang, 'code_not_found', { code: escapeHTML(text) }), { parse_mode: 'HTML' });
+      await ctx.reply(
+        `❌ <b>«${escapeHTML(text)}»</b> bo'yicha hech qanday video topilmadi.\n\n` +
+        `<i>Iltimos, video kodini to'g'ri kiriting yoki nomi bilan qidirib ko'ring.</i>`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: isAdmin(ctx.from.id) ? getSingleBoshqaruvKeyboard() : getUserKeyboard()
+        }
+      );
     });
 
-    let reconnectTimer = null;
+    // Pollingni ishga tushirish
     async function launchPolling() {
       if (!botInstance) return;
       try {
@@ -401,15 +584,19 @@ async function startBot(botToken) {
         isBotRunning = true;
         await botInstance.start({
           allowed_updates: ['message', 'callback_query', 'inline_query', 'chat_member', 'my_chat_member'],
-          onStart: (info) => console.log(`Adult Bot @${info.username} qayta tiklandi.`)
+          onStart: (info) => console.log(`Adult Bot @${info.username} faol ishga tushdi.`)
         });
       } catch (err) {
-        console.error('Adult Bot polling error:', err.message);
+        console.error('Adult Bot polling error:', err.message || err);
         isBotRunning = false;
         if (!botInstance) return;
+
         if (reconnectTimer) clearTimeout(reconnectTimer);
         reconnectTimer = setTimeout(() => {
-          if (botInstance) launchPolling();
+          if (botInstance && !isBotRunning) {
+            console.log('Adult Bot qayta ulanmoqda...');
+            launchPolling();
+          }
         }, 5000);
       }
     }
@@ -417,8 +604,9 @@ async function startBot(botToken) {
     launchPolling();
     return true;
   } catch (err) {
-    console.error('Adult Bot startBot error:', err.message);
+    console.error('Adult Bot startBot error:', err.message || err);
     isBotRunning = false;
+    botInstance = null;
     return false;
   }
 }
@@ -431,12 +619,35 @@ async function publishAutoPost(movie) {
     const cleanTitle = escapeHTML(movie.title || `Video #${movie.code}`);
     const caption = `🔞 <b>YANGI 18+ PREMYERA!</b>\n\n🎬 <b>Nomi:</b> ${cleanTitle}\n🔑 <b>KODI:</b> <code>${movie.code}</code>`;
     const keyboard = new InlineKeyboard().url('📥 Botda ko\'rish', `https://t.me/${botUsername}?start=${movie.code}`);
-    if (movie.poster) await botInstance.api.sendPhoto(channelId, movie.poster, { caption, parse_mode: 'HTML', reply_markup: keyboard });
-    else await botInstance.api.sendMessage(channelId, caption, { parse_mode: 'HTML', reply_markup: keyboard });
+    if (movie.poster) {
+      await botInstance.api.sendPhoto(channelId, movie.poster, { caption, parse_mode: 'HTML', reply_markup: keyboard });
+    } else {
+      await botInstance.api.sendMessage(channelId, caption, { parse_mode: 'HTML', reply_markup: keyboard });
+    }
     return true;
-  } catch (e) { return false; }
+  } catch (e) {
+    return false;
+  }
 }
 
-async function stopBot() { if (botInstance) await botInstance.stop(); isBotRunning = false; return true; }
-module.exports = { startBot, stopBot, getBotStatus: () => ({ running: isBotRunning }), getBotInstance: () => botInstance };
+async function stopBot() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (botInstance) {
+    try {
+      await botInstance.stop();
+    } catch (e) {}
+    botInstance = null;
+  }
+  isBotRunning = false;
+  return true;
+}
 
+module.exports = {
+  startBot,
+  stopBot,
+  getBotStatus: () => ({ running: isBotRunning, botUsername: botInstance?.botInfo?.username || 'Instavdeo_bot' }),
+  getBotInstance: () => botInstance
+};

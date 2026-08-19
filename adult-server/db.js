@@ -603,6 +603,16 @@ function saveChannels(channels) {
   }
 }
 
+function getSettings() {
+  const channels = getChannels();
+  return {
+    sponsorEnabled: process.env.ADULT_SPONSOR_CHANNEL_ENABLED !== 'false',
+    sponsorChannels: channels,
+    sponsorUsername: process.env.ADULT_SPONSOR_CHANNEL_USERNAME || (channels[0]?.username || ''),
+    sponsorLink: process.env.ADULT_SPONSOR_CHANNEL_LINK || (channels[0]?.link || '')
+  };
+}
+
 function getRewardTiers() {
   try {
     return JSON.parse(fs.readFileSync(tiersFile, 'utf8'));
@@ -876,6 +886,7 @@ module.exports = {
   deleteRequest,
   getChannels,
   saveChannels,
+  getSettings,
   getRewardTiers,
   saveRewardTiers,
   getUsers,
