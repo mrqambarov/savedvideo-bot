@@ -36,6 +36,17 @@ function extractChannelUsername(raw) {
   return str.split('/')[0].trim();
 }
 
+function isBotSponsor(ch) {
+  if (!ch) return false;
+  if (ch.isBot === true || ch.type === 'bot') return true;
+  const username = extractChannelUsername(ch.username).toLowerCase();
+  const link = String(ch.link || '').toLowerCase();
+  if (username.endsWith('bot') || link.includes('?start=') || /t\.me\/[a-z0-9_]+bot(\?|$)/i.test(link)) {
+    return true;
+  }
+  return false;
+}
+
 function getChannelLink(ch) {
   if (ch && ch.link && String(ch.link).startsWith('http')) {
     return String(ch.link).trim();
@@ -45,6 +56,16 @@ function getChannelLink(ch) {
     return `https://t.me/${uname}`;
   }
   return 'https://t.me';
+}
+
+function getSponsorLink(ch, userId = '') {
+  let link = getChannelLink(ch);
+  if (isBotSponsor(ch)) {
+    if (!link.includes('?start=')) {
+      link += `?start=adult_${userId || 'user'}`;
+    }
+  }
+  return link;
 }
 
 function getUserKeyboard() {
@@ -93,7 +114,18 @@ async function checkSponsorSubscription(ctx, userId) {
 
     const notJoined = [];
     for (const ch of channels) {
-      if (!ch) continue;
+      if (!ch || (!ch.username && !ch.link && !ch.chatId)) continue;
+
+      // 1. Agar homiy BOT bo'lsa: Botga start bosganligini tekshiramiz
+      if (isBotSponsor(ch)) {
+        const hasStarted = db.hasStartedBot(userId, ch);
+        if (!hasStarted) {
+          notJoined.push({ ...ch, isBot: true });
+        }
+        continue;
+      }
+
+      // 2. Agar homiy KANAL bo'lsa:
       if (db.hasJoinedOrRequested && db.hasJoinedOrRequested(userId, ch)) {
         continue;
       }
@@ -111,7 +143,7 @@ async function checkSponsorSubscription(ctx, userId) {
       try {
         const member = await ctx.api.getChatMember('@' + uname, userId);
         if (['left', 'kicked'].includes(member.status)) {
-          notJoined.push(ch);
+          notJoined.push({ ...ch, isBot: false });
         }
       } catch (err) {
         // Agar bot kanalda admin bo'lmasa, foydalanuvchini bloklamaymiz
@@ -128,17 +160,25 @@ async function checkSponsorSubscription(ctx, userId) {
 }
 
 async function sendSponsorGate(ctx, notJoinedChannels, targetCode = '') {
-  let text = `⚠️ <b>Videoni ko'rish uchun quyidagi kanallarga a'zo bo'ling:</b>\n\n`;
+  const userId = ctx.from?.id;
+  let text = `⚠️ <b>Botdan to'liq foydalanish va videoni olish uchun quyidagilarni bajaring:</b>\n\n`;
   const kb = new InlineKeyboard();
 
   (notJoinedChannels || []).forEach((ch, idx) => {
-    const title = ch.title || `${idx + 1}-Kanal`;
-    const link = getChannelLink(ch);
-    text += `${idx + 1}. <a href="${link}">${escapeHTML(title)}</a>\n`;
-    kb.url(`➕ ${title}`, link).row();
+    const isBot = isBotSponsor(ch);
+    const title = ch.title || (isBot ? `Homiy Bot #${idx + 1}` : `${idx + 1}-Kanal`);
+    const link = getSponsorLink(ch, userId);
+
+    if (isBot) {
+      text += `${idx + 1}. 🤖 <a href="${link}">${escapeHTML(title)}</a> <i>(Botga kirib START bosing)</i>\n`;
+      kb.url(`🤖 ${title} (START)`, link).row();
+    } else {
+      text += `${idx + 1}. 📢 <a href="${link}">${escapeHTML(title)}</a> <i>(Kanalga a'zo bo'ling)</i>\n`;
+      kb.url(`➕ ${title}`, link).row();
+    }
   });
 
-  text += `\n<i>A'zo bo'lib, pastdagi «✅ Obunani tekshirish» tugmasini bosing:</i>`;
+  text += `\n<i>Barchasiga a'zo bo'lib / start bosgach, pastdagi «✅ Obunani tekshirish» tugmasini bosing:</i>`;
   kb.text('✅ Obunani tekshirish', targetCode ? `chk_sub:${targetCode}` : 'chk_sub:home');
 
   await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb, disable_web_page_preview: true });
@@ -425,30 +465,40 @@ async function startBot(botToken) {
     // Sponsor check callback
     botInstance.callbackQuery(/^chk_sub:(.+)$/, async (ctx) => {
       const code = ctx.match[1];
-      const sub = await checkSponsorSubscription(ctx, ctx.from.id);
+      const userId = ctx.from.id;
+
+      // Agar homiy botlar ro'yxatda bo'lsa va foydalanuvchi tekshirishni bossa,
+      // bot startlarini saqlaymiz
+      const channels = db.getChannels() || [];
+      channels.forEach(ch => {
+        if (isBotSponsor(ch)) {
+          db.recordBotStart(userId, ch);
+        }
+      });
+
+      const sub = await checkSponsorSubscription(ctx, userId);
       if (sub.ok) {
         try {
           const sm = require(path.resolve(__dirname, '../server/sponsorManager'));
-          const channels = db.getChannels();
           channels.forEach(ch => {
             const uname = extractChannelUsername(ch.username);
             if (uname && sm && typeof sm.recordMemberJoin === 'function') {
-              sm.recordMemberJoin('@' + uname, ctx.from.id);
+              sm.recordMemberJoin('@' + uname, userId);
             }
           });
         } catch (e) {}
 
-        await ctx.answerCallbackQuery({ text: 'Tasdiqlandi! ✅' });
+        await ctx.answerCallbackQuery({ text: 'Obuna tasdiqlandi! ✅' });
         try { await ctx.deleteMessage(); } catch (e) {}
         if (code && code !== 'home') {
           const movie = db.findMovieByCode(code);
           if (movie) return await sendMovie(ctx, movie);
         }
         await ctx.reply('✅ Obuna tasdiqlandi. Video kodini yuboring:', {
-          reply_markup: isAdmin(ctx.from.id) ? getSingleBoshqaruvKeyboard() : getUserKeyboard()
+          reply_markup: isAdmin(userId) ? getSingleBoshqaruvKeyboard() : getUserKeyboard()
         });
       } else {
-        await ctx.answerCallbackQuery({ text: 'Kanalga a\'zo bo\'lmadingiz! ❌', show_alert: true });
+        await ctx.answerCallbackQuery({ text: 'Hamma kanal va botlarga kirmadingiz! ❌', show_alert: true });
       }
     });
 

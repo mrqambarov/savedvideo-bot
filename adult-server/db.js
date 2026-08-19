@@ -755,6 +755,84 @@ function hasJoinedOrRequested(userId, channelObj) {
   return false;
 }
 
+const startedBotsFile = path.join(dataDir, 'started_bots.json');
+function getStartedBots() {
+  try {
+    if (fs.existsSync(startedBotsFile)) {
+      return JSON.parse(fs.readFileSync(startedBotsFile, 'utf8'));
+    }
+  } catch (e) {}
+  return [];
+}
+
+function recordBotStart(userId, botIdentifier) {
+  try {
+    const list = getStartedBots();
+    let raw = typeof botIdentifier === 'object' ? (botIdentifier.username || botIdentifier.link || '') : String(botIdentifier || '');
+    const cleanBot = raw.toLowerCase().replace(/https?:\/\/t\.me\//i, '').replace('@', '').split('?')[0].trim();
+    if (!cleanBot) return false;
+    const key = `${userId}_${cleanBot}`;
+    if (!list.includes(key)) {
+      list.push(key);
+      fs.writeFileSync(startedBotsFile, JSON.stringify(list, null, 2));
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function hasStartedBot(userId, botObjOrUsername) {
+  const uId = String(userId);
+  let raw = typeof botObjOrUsername === 'object'
+    ? (botObjOrUsername.username || botObjOrUsername.link || '')
+    : String(botObjOrUsername || '');
+  const botUname = raw.toLowerCase().replace(/https?:\/\/t\.me\//i, '').replace('@', '').split('?')[0].trim();
+
+  if (!botUname) return true;
+
+  // 1. Check if user exists in server/data/users.json (Music / Downloader Bot)
+  try {
+    const mainUsersPath = path.resolve(__dirname, '../server/data/users.json');
+    if (fs.existsSync(mainUsersPath)) {
+      const mainUsers = JSON.parse(fs.readFileSync(mainUsersPath, 'utf8'));
+      if (Array.isArray(mainUsers) && mainUsers.some(u => String(u.id) === uId)) {
+        const mainBotUname = (process.env.DOWNLOADER_BOT_USERNAME || 'savemedia_music_bot').toLowerCase().replace('@', '');
+        if (botUname.includes(mainBotUname) || mainBotUname.includes(botUname)) {
+          return true;
+        }
+      }
+    }
+  } catch (e) {}
+
+  // 2. Check if user exists in movie-server/data/users.json (Movie Bot)
+  try {
+    const movieUsersPath = path.resolve(__dirname, '../movie-server/data/users.json');
+    if (fs.existsSync(movieUsersPath)) {
+      const movieUsers = JSON.parse(fs.readFileSync(movieUsersPath, 'utf8'));
+      if (Array.isArray(movieUsers) && movieUsers.some(u => String(u.id) === uId)) {
+        const movieBotUname = (process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot').toLowerCase().replace('@', '');
+        if (botUname.includes(movieBotUname) || movieBotUname.includes(botUname)) {
+          return true;
+        }
+      }
+    }
+  } catch (e) {}
+
+  // 3. Check started_bots.json
+  const list = getStartedBots();
+  for (const item of list) {
+    if (item.startsWith(uId + '_')) {
+      const target = item.replace(uId + '_', '');
+      if (target && (target.includes(botUname) || botUname.includes(target))) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 function getAdvancedStats() {
   try {
     const users = getUsers();
@@ -902,6 +980,9 @@ module.exports = {
   removeAdminId,
   recordJoinRequest,
   hasJoinedOrRequested,
+  getStartedBots,
+  recordBotStart,
+  hasStartedBot,
   getStats,
   saveStats,
   trackActiveUser,
