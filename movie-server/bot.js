@@ -352,11 +352,15 @@ async function sendSerialMenu(ctx, movie, currentSeason = 1, page = 1, isEdit = 
     kb.row();
   }
 
-  const baseUrl = process.env.MOVIE_MINI_APP_URL || 'https://xitfilm.uz';
-  const miniAppUrl = `${baseUrl}?code=${code}&tma=1&v=4.2.0`;
-  kb.webApp(`📱 Ilovada ko'rish (HD Player)`, miniAppUrl);
-
   const userId = ctx.from?.id;
+  const userLang = db.getUserLang(userId) || 'uz';
+
+  // Add Watchlist + Review buttons for serials too
+  const inWatchlist = userId ? db.isInWatchlist(userId, code) : false;
+  kb.row()
+    .text(inWatchlist ? i18n.t(userLang, 'watchlist_remove_btn') : i18n.t(userLang, 'watchlist_btn'), inWatchlist ? `wl_remove:${code}` : `wl_add:${code}`)
+    .text(i18n.t(userLang, 'review_btn'), `review_start:${code}`);
+
   if (userId && isAdmin(userId)) {
     kb.row().text('➕ Qism yuklash (/serial)', `adm_serial:${code}`);
   }
@@ -412,11 +416,18 @@ async function sendMovie(ctx, movie) {
     color: '#d946ef'
   });
 
+  const userId = ctx.from?.id;
+  const userLang = db.getUserLang(userId) || 'uz';
   const cleanTitle = escapeHTML(movie.title);
   const cleanGenre = escapeHTML((movie.genre || 'Tarjima kino').replace(/\s+/g, '_'));
   const cleanDesc = escapeHTML(movie.description || '');
 
-  const caption = `🎬 <b>${cleanTitle}</b>\n\n🎭 Janr: #${cleanGenre}\n🔑 Kod: <code>${code}</code>\n\n📝 <i>${cleanDesc}</i>`;
+  // Rating info
+  const avgRating = db.getAverageRating(code);
+  const reviewCount = db.getReviews(code).length;
+  const ratingStr = avgRating ? ` | ⭐ ${avgRating} (${reviewCount} sharh)` : '';
+
+  const caption = `🎬 <b>${cleanTitle}</b>\n\n🎭 Janr: #${cleanGenre}\n🔑 Kod: <code>${code}</code>${ratingStr}\n\n📝 <i>${cleanDesc}</i>`;
   
   const likesCount = Array.isArray(movie.likes) ? movie.likes.length : (Number(movie.likes) || 0);
   const dislikesCount = Array.isArray(movie.dislikes) ? movie.dislikes.length : (Number(movie.dislikes) || 0);
@@ -424,9 +435,14 @@ async function sendMovie(ctx, movie) {
   const baseUrl = process.env.MOVIE_MINI_APP_URL || 'https://xitfilm.uz';
   const miniAppUrl = `${baseUrl}?code=${code}&tma=1&v=4.2.0`;
 
+  const inWatchlist = userId ? db.isInWatchlist(userId, code) : false;
+
   const keyboard = new InlineKeyboard()
     .text(`🔥 ${likesCount}`, `like:${code}`)
     .text(`❄️ ${dislikesCount}`, `dislike:${code}`)
+    .text(i18n.t(userLang, 'review_btn'), `review_start:${code}`)
+    .row()
+    .text(inWatchlist ? i18n.t(userLang, 'watchlist_remove_btn') : i18n.t(userLang, 'watchlist_btn'), inWatchlist ? `wl_remove:${code}` : `wl_add:${code}`)
     .row()
     .webApp(`📱 Ilovada ko'rish (HD Player)`, miniAppUrl);
 
@@ -487,6 +503,14 @@ async function startBot(botToken) {
   try {
     botInstance = new Bot(botToken);
     botInstance.catch((err) => console.error('Movie Grammy error:', err.message));
+
+    // Feature #9 — Partner Channel Auto-Sync
+    try {
+      const channelSync = require('./channelSync');
+      channelSync.registerChannelPostListener(botInstance);
+    } catch (e) {
+      console.warn('[channelSync] Could not register listener:', e.message);
+    }
 
     // Global User Registration & Activity Tracking
     botInstance.use((ctx, next) => {
@@ -714,6 +738,29 @@ async function startBot(botToken) {
       await ctx.reply(`✅ <b>Barcha faol jarayonlar bekor qilindi.</b>`, { parse_mode: 'HTML', reply_markup: getMainKeyboard(userLang) });
     });
 
+    // --- WATCHLIST COMMAND ---
+    botInstance.command(['watchlist', 'kuzatuv', 'wl'], async (ctx) => {
+      const userId = ctx.from.id;
+      const userLang = db.getUserLang(userId) || 'uz';
+      const list = db.getWatchlist(userId);
+
+      if (!list.length) {
+        return await ctx.reply(i18n.t(userLang, 'watchlist_empty'), { parse_mode: 'Markdown' });
+      }
+
+      let text = i18n.t(userLang, 'watchlist_title', { count: list.length }) + '\n\n';
+      const kb = new InlineKeyboard();
+      list.forEach((m, idx) => {
+        const isSerial = m.type === 'serial' || m.isSerial;
+        text += `${idx + 1}. ${isSerial ? '📺' : '🎬'} <b>${escapeHTML(m.title)}</b> (Kod: <code>${m.code}</code>)\n`;
+        kb.text(`▶️ ${m.code}`, `mv:${m.code}`);
+        kb.text('🗑 O\'chirish', `wl_remove:${m.code}`);
+        kb.row();
+      });
+
+      await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+    });
+
     // --- BUTTON / TEXT HANDLERS ---
     botInstance.hears([/Shorts/i, /Лавхалар/i, /Lavhalar/i], async (ctx) => {
       const kb = new InlineKeyboard()
@@ -792,10 +839,15 @@ async function startBot(botToken) {
       if (updated) {
         const likesCount = Array.isArray(updated.likes) ? updated.likes.length : 0;
         const dislikesCount = Array.isArray(updated.dislikes) ? updated.dislikes.length : 0;
+        const userLang = db.getUserLang(userId) || 'uz';
+        const inWatchlist = db.isInWatchlist(userId, code);
 
         const newKb = new InlineKeyboard()
           .text(`🔥 ${likesCount}`, `like:${code}`)
-          .text(`❄️ ${dislikesCount}`, `dislike:${code}`);
+          .text(`❄️ ${dislikesCount}`, `dislike:${code}`)
+          .text(i18n.t(userLang, 'review_btn'), `review_start:${code}`)
+          .row()
+          .text(inWatchlist ? i18n.t(userLang, 'watchlist_remove_btn') : i18n.t(userLang, 'watchlist_btn'), inWatchlist ? `wl_remove:${code}` : `wl_add:${code}`);
 
         if (updated.youtubeUrl) {
           newKb.row().url('📺 YouTubeda ko\'rish', updated.youtubeUrl);
@@ -808,6 +860,124 @@ async function startBot(botToken) {
       } else {
         await ctx.answerCallbackQuery();
       }
+    });
+
+    // --- WATCHLIST CALLBACKS ---
+    botInstance.callbackQuery(/^wl_add:(.+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      const userId = ctx.from.id;
+      const userLang = db.getUserLang(userId) || 'uz';
+      const movie = db.getMovieByCode(code);
+      if (!movie) return await ctx.answerCallbackQuery({ text: 'Kino topilmadi', show_alert: true });
+
+      const added = db.addToWatchlist(userId, code);
+      const msg = added
+        ? i18n.t(userLang, 'watchlist_added', { title: movie.title })
+        : i18n.t(userLang, 'watchlist_already');
+
+      await ctx.answerCallbackQuery({ text: msg.replace(/\*/g, ''), show_alert: false });
+
+      // Update button label in message
+      try {
+        const kb = ctx.callbackQuery.message.reply_markup;
+        if (kb) {
+          for (const row of kb.inline_keyboard) {
+            for (const btn of row) {
+              if (btn.callback_data === `wl_add:${code}`) {
+                btn.text = i18n.t(userLang, 'watchlist_remove_btn');
+                btn.callback_data = `wl_remove:${code}`;
+              }
+            }
+          }
+          await ctx.editMessageReplyMarkup({ reply_markup: kb });
+        }
+      } catch (e) {}
+    });
+
+    botInstance.callbackQuery(/^wl_remove:(.+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      const userId = ctx.from.id;
+      const userLang = db.getUserLang(userId) || 'uz';
+      const movie = db.getMovieByCode(code);
+
+      db.removeFromWatchlist(userId, code);
+      const title = movie ? movie.title : code;
+      await ctx.answerCallbackQuery({ text: i18n.t(userLang, 'watchlist_removed', { title }).replace(/\*/g, '').substring(0, 200), show_alert: false });
+
+      try {
+        const kb = ctx.callbackQuery.message.reply_markup;
+        if (kb) {
+          for (const row of kb.inline_keyboard) {
+            for (const btn of row) {
+              if (btn.callback_data === `wl_remove:${code}`) {
+                btn.text = i18n.t(userLang, 'watchlist_btn');
+                btn.callback_data = `wl_add:${code}`;
+              }
+            }
+          }
+          await ctx.editMessageReplyMarkup({ reply_markup: kb });
+        }
+      } catch (e) {}
+    });
+
+    // --- REVIEW CALLBACKS (Feature #12) ---
+    botInstance.callbackQuery(/^review_start:(.+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      const userId = ctx.from.id;
+      const userLang = db.getUserLang(userId) || 'uz';
+      const movie = db.getMovieByCode(code);
+      if (!movie) return await ctx.answerCallbackQuery({ text: 'Kino topilmadi', show_alert: true });
+
+      await ctx.answerCallbackQuery();
+
+      const starsKb = new InlineKeyboard()
+        .text('⭐', `review_rate:${code}:1`)
+        .text('⭐⭐', `review_rate:${code}:2`)
+        .text('⭐⭐⭐', `review_rate:${code}:3`)
+        .row()
+        .text('⭐⭐⭐⭐', `review_rate:${code}:4`)
+        .text('⭐⭐⭐⭐⭐', `review_rate:${code}:5`);
+
+      await ctx.reply(
+        `🎬 <b>${escapeHTML(movie.title)}</b>\n\n${i18n.t(userLang, 'review_stars_prompt')}`,
+        { parse_mode: 'HTML', reply_markup: starsKb }
+      );
+    });
+
+    botInstance.callbackQuery(/^review_rate:([^:]+):([1-5])$/, async (ctx) => {
+      const code = ctx.match[1];
+      const rating = parseInt(ctx.match[2], 10);
+      const userId = ctx.from.id;
+      const userLang = db.getUserLang(userId) || 'uz';
+
+      await ctx.answerCallbackQuery({ text: `${'⭐'.repeat(rating)} Tanlovingiz qabul qilindi!` });
+      try { await ctx.deleteMessage(); } catch (e) {}
+
+      // Save rating immediately, then ask for text
+      userStates.set(userId, { action: 'review_text', code, rating, timestamp: Date.now() });
+
+      const skipKb = new InlineKeyboard()
+        .text(i18n.t(userLang, 'review_skip_btn'), `review_save:${code}:${rating}:`);
+
+      await ctx.reply(
+        `${'⭐'.repeat(rating)} (${'★'.repeat(rating)}${'☆'.repeat(5 - rating)}) — ${rating}/5 yulduz berildi!\n\n${i18n.t(userLang, 'review_text_prompt')}`,
+        { reply_markup: skipKb }
+      );
+    });
+
+    botInstance.callbackQuery(/^review_save:([^:]+):([1-5]):(.*)$/, async (ctx) => {
+      const code = ctx.match[1];
+      const rating = parseInt(ctx.match[2], 10);
+      const userId = ctx.from.id;
+      const userName = ctx.from.first_name || 'Anonim';
+      const userLang = db.getUserLang(userId) || 'uz';
+
+      userStates.delete(userId);
+      db.addReview(code, userId, userName, rating, '');
+
+      await ctx.answerCallbackQuery({ text: '✅ Sharh saqlandi!' });
+      try { await ctx.deleteMessage(); } catch (e) {}
+      await ctx.reply(i18n.t(userLang, 'review_success'));
     });
 
     // Sponsor Check Callback
@@ -1756,6 +1926,15 @@ async function startBot(botToken) {
         }
       }
 
+      // 0. Handle review text input
+      if (state && state.action === 'review_text') {
+        userStates.delete(userId);
+        const { code: reviewCode, rating } = state;
+        const userName = ctx.from.first_name || ctx.from.username || 'Anonim';
+        db.addReview(reviewCode, userId, userName, rating, text);
+        return await ctx.reply(i18n.t(userLang, 'review_success'), { reply_markup: getMainKeyboard(userLang) });
+      }
+
       // 1. Handle movie order/request state
       if (state && state.action === 'request') {
         userStates.delete(userId);
@@ -1771,6 +1950,7 @@ async function startBot(botToken) {
         const successMsg = i18n.t(userLang, 'req_success', { title: escapeHTML(text) });
         return await ctx.reply(successMsg, { parse_mode: 'Markdown', reply_markup: getMainKeyboard(userLang) });
       }
+
 
       // 2. Search state or direct code/name lookup
       userStates.delete(userId);
@@ -1978,3 +2158,14 @@ async function notifyNewMovie(movie) {
 }
 
 module.exports = { startBot, stopBot, getBotInstance, notifyNewMovie };
+
+// Feature #8 — External notifyWatchers access
+module.exports.notifyWatchers = async function(movieCode, episodeNum) {
+  try {
+    const channelSync = require('./channelSync');
+    if (botInstance) channelSync.setBotRef(botInstance);
+    return await channelSync.notifyWatchers(movieCode, episodeNum);
+  } catch (e) {
+    console.error('notifyWatchers error:', e.message);
+  }
+};

@@ -13,6 +13,9 @@ const requestsFile = path.join(dataDir, 'requests.json');
 const genresFile = path.join(dataDir, 'genres.json');
 const searchesFile = path.join(dataDir, 'searches.json');
 const tiersFile = path.join(dataDir, 'reward_tiers.json');
+const reviewsFile = path.join(dataDir, 'movie_reviews.json');
+const watchlistFile = path.join(dataDir, 'watchlist.json');
+const partnerChannelsFile = path.join(dataDir, 'partner_channels.json');
 
 const DEFAULT_GENRES = ['Jangari', 'Komediya', 'Melodrama', 'Multfilm', 'Tarixiy', 'Tarjima kino', 'Sarguzasht'];
 
@@ -40,6 +43,15 @@ if (!fs.existsSync(searchesFile)) {
   fs.writeFileSync(searchesFile, JSON.stringify({}, null, 2));
 }
 const settingsFile = path.join(dataDir, 'settings.json');
+if (!fs.existsSync(reviewsFile)) {
+  fs.writeFileSync(reviewsFile, JSON.stringify({}, null, 2));
+}
+if (!fs.existsSync(watchlistFile)) {
+  fs.writeFileSync(watchlistFile, JSON.stringify({}, null, 2));
+}
+if (!fs.existsSync(partnerChannelsFile)) {
+  fs.writeFileSync(partnerChannelsFile, JSON.stringify([], null, 2));
+}
 if (!fs.existsSync(settingsFile)) {
   fs.writeFileSync(settingsFile, JSON.stringify({
     autoPostEnabled: true,
@@ -1243,10 +1255,6 @@ function getAdvancedStats() {
   };
 }
 
-const reviewsFile = path.join(dataDir, 'movie_reviews.json');
-if (!fs.existsSync(reviewsFile)) {
-  fs.writeFileSync(reviewsFile, JSON.stringify({}, null, 2));
-}
 
 function recommendMoviesByMood(moodKey) {
   const movies = getMovies();
@@ -1748,7 +1756,25 @@ module.exports = {
   registerCreator,
   addCreatorViews,
   getCreatorStats,
-  getCreatorFullProfile
+  getCreatorFullProfile,
+  // Feature #12 — Reviews
+  getReviews,
+  getUserReview,
+  addReview,
+  deleteReview,
+  getAverageRating,
+  getAllReviewsForAdmin,
+  // Feature #8 — Watchlist
+  getWatchlist,
+  addToWatchlist,
+  removeFromWatchlist,
+  isInWatchlist,
+  getWatchersOfMovie,
+  // Feature #9 — Partner Channels
+  getPartnerChannels,
+  addPartnerChannel,
+  removePartnerChannel,
+  updatePartnerChannelSyncId
 };
 
 function savePlaybackProgress(userId, code, { currentTime, duration, title, poster, genre }) {
@@ -2676,5 +2702,239 @@ function getCreatorFullProfile(creatorTagOrId, currentUserId = null) {
   }
 }
 
+// ============================================================
+// FEATURE #12 — MOVIE REVIEWS & RATINGS
+// ============================================================
+
+function getReviews(movieCode) {
+  try {
+    const raw = fs.readFileSync(reviewsFile, 'utf8');
+    const all = JSON.parse(raw);
+    const code = String(movieCode).trim();
+    return Array.isArray(all[code]) ? all[code] : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveAllReviews(data) {
+  try {
+    fs.writeFileSync(reviewsFile, JSON.stringify(data, null, 2));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function getUserReview(movieCode, userId) {
+  const reviews = getReviews(movieCode);
+  return reviews.find(r => Number(r.userId) === Number(userId)) || null;
+}
+
+function addReview(movieCode, userId, userName, rating, text) {
+  try {
+    const raw = fs.readFileSync(reviewsFile, 'utf8');
+    const all = JSON.parse(raw);
+    const code = String(movieCode).trim();
+    if (!Array.isArray(all[code])) all[code] = [];
+
+    const existingIdx = all[code].findIndex(r => Number(r.userId) === Number(userId));
+    const reviewEntry = {
+      userId: Number(userId),
+      userName: String(userName || 'Anonim'),
+      rating: Math.min(5, Math.max(1, Number(rating) || 5)),
+      text: String(text || '').trim().substring(0, 500),
+      date: new Date().toISOString()
+    };
+
+    if (existingIdx !== -1) {
+      all[code][existingIdx] = reviewEntry;
+    } else {
+      all[code].push(reviewEntry);
+    }
+
+    saveAllReviews(all);
+    return reviewEntry;
+  } catch (e) {
+    console.error('addReview error:', e.message);
+    return null;
+  }
+}
+
+function deleteReview(movieCode, userId) {
+  try {
+    const raw = fs.readFileSync(reviewsFile, 'utf8');
+    const all = JSON.parse(raw);
+    const code = String(movieCode).trim();
+    if (!Array.isArray(all[code])) return false;
+    const before = all[code].length;
+    all[code] = all[code].filter(r => Number(r.userId) !== Number(userId));
+    if (all[code].length < before) {
+      saveAllReviews(all);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+function getAverageRating(movieCode) {
+  const reviews = getReviews(movieCode);
+  if (!reviews.length) return null;
+  const sum = reviews.reduce((acc, r) => acc + (Number(r.rating) || 0), 0);
+  return Math.round((sum / reviews.length) * 10) / 10;
+}
+
+function getAllReviewsForAdmin() {
+  try {
+    const raw = fs.readFileSync(reviewsFile, 'utf8');
+    return JSON.parse(raw);
+  } catch (e) {
+    return {};
+  }
+}
+
+// ============================================================
+// FEATURE #8 — SERIAL KUZATUV (WATCHLIST)
+// ============================================================
+
+function getWatchlist(userId) {
+  try {
+    const raw = fs.readFileSync(watchlistFile, 'utf8');
+    const all = JSON.parse(raw);
+    const codes = Array.isArray(all[String(userId)]) ? all[String(userId)] : [];
+    const movies = getMovies();
+    return codes
+      .map(code => movies.find(m => String(m.code).trim() === String(code).trim()))
+      .filter(Boolean);
+  } catch (e) {
+    return [];
+  }
+}
+
+function addToWatchlist(userId, movieCode) {
+  try {
+    const raw = fs.readFileSync(watchlistFile, 'utf8');
+    const all = JSON.parse(raw);
+    const uid = String(userId);
+    const code = String(movieCode).trim();
+    if (!Array.isArray(all[uid])) all[uid] = [];
+    if (!all[uid].includes(code)) {
+      all[uid].push(code);
+      fs.writeFileSync(watchlistFile, JSON.stringify(all, null, 2));
+      return true;
+    }
+    return false; // already in list
+  } catch (e) {
+    return false;
+  }
+}
+
+function removeFromWatchlist(userId, movieCode) {
+  try {
+    const raw = fs.readFileSync(watchlistFile, 'utf8');
+    const all = JSON.parse(raw);
+    const uid = String(userId);
+    const code = String(movieCode).trim();
+    if (!Array.isArray(all[uid])) return false;
+    const before = all[uid].length;
+    all[uid] = all[uid].filter(c => c !== code);
+    if (all[uid].length < before) {
+      fs.writeFileSync(watchlistFile, JSON.stringify(all, null, 2));
+      return true;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+function isInWatchlist(userId, movieCode) {
+  try {
+    const raw = fs.readFileSync(watchlistFile, 'utf8');
+    const all = JSON.parse(raw);
+    const codes = Array.isArray(all[String(userId)]) ? all[String(userId)] : [];
+    return codes.includes(String(movieCode).trim());
+  } catch (e) {
+    return false;
+  }
+}
+
+function getWatchersOfMovie(movieCode) {
+  try {
+    const raw = fs.readFileSync(watchlistFile, 'utf8');
+    const all = JSON.parse(raw);
+    const code = String(movieCode).trim();
+    return Object.entries(all)
+      .filter(([, codes]) => Array.isArray(codes) && codes.includes(code))
+      .map(([uid]) => Number(uid));
+  } catch (e) {
+    return [];
+  }
+}
+
+// ============================================================
+// FEATURE #9 — HAMKOR KINO KANALLAR (PARTNER CHANNELS)
+// ============================================================
+
+function getPartnerChannels() {
+  try {
+    const raw = fs.readFileSync(partnerChannelsFile, 'utf8');
+    return JSON.parse(raw);
+  } catch (e) {
+    return [];
+  }
+}
+
+function addPartnerChannel(channelData) {
+  try {
+    const channels = getPartnerChannels();
+    const username = String(channelData.username || '').replace('@', '').toLowerCase();
+    if (!username) return null;
+    const existing = channels.findIndex(c => c.username === username);
+    const entry = {
+      username,
+      title: channelData.title || `@${username}`,
+      autoSync: channelData.autoSync !== false,
+      lastSyncedMsgId: channelData.lastSyncedMsgId || 0,
+      addedAt: existing !== -1 ? channels[existing].addedAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    if (existing !== -1) {
+      channels[existing] = entry;
+    } else {
+      channels.push(entry);
+    }
+    fs.writeFileSync(partnerChannelsFile, JSON.stringify(channels, null, 2));
+    return entry;
+  } catch (e) {
+    return null;
+  }
+}
+
+function removePartnerChannel(username) {
+  try {
+    const clean = String(username || '').replace('@', '').toLowerCase();
+    const channels = getPartnerChannels().filter(c => c.username !== clean);
+    fs.writeFileSync(partnerChannelsFile, JSON.stringify(channels, null, 2));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function updatePartnerChannelSyncId(username, lastMsgId) {
+  try {
+    const channels = getPartnerChannels();
+    const clean = String(username || '').replace('@', '').toLowerCase();
+    const idx = channels.findIndex(c => c.username === clean);
+    if (idx !== -1) {
+      channels[idx].lastSyncedMsgId = lastMsgId;
+      channels[idx].updatedAt = new Date().toISOString();
+      fs.writeFileSync(partnerChannelsFile, JSON.stringify(channels, null, 2));
+    }
+  } catch (e) {}
+}
 
 

@@ -24,7 +24,25 @@ app.use('/api', apiRouter);
 app.use('/movies/api', apiRouter);
 // NOTE: /adult/api is handled exclusively by adult-server (port 5002)
 
+// Feature #12 — Reviews
+const { reviewsRouter, watchlistRouter, partnerRouter } = require('./api');
+if (reviewsRouter) {
+  app.use('/api/reviews', reviewsRouter);
+  app.use('/movies/api/reviews', reviewsRouter);
+}
+// Feature #8 — Watchlist
+if (watchlistRouter) {
+  app.use('/api/watchlist', watchlistRouter);
+  app.use('/movies/api/watchlist', watchlistRouter);
+}
+// Feature #9 — Partner Channels
+if (partnerRouter) {
+  app.use('/api/partner-channels', partnerRouter);
+  app.use('/movies/api/partner-channels', partnerRouter);
+}
+
 const tunnelManager = require('./tunnelManager');
+
 
 // Serve Static Admin Panel (if compiled)
 const adminDist = path.join(__dirname, '..', 'admin-panel', 'dist');

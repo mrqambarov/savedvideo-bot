@@ -707,4 +707,84 @@ router.get('/search-analytics', (req, res) => {
   }
 });
 
+
 module.exports = router;
+
+// ============================================================
+// FEATURE #12 — REVIEWS API
+// ============================================================
+
+const reviewsRouter = require('express').Router();
+reviewsRouter.use(require('express').json());
+
+reviewsRouter.get('/:code', (req, res) => {
+  const reviews = db.getReviews(req.params.code);
+  const avg = db.getAverageRating(req.params.code);
+  res.json({ success: true, reviews, avgRating: avg, count: reviews.length });
+});
+
+reviewsRouter.post('/add', (req, res) => {
+  const { movieCode, userId, userName, rating, text } = req.body;
+  if (!movieCode || !userId || !rating) return res.status(400).json({ error: 'movieCode, userId, rating required' });
+  const review = db.addReview(movieCode, userId, userName, rating, text);
+  res.json({ success: !!review, review });
+});
+
+reviewsRouter.delete('/:code/:userId', (req, res) => {
+  const ok = db.deleteReview(req.params.code, req.params.userId);
+  res.json({ success: ok });
+});
+
+// ============================================================
+// FEATURE #8 — WATCHLIST API
+// ============================================================
+
+const watchlistRouter = require('express').Router();
+watchlistRouter.use(require('express').json());
+
+watchlistRouter.get('/:userId', (req, res) => {
+  const list = db.getWatchlist(req.params.userId);
+  res.json({ success: true, watchlist: list });
+});
+
+watchlistRouter.post('/add', (req, res) => {
+  const { userId, movieCode } = req.body;
+  if (!userId || !movieCode) return res.status(400).json({ error: 'userId and movieCode required' });
+  const added = db.addToWatchlist(userId, movieCode);
+  res.json({ success: true, added });
+});
+
+watchlistRouter.delete('/remove', (req, res) => {
+  const { userId, movieCode } = req.body;
+  const ok = db.removeFromWatchlist(userId, movieCode);
+  res.json({ success: ok });
+});
+
+// ============================================================
+// FEATURE #9 — PARTNER CHANNELS API
+// ============================================================
+
+const partnerRouter = require('express').Router();
+partnerRouter.use(require('express').json());
+
+partnerRouter.get('/', (req, res) => {
+  res.json({ success: true, channels: db.getPartnerChannels() });
+});
+
+partnerRouter.post('/add', (req, res) => {
+  const { username, title, autoSync } = req.body;
+  if (!username) return res.status(400).json({ error: 'username required' });
+  const ch = db.addPartnerChannel({ username, title, autoSync });
+  res.json({ success: !!ch, channel: ch });
+});
+
+partnerRouter.delete('/:username', (req, res) => {
+  const ok = db.removePartnerChannel(req.params.username);
+  res.json({ success: ok });
+});
+
+// Export sub-routers for mounting in index.js
+module.exports.reviewsRouter = reviewsRouter;
+module.exports.watchlistRouter = watchlistRouter;
+module.exports.partnerRouter = partnerRouter;
+

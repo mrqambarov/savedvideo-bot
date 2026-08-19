@@ -23,7 +23,25 @@ const messages = {
     order_this_movie: "🙋‍♂️ Ushbu kinoni buyurtma qilish",
     views_unit: "marta",
     help_text: "❓ **Yordam bo'limi:**\n\n• Kino kodini (masalan: 1001) yuboring -> Kino yuklab beriladi.\n• Kino nomini yozing -> Kino nomiga qarab qidiriladi.\n• Janrlar bo'yicha qidirish uchun **🗂 Janrlar** tugmasini bosing.\n• Tilni o'zgartirish uchun `/lang` buyrug'ini yuboring.",
-    admin_help: "\n\n⚙️ **Admin buyruqlari:**\n• Videoga reply qilib `/add [kod] [nom] | [tavsif] | [janr]` deb yozing."
+    admin_help: "\n\n⚙️ **Admin buyruqlari:**\n• Videoga reply qilib `/add [kod] [nom] | [tavsif] | [janr]` deb yozing.",
+    // Feature #12 — Reviews
+    review_btn: "⭐ Sharh qoldirish",
+    review_stars_prompt: "⭐ Ushbu kino uchun necha yulduz berasiz?",
+    review_text_prompt: "✍️ Qisqacha fikringizni yozing (yoki o'tkazib yuboring):",
+    review_skip_btn: "⏩ Faqat yulduz berish",
+    review_success: "✅ Sharhingiz qabul qilindi! Rahmat 🙏",
+    review_already: "📝 Siz bu kino uchun allaqachon sharh qoldirdingiz. Yangilash uchun qayta yulduz bosing.",
+    review_list_title: "⭐ **{title}** — Sharhlar ({count} ta):",
+    review_empty: "📭 Bu kino uchun hali sharh yo'q. Birinchi sharh qoldiring!",
+    // Feature #8 — Watchlist
+    watchlist_added: "📺 «{title}» kuzatuv ro'yxatingizga qo'shildi! Yangi qism chiqganda xabar olasiz.",
+    watchlist_removed: "❌ «{title}» kuzatuv ro'yxatidan o'chirildi.",
+    watchlist_already: "✅ Bu kino/serial allaqachon kuzatuv ro'yxatingizda bor.",
+    watchlist_empty: "📭 Kuzatuv ro'yxatingiz bo'sh.\n\nKino yoki serial yuborilganda «📺 Kuzatish» tugmasini bosing.",
+    watchlist_title: "📺 **Mening Kuzatuv Ro'yxatim ({count} ta):**",
+    watchlist_btn: "📺 Kuzatish",
+    watchlist_remove_btn: "❌ Ro'yxatdan o'chirish",
+    watchlist_new_episode: "🔔 **{title}** serialiga yangi qism ({episode}-qism) yuklandi!\n\nKo'rish uchun: /serial_{code}"
   },
   ru: {
     welcome: "👋 **Привет, {name}!**\n\nЯ **Xit Film (Kino) Bot**.\n\n🍿 Пришлите код фильма (например: `1001`).\n🔍 Для поиска напишите название фильма или используйте меню ниже.",
@@ -49,7 +67,25 @@ const messages = {
     order_this_movie: "🙋‍♂️ Заказать этот фильм",
     views_unit: "раз",
     help_text: "❓ **Раздел помощи:**\n\n• Отправьте код фильма (например: 1001) -> Боты отправят видео.\n• Напишите название -> Поиск по названию.\n• Нажмите **🗂 Жанры** для выбора категорий.\n• Для смены языка отправьте `/lang`.",
-    admin_help: "\n\n⚙️ **Команды админа:**\n• Ответьте на видео `/add [код] [название] | [описание] | [жанр]`."
+    admin_help: "\n\n⚙️ **Команды админа:**\n• Ответьте на видео `/add [код] [название] | [описание] | [жанр]`.",
+    // Feature #12 — Reviews
+    review_btn: "⭐ Оставить отзыв",
+    review_stars_prompt: "⭐ Сколько звёзд дадите этому фильму?",
+    review_text_prompt: "✍️ Напишите краткий отзыв (или пропустите):",
+    review_skip_btn: "⏩ Только звёзды",
+    review_success: "✅ Отзыв принят! Спасибо 🙏",
+    review_already: "📝 Вы уже оставляли отзыв. Нажмите звёзды, чтобы обновить его.",
+    review_list_title: "⭐ **{title}** — Отзывы ({count}):",
+    review_empty: "📭 Отзывов пока нет. Будьте первым!",
+    // Feature #8 — Watchlist
+    watchlist_added: "📺 «{title}» добавлен в список отслеживания! Уведомим о новых сериях.",
+    watchlist_removed: "❌ «{title}» удалён из списка отслеживания.",
+    watchlist_already: "✅ Этот фильм/сериал уже в вашем списке.",
+    watchlist_empty: "📭 Ваш список отслеживания пуст.\n\nПри просмотре нажмите «📺 Отслеживать».",
+    watchlist_title: "📺 **Мой список отслеживания ({count}):**",
+    watchlist_btn: "📺 Отслеживать",
+    watchlist_remove_btn: "❌ Убрать из списка",
+    watchlist_new_episode: "🔔 К сериалу **{title}** добавлена новая серия ({episode}-серия)!\n\nПосмотреть: /serial_{code}"
   },
   en: {
     welcome: "👋 **Hello, {name}!**\n\nI am the **Xit Film (Movie) Bot**.\n\n🍿 Send a movie code (e.g. `1001`).\n🔍 Type the title or use the menu below to search.",
@@ -75,7 +111,25 @@ const messages = {
     order_this_movie: "🙋‍♂️ Request this movie",
     views_unit: "times",
     help_text: "❓ **Help section:**\n\n• Send a movie code (e.g. 1001) -> Receive video.\n• Type title -> Search by name.\n• Click **🗂 Genres** to browse categories.\n• Type `/lang` to change language.",
-    admin_help: "\n\n⚙️ **Admin commands:**\n• Reply to video with `/add [code] [title] | [desc] | [genre]`."
+    admin_help: "\n\n⚙️ **Admin commands:**\n• Reply to video with `/add [code] [title] | [desc] | [genre]`.",
+    // Feature #12 — Reviews
+    review_btn: "⭐ Leave Review",
+    review_stars_prompt: "⭐ How many stars for this movie?",
+    review_text_prompt: "✍️ Write a short review (or skip):",
+    review_skip_btn: "⏩ Stars only",
+    review_success: "✅ Your review was saved! Thank you 🙏",
+    review_already: "📝 You've already reviewed this. Tap stars to update.",
+    review_list_title: "⭐ **{title}** — Reviews ({count}):",
+    review_empty: "📭 No reviews yet. Be the first!",
+    // Feature #8 — Watchlist
+    watchlist_added: "📺 «{title}» added to your watchlist! You'll be notified of new episodes.",
+    watchlist_removed: "❌ «{title}» removed from your watchlist.",
+    watchlist_already: "✅ This movie/series is already in your watchlist.",
+    watchlist_empty: "📭 Your watchlist is empty.\n\nTap '📺 Watch' when viewing a movie to add it.",
+    watchlist_title: "📺 **My Watchlist ({count}):**",
+    watchlist_btn: "📺 Watch",
+    watchlist_remove_btn: "❌ Remove from list",
+    watchlist_new_episode: "🔔 **{title}** has a new episode ({episode}) available!\n\nWatch: /serial_{code}"
   }
 };
 
