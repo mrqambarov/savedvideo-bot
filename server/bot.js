@@ -434,6 +434,7 @@ function startBot(token) {
 
         if (activeChannel) {
           if (!ctx.from) return await next();
+          sponsorManager.recordChannelCheck(activeChannel.username);
           try {
             const chatMember = await ctx.api.getChatMember(activeChannel.username, ctx.from.id);
             const isMember = ['creator', 'administrator', 'member', 'restricted'].includes(chatMember.status);

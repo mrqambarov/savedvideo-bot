@@ -69,23 +69,64 @@ function getActiveSponsorChannel() {
   };
 }
 
+function normalizeChannelIdentifier(input) {
+  if (!input) return '';
+  let str = String(input).trim();
+  if (str.includes('t.me/')) {
+    const parts = str.split('t.me/');
+    str = parts[parts.length - 1].split('/')[0].split('?')[0];
+  }
+  return str.toLowerCase().replace(/^@/, '');
+}
+
+function recordChannelCheck(usernameOrId) {
+  try {
+    const channels = getChannels();
+    const clean = normalizeChannelIdentifier(usernameOrId);
+    let updated = false;
+
+    channels.forEach(c => {
+      const cIdClean = normalizeChannelIdentifier(c.id);
+      const cUserClean = normalizeChannelIdentifier(c.username);
+      if (c.id === usernameOrId || cIdClean === clean || cUserClean === clean) {
+        c.checksCount = (Number(c.checksCount) || Number(c.joinedCount) || 0) + 1;
+        updated = true;
+      }
+    });
+
+    if (updated) {
+      saveChannels(channels);
+      return true;
+    }
+  } catch (e) {
+    console.error('Error recording channel check:', e.message);
+  }
+  return false;
+}
+
 function recordMemberJoin(usernameOrId, userId) {
   const channels = getChannels();
   const todayStr = new Date().toISOString().split('T')[0];
   const monthStr = todayStr.substring(0, 7);
 
-  const clean = String(usernameOrId).toLowerCase().replace(/^@/, '');
+  const clean = normalizeChannelIdentifier(usernameOrId);
   const channel = channels.find(c =>
     c.id === usernameOrId ||
-    c.username.toLowerCase().replace(/^@/, '') === clean
+    normalizeChannelIdentifier(c.id) === clean ||
+    normalizeChannelIdentifier(c.username) === clean
   );
 
   if (!channel) return { success: false, reason: 'Channel not found' };
 
+  if (!Array.isArray(channel.joinedUsers)) channel.joinedUsers = [];
+  if (!channel.dailyStats) channel.dailyStats = {};
+  if (!channel.monthlyStats) channel.monthlyStats = {};
+
   const uidStr = String(userId);
   if (!channel.joinedUsers.includes(uidStr)) {
     channel.joinedUsers.push(uidStr);
-    channel.joinedCount = (channel.joinedCount || 0) + 1;
+    channel.joinedCount = channel.joinedUsers.length;
+    channel.checksCount = Math.max(Number(channel.checksCount) || 0, channel.joinedCount);
     channel.dailyStats[todayStr] = (channel.dailyStats[todayStr] || 0) + 1;
     channel.monthlyStats[monthStr] = (channel.monthlyStats[monthStr] || 0) + 1;
 
@@ -103,10 +144,49 @@ function recordMemberJoin(usernameOrId, userId) {
   };
 }
 
+function getSponsorStats() {
+  const rawChannels = getChannels();
+  let totalJoined = 0;
+  let totalChecks = 0;
+
+  const formattedChannels = rawChannels.map((ch, idx) => {
+    const joined = Number(ch.joinedCount) || (Array.isArray(ch.joinedUsers) ? ch.joinedUsers.length : 0);
+    const checks = Math.max(Number(ch.checksCount) || joined || 0, joined);
+    totalJoined += joined;
+    totalChecks += checks;
+
+    const passRate = checks > 0 ? Math.min(100, Math.round((joined / checks) * 100)) : (joined > 0 ? 100 : 0);
+    let displayName = ch.username || ch.title || `Kanal #${idx + 1}`;
+    if (!displayName.startsWith('@') && !displayName.includes(' ')) displayName = '@' + displayName;
+
+    return {
+      id: ch.id || `ch_${idx + 1}`,
+      name: displayName,
+      link: ch.link || (ch.username ? `https://t.me/${ch.username.replace('@', '')}` : '#'),
+      joinedCount: joined,
+      targetCount: ch.targetCount || 0,
+      checks: checks,
+      passRate: passRate,
+      active: ch.active !== false
+    };
+  });
+
+  const conversionRate = totalChecks > 0 ? Math.min(100, Math.round((totalJoined / totalChecks) * 100)) : (totalJoined > 0 ? 100 : 0);
+
+  return {
+    totalChecks: Math.max(totalChecks, totalJoined),
+    subscribedCount: totalJoined,
+    conversionRate: conversionRate,
+    channels: formattedChannels
+  };
+}
+
 module.exports = {
   getChannels,
   saveChannels,
   getActiveChannels,
   getActiveSponsorChannel,
-  recordMemberJoin
+  recordChannelCheck,
+  recordMemberJoin,
+  getSponsorStats
 };

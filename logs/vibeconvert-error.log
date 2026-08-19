@@ -1,0 +1,16 @@
+2026-08-18 20:02:30: Failed to start Telegram Bot: Cannot find module 'axios'
+2026-08-18 20:02:30: Require stack:
+2026-08-18 20:02:30: - H:\shaxsiy\savedvideo\guardian\actions\alerter.js
+2026-08-18 20:02:30: - H:\shaxsiy\savedvideo\guardian\actions\restarter.js
+2026-08-18 20:02:30: - H:\shaxsiy\savedvideo\guardian\bot\telegramControl.js
+2026-08-18 20:02:30: - H:\shaxsiy\savedvideo\server\bot.js
+2026-08-18 20:02:30: - H:\shaxsiy\savedvideo\server\api.js
+2026-08-18 20:02:30: - H:\shaxsiy\savedvideo\server\index.js
+2026-08-18 20:02:30: Telegram Bot auto-start failed: Cannot find module 'axios'
+2026-08-18 20:02:30: Require stack:
+2026-08-18 20:02:30: - H:\shaxsiy\savedvideo\guardian\actions\alerter.js
+2026-08-18 20:02:30: - H:\shaxsiy\savedvideo\guardian\actions\restarter.js
+2026-08-18 20:02:30: - H:\shaxsiy\savedvideo\guardian\bot\telegramControl.js
+2026-08-18 20:02:30: - H:\shaxsiy\savedvideo\server\bot.js
+2026-08-18 20:02:30: - H:\shaxsiy\savedvideo\server\api.js
+2026-08-18 20:02:30: - H:\shaxsiy\savedvideo\server\index.js

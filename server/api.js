@@ -169,33 +169,8 @@ function formatRelativeTime(isoString) {
 
 router.get('/sponsor-stats', (req, res) => {
   try {
-    const rawChannels = sponsorManager.getChannels();
-    let totalJoined = 0;
-    const formattedChannels = rawChannels.map((ch, idx) => {
-      const joined = ch.joinedCount || (ch.joinedUsers ? ch.joinedUsers.length : 0);
-      totalJoined += joined;
-      const target = ch.targetCount || 1000;
-      const passRate = target > 0 ? Math.min(100, Math.round((joined / target) * 100)) : 94;
-      let displayName = ch.username || `Kanal #${idx + 1}`;
-      return {
-        id: ch.id || `ch_${idx + 1}`,
-        name: displayName,
-        link: ch.link,
-        joinedCount: joined,
-        targetCount: ch.targetCount || 0,
-        checks: joined + 20,
-        passRate: passRate || 92,
-        active: ch.active
-      };
-    });
-    const totalChecks = Math.max(totalJoined + 85, 120);
-    const conversionRate = Math.min(100, Math.round((totalJoined / totalChecks) * 100)) || 92;
-    res.json({
-      totalChecks,
-      subscribedCount: totalJoined,
-      conversionRate,
-      channels: formattedChannels
-    });
+    const stats = sponsorManager.getSponsorStats();
+    res.json(stats);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

@@ -196,6 +196,13 @@ async function checkSponsorSubscription(ctx, userId) {
       if (!ch.username) continue;
       const uname = ch.username.startsWith('@') ? ch.username : `@${ch.username}`;
       try {
+        const sm = require(path.resolve(__dirname, '../server/sponsorManager'));
+        if (sm && typeof sm.recordChannelCheck === 'function') {
+          sm.recordChannelCheck(uname);
+        }
+      } catch (e) {}
+
+      try {
         const member = await ctx.api.getChatMember(uname, userId);
         if (['left', 'kicked'].includes(member.status)) {
           notJoined.push(ch);
@@ -808,6 +815,17 @@ async function startBot(botToken) {
       const targetCode = ctx.match[1];
       const sub = await checkSponsorSubscription(ctx, ctx.from.id);
       if (sub.ok) {
+        try {
+          const sm = require(path.resolve(__dirname, '../server/sponsorManager'));
+          const settings = db.getMovieSettings() || {};
+          const channels = settings.sponsorChannels || [{ username: settings.sponsorUsername || '@XitFilm_uz' }];
+          channels.forEach(ch => {
+            if (ch.username && sm && typeof sm.recordMemberJoin === 'function') {
+              sm.recordMemberJoin(ch.username, ctx.from.id);
+            }
+          });
+        } catch (e) {}
+
         await ctx.answerCallbackQuery({ text: 'Azo bo\'lganingiz tasdiqlandi! ✅' });
         try { await ctx.deleteMessage(); } catch (e) {}
         if (targetCode && targetCode !== 'home') {

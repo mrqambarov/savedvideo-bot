@@ -1,0 +1,16 @@
+2026-08-18 20:02:30: Error: Cannot find module 'dotenv'
+2026-08-18 20:02:30: Require stack:
+2026-08-18 20:02:30: - H:\shaxsiy\savedvideo\guardian\index.js
+2026-08-18 20:02:30:     at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+2026-08-18 20:02:30:     at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+2026-08-18 20:02:30:     at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+2026-08-18 20:02:30:     at Module._load (node:internal/modules/cjs/loader:1227:37)
+2026-08-18 20:02:30:     at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+2026-08-18 20:02:30:     at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+2026-08-18 20:02:30:     at Module.require (node:internal/modules/cjs/loader:1504:12)
+2026-08-18 20:02:30:     at require (node:internal/modules/helpers:152:16)
+2026-08-18 20:02:30:     at Object.<anonymous> (H:\shaxsiy\savedvideo\guardian\index.js:10:1)
+2026-08-18 20:02:30:     at Module._compile (node:internal/modules/cjs/loader:1761:14) {
+2026-08-18 20:02:30:   code: 'MODULE_NOT_FOUND',
+2026-08-18 20:02:30:   requireStack: [ 'H:\\shaxsiy\\savedvideo\\guardian\\index.js' ]
+2026-08-18 20:02:30: }

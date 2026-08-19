@@ -116,6 +116,19 @@ function authMiddleware(req, res, next) {
 router.get('/public-movies', (req, res) => res.json(db.getMovies()));
 router.get('/public-genres', (req, res) => res.json(db.getGenres()));
 
+router.post('/public-movie/:code/view', (req, res) => {
+    try {
+        const code = req.params.code;
+        const uid = req.body?.userId || req.headers['x-user-id'] || null;
+        if (code) {
+            db.trackMovieView(code, uid);
+        }
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Dynamic SEO Sitemap endpoint
 router.get(['/public-sitemap.xml', '/sitemap.xml'], (req, res) => {
     try {
@@ -410,6 +423,7 @@ router.get('/movie/:code', (req, res) => {
 
     let html = fs.readFileSync(htmlPath, 'utf8');
     if (movie) {
+        try { db.trackMovieView(code); } catch (e) {}
         const title = `${movie.title} — XIT FILM`;
         const desc = movie.description || 'XIT FILM portalida sara filmlarni professional tarjimada va yuqori sifatda tomosha qiling.';
         const poster = movie.poster || 'https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=1200&auto=format&fit=crop';

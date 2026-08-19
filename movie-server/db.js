@@ -1476,18 +1476,29 @@ function saveStats(stats) {
 
 function trackMovieView(code, userId = null) {
   try {
+    const cleanCode = String(code || '').trim();
+    if (cleanCode) {
+      const movies = getMovies();
+      const movieIdx = movies.findIndex(m => String(m.code || '').trim().toLowerCase() === cleanCode.toLowerCase());
+      if (movieIdx !== -1) {
+        movies[movieIdx].views = (Number(movies[movieIdx].views) || 0) + 1;
+        saveMovies(movies);
+      }
+    }
+
     const stats = getStats();
     const today = new Date().toISOString().split('T')[0];
     if (!stats.dailyUsage) stats.dailyUsage = {};
     if (!stats.dailyUsage[today]) {
       stats.dailyUsage[today] = { movieViews: 0, searchQueries: 0, activeUsers: [] };
     }
-    stats.dailyUsage[today].movieViews = (stats.dailyUsage[today].movieViews || 0) + 1;
-    stats.totalViews = (stats.totalViews || 0) + 1;
+    stats.dailyUsage[today].movieViews = (Number(stats.dailyUsage[today].movieViews) || 0) + 1;
+    stats.totalViews = (Number(stats.totalViews) || 0) + 1;
     if (userId) {
+      const numId = Number(userId);
       if (!Array.isArray(stats.dailyUsage[today].activeUsers)) stats.dailyUsage[today].activeUsers = [];
-      if (!stats.dailyUsage[today].activeUsers.includes(userId)) {
-        stats.dailyUsage[today].activeUsers.push(userId);
+      if (!stats.dailyUsage[today].activeUsers.includes(numId)) {
+        stats.dailyUsage[today].activeUsers.push(numId);
       }
     }
     saveStats(stats);
@@ -1600,13 +1611,14 @@ function getAdvancedStats() {
       trend.push({
         date: dateStr,
         newUsers: newUsersOnDay,
-        activeUsers: (day.activeUsers || []).length,
+        activeUsers: Math.max((day.activeUsers || []).length, newUsersOnDay),
+        views: day.movieViews || 0,
         movieViews: day.movieViews || 0,
         searches: day.searchQueries || 0
       });
     }
 
-    const calculatedViews = movies.reduce((acc, m) => acc + (m.views || 0), 0) || stats.totalViews || 0;
+    const calculatedViews = movies.reduce((acc, m) => acc + (Number(m.views) || 0), 0) || stats.totalViews || 0;
 
     return {
       totalUsers: users.length,
@@ -1990,59 +2002,6 @@ function saveMovieSettings(settings) {
   try {
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
   } catch (e) {}
-}
-
-function getAdvancedStats() {
-  try {
-    const users = getUsers() || [];
-    const movies = getMovies() || [];
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    
-    const daysAgo = (n) => {
-      const d = new Date(now);
-      d.setDate(d.getDate() - n);
-      return d.toISOString().split('T')[0];
-    };
-
-    const weekAgoStr = daysAgo(7);
-    const monthAgoStr = daysAgo(30);
-
-    let newUsersToday = 0, newUsersWeek = 0, newUsersMonth = 0;
-    users.forEach(u => {
-      if (u.dateJoined || u.joinedDate) {
-        const joinDate = (u.dateJoined || u.joinedDate).split('T')[0];
-        if (joinDate === todayStr) newUsersToday++;
-        if (joinDate >= weekAgoStr) newUsersWeek++;
-        if (joinDate >= monthAgoStr) newUsersMonth++;
-      }
-    });
-
-    const totalViews = movies.reduce((sum, m) => sum + (Number(m.views) || 0), 0);
-
-    return {
-      totalUsers: users.length,
-      totalMovies: movies.length,
-      totalViews: totalViews,
-      growth: { newUsersToday, newUsersWeek, newUsersMonth },
-      active: { today: Math.min(users.length, Math.max(1, newUsersToday || 1)), week: users.length, month: users.length },
-      usage: { 
-        today: { movieViews: totalViews, searches: 0, downloadsVideo: 0, downloadsAudio: 0 }, 
-        week: { movieViews: totalViews }, 
-        month: { movieViews: totalViews } 
-      },
-      trend: []
-    };
-  } catch (e) {
-    return {
-      totalUsers: 0,
-      totalMovies: 0,
-      totalViews: 0,
-      growth: { newUsersToday: 0, newUsersWeek: 0, newUsersMonth: 0 },
-      active: { today: 0, week: 0, month: 0 },
-      usage: { today: { movieViews: 0 } }
-    };
-  }
 }
 
 // ============================================

@@ -802,6 +802,17 @@ function dismissResumeBanner() {
 // ============================================
 async function openMovieModal(m, autoResume = false) {
     currentMovie = m;
+    if (m && m.code) {
+        m.views = (Number(m.views) || 0) + 1;
+        try {
+            const uid = localStorage.getItem('xitfilm_user_id') || null;
+            fetch(`${API_BASE}/public-movie/${m.code}/view`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: uid })
+            }).catch(() => {});
+        } catch (e) {}
+    }
     const meta = await fetchMeta(m.title);
     document.getElementById('modalTitle').textContent = meta?.title || m.title;
 

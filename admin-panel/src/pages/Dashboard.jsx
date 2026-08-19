@@ -182,9 +182,9 @@ export default function Dashboard() {
   ];
 
   const sponsorData = sponsorStats.data || {
-    totalChecks: 1480,
-    subscribedCount: 1392,
-    conversionRate: 94,
+    totalChecks: 0,
+    subscribedCount: 0,
+    conversionRate: 0,
     channels: []
   };
 
@@ -371,10 +371,10 @@ export default function Dashboard() {
       <div className="card mb" style={{ border: '1px solid rgba(16,185,129,0.3)', background: 'linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(5,150,105,0.02) 100%)' }}>
         <div className="card-head" style={{ justifyContent: 'space-between' }}>
           <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Radio size={18} color="#10b981" /> 📊 CPA va 5 ta Majburiy Obunalar Samaradorligi (Sponsor Guard Conversion)
+            <Radio size={18} color="#10b981" /> 📊 Homiy Obunalar Samaradorligi (Sponsor Guard Conversion)
           </h3>
           <span className="badge badge-success" style={{ fontSize: 12, padding: '5px 12px' }}>
-            CONVERSION RATE: {sponsorData.conversionRate}%
+            CONVERSION RATE: {sponsorData.conversionRate || 0}%
           </span>
         </div>
 
@@ -382,21 +382,21 @@ export default function Dashboard() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 20 }}>
             <div style={{ background: 'var(--surface-solid)', padding: '14px 16px', borderRadius: 12, border: '1px solid var(--border)' }}>
               <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Jami Obuna Tekshiruvlari</div>
-              <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4, color: 'var(--text)' }}>{nf(sponsorData.totalChecks)} ta</div>
+              <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4, color: 'var(--text)' }}>{nf(sponsorData.totalChecks || 0)} ta</div>
               <div style={{ fontSize: 11, color: '#10b981', marginTop: 2 }}>Botlardan foydalanish jarayonida</div>
             </div>
 
             <div style={{ background: 'var(--surface-solid)', padding: '14px 16px', borderRadius: 12, border: '1px solid var(--border)' }}>
               <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Muvaffaqiyatli A'zo Bo'lganlar</div>
-              <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4, color: '#10b981' }}>{nf(sponsorData.subscribedCount)} user</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>5 ta kanal obunasi tasdiqlangan</div>
+              <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4, color: '#10b981' }}>{nf(sponsorData.subscribedCount || 0)} user</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{sponsorData.channels?.length || 1} ta homiy kanal obunasi bo'yicha</div>
             </div>
 
             <div style={{ background: 'var(--surface-solid)', padding: '14px 16px', borderRadius: 12, border: '1px solid var(--border)' }}>
               <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Obuna Konversiyasi (Conversion Rate)</div>
-              <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4, color: '#6366f1' }}>{sponsorData.conversionRate}%</div>
+              <div style={{ fontSize: 24, fontWeight: 900, marginTop: 4, color: '#6366f1' }}>{sponsorData.conversionRate || 0}%</div>
               <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, marginTop: 6, overflow: 'hidden' }}>
-                <div style={{ width: `${sponsorData.conversionRate}%`, height: '100%', background: 'linear-gradient(90deg, #10b981, #6366f1)', borderRadius: 3 }} />
+                <div style={{ width: `${sponsorData.conversionRate || 0}%`, height: '100%', background: 'linear-gradient(90deg, #10b981, #6366f1)', borderRadius: 3 }} />
               </div>
             </div>
           </div>
@@ -410,8 +410,8 @@ export default function Dashboard() {
                 <div style={{ fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   <span style={{ color: '#10b981', marginRight: 4 }}>#{idx + 1}</span> {ch.name}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0' }}>Tekshirildi: <b>{ch.checks}x</b></div>
-                <div style={{ fontSize: 11, color: '#10b981', fontWeight: 700 }}>Obuna o'tdi: {ch.passRate}%</div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0' }}>Tekshirildi: <b>{ch.checks || 0}x</b></div>
+                <div style={{ fontSize: 11, color: '#10b981', fontWeight: 700 }}>Obuna o'tdi: {ch.passRate || 0}%</div>
               </div>
             ))}
           </div>
