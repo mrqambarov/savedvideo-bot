@@ -59,15 +59,32 @@ const CLIENT_STRATEGIES = [
   ['--extractor-args', 'youtube:player_client=mweb,web']
 ];
 
-const BASE_NET_ARGS = [
-  '--js-runtimes', 'node',
-  '--ffmpeg-location', binDir,
-  '--retries', '10',
-  '--fragment-retries', '10',
-  '--socket-timeout', '30',
-  '--no-check-certificates',
-  '--geo-bypass'
-];
+function getFFmpegLocation() {
+  const localFFmpeg = path.join(binDir, isWindows ? 'ffmpeg.exe' : 'ffmpeg');
+  if (fs.existsSync(localFFmpeg)) {
+    return binDir;
+  }
+  if (!isWindows) {
+    if (fs.existsSync('/usr/bin/ffmpeg')) return '/usr/bin';
+    if (fs.existsSync('/usr/local/bin/ffmpeg')) return '/usr/local/bin';
+  }
+  return null;
+}
+
+function getBaseNetArgs() {
+  const args = [
+    '--retries', '10',
+    '--fragment-retries', '10',
+    '--socket-timeout', '30',
+    '--no-check-certificates',
+    '--geo-bypass'
+  ];
+  const ffmpegLoc = getFFmpegLocation();
+  if (ffmpegLoc) {
+    args.push('--ffmpeg-location', ffmpegLoc);
+  }
+  return args;
+}
 
 /**
  * Fallback download using Cobalt public APIs when yt-dlp is blocked by datacenter IP filters
@@ -158,7 +175,7 @@ async function getInfo(url) {
           '--dump-json',
           '--no-playlist',
           '--no-warnings',
-          ...BASE_NET_ARGS,
+          ...getBaseNetArgs(),
           ...strategyArgs,
           ...cookiesArgs,
           ...browserHeaders,
@@ -228,7 +245,7 @@ async function downloadVideo(url, outputName, quality = '720') {
           '-f', formatFilter,
           '--merge-output-format', 'mp4',
           '--no-playlist',
-          ...BASE_NET_ARGS,
+          ...getBaseNetArgs(),
           ...strategyArgs,
           ...cookiesArgs,
           '-o', templatePath,
@@ -307,7 +324,7 @@ function downloadPhoto(url, outputName) {
       '--convert-thumbnails', 'jpg',
       '--skip-download',
       '--ignore-no-formats-error',
-      ...BASE_NET_ARGS,
+      ...getBaseNetArgs(),
       ...CLIENT_STRATEGIES[0],
       ...cookiesArgs,
       '-o', templatePath,
@@ -353,7 +370,7 @@ async function downloadAudio(url, outputName) {
           '--audio-format', 'mp3',
           '--audio-quality', '5',
           '--no-playlist',
-          ...BASE_NET_ARGS,
+          ...getBaseNetArgs(),
           ...strategyArgs,
           ...cookiesArgs,
           '-o', path.join(tempDir, `${outputName}.%(ext)s`),
@@ -408,7 +425,7 @@ function searchMusic(query, limit = 10) {
       '--flat-playlist',
       '--dump-json',
       '--no-playlist',
-      ...BASE_NET_ARGS,
+      ...getBaseNetArgs(),
       ...CLIENT_STRATEGIES[0],
       ...cookiesArgs,
       ...browserHeaders,
