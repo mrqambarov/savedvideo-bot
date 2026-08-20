@@ -51,6 +51,7 @@ function getCookiesArgs() {
 
 // Player client strategies to bypass YouTube/Instagram VPS datacenter IP blocks without cookies
 const CLIENT_STRATEGIES = [
+  [], // Default (auto best client selection by yt-dlp + EJS runtime)
   ['--extractor-args', 'youtube:player_client=android,web'],
   ['--extractor-args', 'youtube:player_client=web,mweb'],
   ['--extractor-args', 'youtube:player_client=android_creator,android'],
@@ -348,7 +349,6 @@ async function downloadAudio(url, outputName) {
     try {
       const resPath = await new Promise((resolve, reject) => {
         const args = [
-          '-f', 'ba/best',
           '-x',
           '--audio-format', 'mp3',
           '--audio-quality', '5',
