@@ -73,6 +73,15 @@ export default function Movies() {
 
   const save = async () => {
     if (!form.code || !form.title) { toast('Kod va sarlavha majburiy', 'error'); return; }
+    
+    if (!editing) {
+      const codeExists = movies.some(m => String(m.code).trim().toLowerCase() === String(form.code).trim().toLowerCase());
+      if (codeExists) {
+        toast(`⚠️ Ushbu kod (${form.code}) bazada allaqachon mavjud! Boshqa kod kiriting.`, 'error');
+        return;
+      }
+    }
+
     setBusy(true);
     const { error } = await safe(api.post('/movies', form));
     setBusy(false);

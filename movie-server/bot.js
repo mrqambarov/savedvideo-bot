@@ -32,11 +32,17 @@ function getNextMovieCode() {
     const numericCodes = movies
       .map(m => parseInt(m.code, 10))
       .filter(n => !isNaN(n) && n > 0);
-    if (numericCodes.length === 0) return '1001';
-    const maxCode = Math.max(...numericCodes);
-    return String(maxCode + 1);
+    let candidate = numericCodes.length === 0 ? 1001 : Math.max(...numericCodes) + 1;
+    while (db.getMovieByCode(String(candidate))) {
+      candidate++;
+    }
+    return String(candidate);
   } catch (_) {
-    return String(Math.floor(1000 + Math.random() * 9000));
+    let fallback = Math.floor(1000 + Math.random() * 9000);
+    while (db.getMovieByCode(String(fallback))) {
+      fallback++;
+    }
+    return String(fallback);
   }
 }
 
@@ -45,16 +51,20 @@ function extractCleanMovieMeta(rawCaption, fallbackCode) {
   let description = '';
   let genre = 'Tarjima kino';
   let code = String(fallbackCode || '').trim();
+  let hasExplicitCode = false;
 
   if (!rawCaption) {
-    return { title: `Kino #${code}`, description: 'XIT FILM portalida eng yuqori sifatda tomosha qiling.', genre, code };
+    return { title: `Kino #${code}`, description: 'XIT FILM portalida eng yuqori sifatda tomosha qiling.', genre, code, hasExplicitCode: false };
   }
 
   const lines = String(rawCaption).split('\n').map(l => l.trim()).filter(Boolean);
 
   // 1. Code extraction
   const codeMatch = rawCaption.match(/(?:kodi|kod|code|#)\s*[:=-]?\s*(\d+)/i);
-  if (codeMatch) code = codeMatch[1];
+  if (codeMatch) {
+    code = codeMatch[1];
+    hasExplicitCode = true;
+  }
 
   // 2. Explicit title line
   for (let l of lines) {
@@ -89,7 +99,7 @@ function extractCleanMovieMeta(rawCaption, fallbackCode) {
   if (!title) title = `Kino #${code}`;
   if (!description) description = 'XIT FILM portalida eng yuqori sifatda tomosha qiling.';
 
-  return { title, description, genre, code };
+  return { title, description, genre, code, hasExplicitCode };
 }
 
 function buildPostPreviewMessage(movie, targetChannel) {
@@ -1145,16 +1155,40 @@ async function startBot(botToken) {
 
     // --- ADMIN MOVIE CODE CHOICE (AUTO VS MANUAL) ---
     botInstance.callbackQuery(/^code_auto:(.+)$/, async (ctx) => {
-      const code = ctx.match[1];
+      const code = ctx.match[1].trim();
       const upload = tempAdminUploads.get(ctx.from.id);
       if (!upload) return await ctx.answerCallbackQuery({ text: 'Yuklash muddati o\'tgan. Qayta video yuboring.', show_alert: true });
+
+      const existingMovie = db.getMovieByCode(code);
+      if (existingMovie) {
+        const nextFree = getNextMovieCode();
+        tempAdminUploads.set(ctx.from.id, { ...upload, pendingCode: code });
+
+        const kb = new InlineKeyboard()
+          .text(`⚡ Bo'sh kod berish (${nextFree})`, `code_use_free:${nextFree}`)
+          .row()
+          .text(`✏️ Boshqa kod kiritish`, `code_reenter`)
+          .row()
+          .text(`🗑 Eskisini o'chirib, yangisini saqlash`, `code_confirm_overwrite:${code}`)
+          .row()
+          .text(`❌ Bekor qilish`, `code_cancel`);
+
+        await ctx.editMessageText(
+          `⚠️ <b>DIQQAT: <code>${code}</code> kodi bazada allaqachon mavjud!</b>\n\n` +
+          `🎬 <b>Bazada bor film:</b> «<b>${escapeHTML(existingMovie.title)}</b>» (👁 ${existingMovie.views || 0} marta ko'rilgan)\n` +
+          `🆕 <b>Siz yuklayotgan film:</b> «<b>${escapeHTML(upload.title)}</b>»\n\n` +
+          `<i>Oldinroq kiritilgan film ustiga yozilib ketmasligi uchun quyidagi variantlardan birini tanlang:</i>`,
+          { parse_mode: 'HTML', reply_markup: kb }
+        );
+        return await ctx.answerCallbackQuery();
+      }
 
       db.addMovie({
         code,
         title: upload.title,
         fileId: upload.fileId,
-        genre: 'Tarjima kino',
-        description: 'XIT FILM portalida eng yuqori sifatda tomosha qiling.',
+        genre: upload.genre || 'Tarjima kino',
+        description: upload.description || 'XIT FILM portalida eng yuqori sifatda tomosha qiling.',
         dateAdded: new Date().toISOString()
       });
 
@@ -1179,12 +1213,130 @@ async function startBot(botToken) {
       if (!upload) return await ctx.answerCallbackQuery({ text: 'Yuklash muddati o\'tgan. Qayta video yuboring.', show_alert: true });
 
       userStates.set(ctx.from.id, { action: 'awaiting_movie_code', timestamp: Date.now() });
+      const kb = new InlineKeyboard().text('❌ Bekor qilish', 'code_cancel');
       await ctx.editMessageText(
         `🎬 Film: <b>${escapeHTML(upload.title)}</b>\n\n` +
-        `✏️ Iltimos, ushbu film uchun <b>maxsus kodni (masalan: 125 yoki 777)</b> yozib yuboring:`,
-        { parse_mode: 'HTML' }
+        `✏️ Iltimos, ushbu film uchun <b>maxsus kodni (masalan: 125 yoki 777)</b> yozib yuboring:\n\n` +
+        `<i>💡 Maslahat: Har qanday raqam yoki so'z kiritishingiz mumkin.</i>`,
+        { parse_mode: 'HTML', reply_markup: kb }
       );
       await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery('code_reenter', async (ctx) => {
+      const upload = tempAdminUploads.get(ctx.from.id);
+      if (!upload) return await ctx.answerCallbackQuery({ text: 'Yuklash muddati o\'tgan. Qayta video yuboring.', show_alert: true });
+
+      userStates.set(ctx.from.id, { action: 'awaiting_movie_code', timestamp: Date.now() });
+      const kb = new InlineKeyboard().text('❌ Bekor qilish', 'code_cancel');
+      await ctx.editMessageText(
+        `🎬 Film: <b>${escapeHTML(upload.title)}</b>\n\n` +
+        `✏️ Iltimos, film uchun <b>boshqa yangi bo'sh kod</b> yozib yuboring (Masalan: <code>${getNextMovieCode()}</code>):`,
+        { parse_mode: 'HTML', reply_markup: kb }
+      );
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery(/^code_use_free:(.+)$/, async (ctx) => {
+      const code = ctx.match[1].trim();
+      const upload = tempAdminUploads.get(ctx.from.id);
+      if (!upload) return await ctx.answerCallbackQuery({ text: 'Yuklash muddati o\'tgan. Qayta video yuboring.', show_alert: true });
+
+      userStates.delete(ctx.from.id);
+
+      db.addMovie({
+        code,
+        title: upload.title,
+        fileId: upload.fileId,
+        genre: upload.genre || 'Tarjima kino',
+        description: upload.description || 'XIT FILM portalida eng yuqori sifatda tomosha qiling.',
+        dateAdded: new Date().toISOString()
+      });
+
+      const kb = new InlineKeyboard()
+        .text('📹 Ha, Shorts yuklayman', `up_shorts:${code}`)
+        .row()
+        .text('⏩ O\'tkazib yuborish', `skip_shorts:${code}`);
+
+      await ctx.editMessageText(
+        `🎉 <b>YANGI FILM BAZAGA SAQLANDI!</b>\n\n` +
+        `🎬 Nomi: <b>${escapeHTML(upload.title)}</b>\n` +
+        `🔑 Kodi: <code>${code}</code> (Bo'sh kod biriktirildi)\n\n` +
+        `📹 <b>Kanal uchun Shorts (treyler / qiziqarli lavha) videosini ham yuklaysizmi?</b>\n\n` +
+        `<i>💡 Shorts videosi kanalda odamlarni o'ziga jalb qiladi va ko'rishlar sonini 5 baravarga oshiradi!</i>`,
+        { parse_mode: 'HTML', reply_markup: kb }
+      );
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery(/^code_confirm_overwrite:(.+)$/, async (ctx) => {
+      const code = ctx.match[1].trim();
+      const upload = tempAdminUploads.get(ctx.from.id);
+      if (!upload) return await ctx.answerCallbackQuery({ text: 'Yuklash muddati o\'tgan. Qayta video yuboring.', show_alert: true });
+
+      const existingMovie = db.getMovieByCode(code);
+      const oldTitle = existingMovie ? existingMovie.title : code;
+
+      const kb = new InlineKeyboard()
+        .text('⚠️ Ha, eskisini o\'chirib yangisini yoz!', `code_do_overwrite:${code}`)
+        .row()
+        .text('◀️ Yo\'q, boshqa kod kiritaman', 'code_reenter')
+        .row()
+        .text('❌ Bekor qilish', 'code_cancel');
+
+      await ctx.editMessageText(
+        `🚨 <b>HURMATLI ADMIN, ROSTDAN HAM ESKI KINONI O'CHIRIB ALMASHTIRASIZMI?</b>\n\n` +
+        `🔑 Kod: <code>${code}</code>\n` +
+        `🗑 <b>O'chiriladigan film:</b> «<b>${escapeHTML(oldTitle)}</b>»\n` +
+        `🆕 <b>O'rniga yoziladigan yangi film:</b> «<b>${escapeHTML(upload.title)}</b>»\n\n` +
+        `<i>⚠️ Diqqat: Tasdiqlasangiz, eski film bazadan to'liq o'chiriladi va uning o'rniga yangisi saqlanadi!</i>`,
+        { parse_mode: 'HTML', reply_markup: kb }
+      );
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery(/^code_do_overwrite:(.+)$/, async (ctx) => {
+      const code = ctx.match[1].trim();
+      const upload = tempAdminUploads.get(ctx.from.id);
+      if (!upload) return await ctx.answerCallbackQuery({ text: 'Yuklash muddati o\'tgan. Qayta video yuboring.', show_alert: true });
+
+      userStates.delete(ctx.from.id);
+
+      const existingMovie = db.getMovieByCode(code);
+      const oldTitle = existingMovie ? existingMovie.title : code;
+
+      // Delete old movie and add new movie
+      db.deleteMovie(code);
+      db.addMovie({
+        code,
+        title: upload.title,
+        fileId: upload.fileId,
+        genre: upload.genre || 'Tarjima kino',
+        description: upload.description || 'XIT FILM portalida eng yuqori sifatda tomosha qiling.',
+        dateAdded: new Date().toISOString()
+      });
+
+      const kb = new InlineKeyboard()
+        .text('📹 Ha, Shorts yuklayman', `up_shorts:${code}`)
+        .row()
+        .text('⏩ O\'tkazib yuborish', `skip_shorts:${code}`);
+
+      await ctx.editMessageText(
+        `✅ <b>FILM MUVAFFAQIYATLI ALMASHTIRILDI!</b>\n\n` +
+        `🗑 <b>Eski film («${escapeHTML(oldTitle)}») o'chirildi.</b>\n` +
+        `🎬 <b>Yangi film saqlandi:</b> «<b>${escapeHTML(upload.title)}</b>»\n` +
+        `🔑 Kodi: <code>${code}</code>\n\n` +
+        `📹 <b>Kanal uchun Shorts (treyler / qiziqarli lavha) videosini ham yuklaysizmi?</b>`,
+        { parse_mode: 'HTML', reply_markup: kb }
+      );
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery('code_cancel', async (ctx) => {
+      userStates.delete(ctx.from.id);
+      tempAdminUploads.delete(ctx.from.id);
+      await ctx.editMessageText(`❌ <b>Film yuklash bekor qilindi. Baza o'zgarishsiz qoldi.</b>`, { parse_mode: 'HTML' });
+      await ctx.answerCallbackQuery({ text: 'Bekor qilindi' });
     });
 
     botInstance.callbackQuery('code_serial', async (ctx) => {
@@ -1690,9 +1842,22 @@ async function startBot(botToken) {
 
       // C. Admin is uploading a Full Movie video
       const caption = ctx.message.caption || '';
-      let autoCode = getNextMovieCode();
-      const meta = extractCleanMovieMeta(caption, autoCode);
-      autoCode = meta.code || autoCode;
+      const freeAutoCode = getNextMovieCode();
+      const meta = extractCleanMovieMeta(caption, freeAutoCode);
+      
+      let autoCode = freeAutoCode;
+      let duplicateWarning = '';
+
+      if (meta.hasExplicitCode && meta.code) {
+        const existingWithCode = db.getMovieByCode(meta.code);
+        if (existingWithCode) {
+          duplicateWarning = `\n\n⚠️ <b>Ogohlantirish:</b> Matndagi <code>${meta.code}</code> kodi bazada mavjud («<b>${escapeHTML(existingWithCode.title)}</b>»). Yangi bo'sh kod tayyorlandi: <code>${freeAutoCode}</code>`;
+          autoCode = freeAutoCode;
+        } else {
+          autoCode = meta.code;
+        }
+      }
+
       const title = meta.title || ctx.message.document?.file_name || `Kino #${autoCode}`;
       const description = meta.description || 'XIT FILM portalida eng yuqori sifatda tomosha qiling.';
       const genre = meta.genre || 'Tarjima kino';
@@ -1716,8 +1881,9 @@ async function startBot(botToken) {
       await ctx.reply(
         `🎬 <b>Video qabul qilindi!</b>\n\n` +
         `📌 <b>Nomi:</b> ${escapeHTML(title)}\n` +
-        `📝 <b>Tavsif:</b> <i>${escapeHTML(description)}</i>\n\n` +
-        `🔑 <b>Ushbu videoni qanday saqlaymiz?</b>\n` +
+        `📝 <b>Tavsif:</b> <i>${escapeHTML(description)}</i>` +
+        duplicateWarning +
+        `\n\n🔑 <b>Ushbu videoni qanday saqlaymiz?</b>\n` +
         `<i>Kino sifatida avtomatik/qo'lda kod berilsinmi yoki Serial qismi sifatida qo'shasizmi?</i>`,
         { parse_mode: 'HTML', reply_markup: kb }
       );
@@ -1767,7 +1933,6 @@ async function startBot(botToken) {
         }
 
         if (state.action === 'awaiting_movie_code') {
-          userStates.delete(userId);
           const customCode = text.replace(/[^0-9a-zA-Z_-]/g, '').trim();
           if (!customCode) {
             return await ctx.reply('⚠️ Kod noto\'g\'ri kiritildi. Iltimos raqam yoki harf kiriting:');
@@ -1775,8 +1940,35 @@ async function startBot(botToken) {
 
           const upload = tempAdminUploads.get(userId);
           if (!upload) {
+            userStates.delete(userId);
             return await ctx.reply('⚠️ Yuklash ma\'lumotlari topilmadi. Qaytadan video yuboring.');
           }
+
+          // Check if code already exists in DB
+          const existingMovie = db.getMovieByCode(customCode);
+          if (existingMovie) {
+            const nextFree = getNextMovieCode();
+            tempAdminUploads.set(userId, { ...upload, pendingCode: customCode });
+
+            const kb = new InlineKeyboard()
+              .text(`⚡ Bo'sh kod berish (${nextFree})`, `code_use_free:${nextFree}`)
+              .row()
+              .text(`✏️ Boshqa kod kiritish`, `code_reenter`)
+              .row()
+              .text(`🗑 Eskisini o'chirib, yangisini saqlash`, `code_confirm_overwrite:${customCode}`)
+              .row()
+              .text(`❌ Bekor qilish`, `code_cancel`);
+
+            return await ctx.reply(
+              `⚠️ <b>DIQQAT: <code>${customCode}</code> kodi bazada allaqachon mavjud!</b>\n\n` +
+              `🎬 <b>Bazada bor film:</b> «<b>${escapeHTML(existingMovie.title)}</b>» (👁 ${existingMovie.views || 0} marta ko'rilgan)\n` +
+              `🆕 <b>Siz yuklayotgan film:</b> «<b>${escapeHTML(upload.title)}</b>»\n\n` +
+              `<i>Oldinroq kiritilgan film ustiga yozilib ketmasligi uchun quyidagi variantlardan birini tanlang:</i>`,
+              { parse_mode: 'HTML', reply_markup: kb }
+            );
+          }
+
+          userStates.delete(userId);
 
           const movie = db.addMovie({
             code: customCode,

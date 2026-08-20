@@ -573,6 +573,16 @@ async function startBot(botToken) {
       // Admin kod kiritayotgan bo'lsa
       const pending = userPendingActions.get(ctx.from.id);
       if (isAdmin(ctx.from.id) && pending && pending.action === 'waiting_for_code') {
+        const existing = db.getMovieByCode(text);
+        if (existing) {
+          return await ctx.reply(
+            `⚠️ <b>DIQQAT: <code>${escapeHTML(text)}</code> kodi bazada allaqachon mavjud!</b>\n\n` +
+            `📹 <b>Bazada bor video:</b> ${escapeHTML(existing.title || 'Video #' + existing.code)}\n\n` +
+            `<i>Iltimos, boshqa bo'sh kod yozib yuboring:</i>`,
+            { parse_mode: 'HTML' }
+          );
+        }
+
         userPendingActions.set(ctx.from.id, { ...pending, action: 'waiting_for_poster', code: text });
         return await ctx.reply(
           `✅ Kod qabul qilindi: <b>${escapeHTML(text)}</b>\n\n` +

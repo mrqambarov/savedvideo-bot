@@ -51,14 +51,16 @@ function getCookiesArgs() {
 
 // Player client strategies to bypass YouTube/Instagram VPS datacenter IP blocks without cookies
 const CLIENT_STRATEGIES = [
-  ['--extractor-args', 'youtube:player_client=ios,android_creator,android,mweb,tv_embedded;player_skip=webpage,configs'],
-  ['--extractor-args', 'youtube:player_client=android_creator,ios,android'],
-  ['--extractor-args', 'youtube:player_client=android,ios'],
-  ['--extractor-args', 'youtube:player_client=tv_embedded,mweb'],
-  ['--extractor-args', 'youtube:player_client=mweb']
+  ['--extractor-args', 'youtube:player_client=android,web'],
+  ['--extractor-args', 'youtube:player_client=web,mweb'],
+  ['--extractor-args', 'youtube:player_client=android_creator,android'],
+  ['--extractor-args', 'youtube:player_client=android'],
+  ['--extractor-args', 'youtube:player_client=mweb,web']
 ];
 
 const BASE_NET_ARGS = [
+  '--js-runtimes', 'node',
+  '--ffmpeg-location', binDir,
   '--retries', '10',
   '--fragment-retries', '10',
   '--socket-timeout', '30',
@@ -362,10 +364,16 @@ async function downloadAudio(url, outputName) {
         execFile(ytDlpBin, args, { env }, (err, stdout, stderr) => {
           if (err) return reject(new Error(stderr || err.message));
           if (fs.existsSync(outputPath)) {
-            resolve(outputPath);
-          } else {
-            reject(new Error('Downloaded audio file not found at ' + outputPath));
+            return resolve(outputPath);
           }
+          try {
+            const files = fs.readdirSync(tempDir);
+            const matched = files.filter(f => f.startsWith(outputName) && !f.endsWith('.part') && !f.endsWith('.ytdl') && !f.endsWith('.tmp'));
+            if (matched.length > 0) {
+              return resolve(path.join(tempDir, matched[0]));
+            }
+          } catch (e) {}
+          reject(new Error('Downloaded audio file not found at ' + outputPath));
         });
       });
 
