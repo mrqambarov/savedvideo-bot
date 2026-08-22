@@ -125,8 +125,104 @@ function buildPostPreviewKeyboard(code) {
     .row()
     .text('📹 Shorts yuklash', `up_shorts:${code}`)
     .row()
-    .text('⏰ Keyinroq eslat', `remind_chan:${code}`)
+    .text('⏰ Vaqt belgilab rejalashtirish', `remind_chan:${code}`)
+    .row()
     .text('❌ Bekor qilish', `cancel_chan:${code}`);
+}
+
+function buildScheduleTimeKeyboard(code) {
+  return new InlineKeyboard()
+    .text('⏱ 30 daqiqadan so\'ng', `sched_preset:${code}:30m`)
+    .text('⏱ 1 soatdan so\'ng', `sched_preset:${code}:1h`)
+    .row()
+    .text('⏱ 2 soatdan so\'ng', `sched_preset:${code}:2h`)
+    .text('⏱ 3 soatdan so\'ng', `sched_preset:${code}:3h`)
+    .row()
+    .text('🌙 Bugun 20:00 da', `sched_preset:${code}:today_2000`)
+    .text('🌙 Bugun 21:30 da', `sched_preset:${code}:today_2130`)
+    .row()
+    .text('☀️ Ertaga 10:00 da', `sched_preset:${code}:tmrw_1000`)
+    .text('☀️ Ertaga 18:00 da', `sched_preset:${code}:tmrw_1800`)
+    .row()
+    .text('✏️ Qo\'lda soat kiritish', `sched_manual:${code}`)
+    .row()
+    .text('◀️ Orqaga', `cancel_sched:${code}`);
+}
+
+function calculateScheduleTime(preset) {
+  const now = new Date();
+  if (preset === '30m') return new Date(now.getTime() + 30 * 60 * 1000);
+  if (preset === '1h') return new Date(now.getTime() + 60 * 60 * 1000);
+  if (preset === '2h') return new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  if (preset === '3h') return new Date(now.getTime() + 3 * 60 * 60 * 1000);
+
+  const UZ_OFFSET = 5 * 60 * 60 * 1000;
+  const uzNow = new Date(now.getTime() + UZ_OFFSET);
+
+  if (preset === 'today_2000' || preset === 'today_2130') {
+    const [targetH, targetM] = preset === 'today_2000' ? [20, 0] : [21, 30];
+    const uzTarget = new Date(uzNow);
+    uzTarget.setUTCHours(targetH, targetM, 0, 0);
+    if (uzTarget.getTime() <= uzNow.getTime()) {
+      uzTarget.setUTCDate(uzTarget.getUTCDate() + 1);
+    }
+    return new Date(uzTarget.getTime() - UZ_OFFSET);
+  }
+
+  if (preset === 'tmrw_1000' || preset === 'tmrw_1800') {
+    const [targetH, targetM] = preset === 'tmrw_1000' ? [10, 0] : [18, 0];
+    const uzTarget = new Date(uzNow);
+    uzTarget.setUTCDate(uzTarget.getUTCDate() + 1);
+    uzTarget.setUTCHours(targetH, targetM, 0, 0);
+    return new Date(uzTarget.getTime() - UZ_OFFSET);
+  }
+
+  return new Date(now.getTime() + 60 * 60 * 1000);
+}
+
+function formatUzDateTime(isoString) {
+  const d = new Date(isoString);
+  const UZ_OFFSET = 5 * 60 * 60 * 1000;
+  const uzDate = new Date(d.getTime() + UZ_OFFSET);
+  const hours = String(uzDate.getUTCHours()).padStart(2, '0');
+  const mins = String(uzDate.getUTCMinutes()).padStart(2, '0');
+  const day = String(uzDate.getUTCDate()).padStart(2, '0');
+  const month = String(uzDate.getUTCMonth() + 1).padStart(2, '0');
+  return `${hours}:${mins} (${day}.${month})`;
+}
+
+function parseManualScheduleInput(input) {
+  const text = String(input || '').trim();
+  const now = new Date();
+  const UZ_OFFSET = 5 * 60 * 60 * 1000;
+  const uzNow = new Date(now.getTime() + UZ_OFFSET);
+
+  const timeOnly = text.match(/^(\d{1,2})[:.](\d{2})$/);
+  if (timeOnly) {
+    const hours = parseInt(timeOnly[1], 10);
+    const mins = parseInt(timeOnly[2], 10);
+    if (hours >= 0 && hours < 24 && mins >= 0 && mins < 60) {
+      const uzTarget = new Date(uzNow);
+      uzTarget.setUTCHours(hours, mins, 0, 0);
+      if (uzTarget.getTime() <= uzNow.getTime()) {
+        uzTarget.setUTCDate(uzTarget.getUTCDate() + 1);
+      }
+      return new Date(uzTarget.getTime() - UZ_OFFSET);
+    }
+  }
+
+  const fullMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2})[:.](\d{2})$/);
+  if (fullMatch) {
+    const y = parseInt(fullMatch[1], 10);
+    const m = parseInt(fullMatch[2], 10) - 1;
+    const d = parseInt(fullMatch[3], 10);
+    const h = parseInt(fullMatch[4], 10);
+    const min = parseInt(fullMatch[5], 10);
+    const uzTarget = new Date(Date.UTC(y, m, d, h, min, 0, 0));
+    return new Date(uzTarget.getTime() - UZ_OFFSET);
+  }
+
+  return null;
 }
 
 async function publishMoviePostToChannel(movie, shortsFileId = null, targetChannel = null) {
@@ -860,6 +956,11 @@ async function startBot(botToken) {
     botInstance.command(['backup_all', 'baza_saqlash'], async (ctx) => {
       if (!isAdmin(ctx.from.id)) return;
       return await runStorageBackupAll(ctx);
+    });
+
+    botInstance.command(['scheduled', 'reja', 'rejalar'], async (ctx) => {
+      if (!isAdmin(ctx.from.id)) return;
+      return await sendScheduledPostsList(ctx);
     });
 
     botInstance.command(['serial', 'seriallar'], async (ctx) => {
@@ -1840,13 +1941,93 @@ async function startBot(botToken) {
 
     botInstance.callbackQuery(/^remind_chan:(.+)$/, async (ctx) => {
       const code = ctx.match[1];
+      const movie = db.getMovieByCode(code);
+      const title = movie ? movie.title : code;
+
       await ctx.editMessageText(
-        `⏰ <b>Eslab qolindi!</b>\n\n` +
-        `Kino kodi: <code>${code}</code>\n` +
-        `Ushbu postni xohlagan vaqtingizda /post buyrug'i orqali kanalga chiqarishingiz mumkin.`,
-        { parse_mode: 'HTML' }
+        `⏰ <b>«${escapeHTML(title)}» FILMINI KANALGA CHIQARISH VAQTINI TANLANG:</b>\n\n` +
+        `🔑 <b>Kodi:</b> <code>${code}</code>\n` +
+        `🎯 <b>Kanal:</b> <code>@XitFilm_uz</code>\n\n` +
+        `<i>Quyidagi qulay vaqtlardan birini tanlang yoki o'zingiz soatni yozib qoldiring:</i>`,
+        { parse_mode: 'HTML', reply_markup: buildScheduleTimeKeyboard(code) }
       );
-      await ctx.answerCallbackQuery({ text: 'Eslatma saqlandi!' });
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery(/^sched_preset:(.+):(.+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      const preset = ctx.match[2];
+      const movie = db.getMovieByCode(code);
+      if (!movie) return await ctx.answerCallbackQuery({ text: 'Kino topilmadi', show_alert: true });
+
+      const targetTime = calculateScheduleTime(preset);
+      const settings = db.getMovieSettings() || {};
+      const targetChannel = settings.autoPostChannel || '@XitFilm_uz';
+
+      db.addScheduledPost({
+        movieCode: code,
+        scheduledTime: targetTime,
+        targetChannel,
+        createdBy: ctx.from.id
+      });
+
+      const timeStr = formatUzDateTime(targetTime.toISOString());
+
+      await ctx.editMessageText(
+        `🎉 <b>POST MUVAFFAQIYATLI REJALASHTIRILDI!</b>\n\n` +
+        `🎬 <b>Film:</b> «<b>${escapeHTML(movie.title)}</b>» (Kod: <code>${code}</code>)\n` +
+        `⏰ <b>Kanalga chiqish vaqti:</b> <b>${timeStr}</b>\n` +
+        `📢 <b>Kanal:</b> <code>${targetChannel}</code>\n\n` +
+        `<i>💡 Belgilangan soat yetishi bilan bot avtomatik tarzda postni kanalga joylaydi va sizga shaxsiy hisobot yuboradi!</i>`,
+        { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('📋 Barcha rejalar (/reja)', 'adm_sched_list').row().text('◀️ Dashboard', 'adm_refresh') }
+      );
+      await ctx.answerCallbackQuery({ text: 'Rejalashtirildi ✅' });
+    });
+
+    botInstance.callbackQuery(/^sched_manual:(.+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      const movie = db.getMovieByCode(code);
+      if (!movie) return await ctx.answerCallbackQuery({ text: 'Kino topilmadi', show_alert: true });
+
+      userStates.set(ctx.from.id, { action: 'awaiting_schedule_time', code, timestamp: Date.now() });
+
+      await ctx.editMessageText(
+        `✏️ <b>QO'LDA VAQT KIRITISH:</b>\n\n` +
+        `🎬 <b>Film:</b> «<b>${escapeHTML(movie.title)}</b>» (Kod: <code>${code}</code>)\n\n` +
+        `Iltimos, post chiqishi kerak bo'lgan soatni yozib yuboring:\n` +
+        `• Masalan: <b>20:00</b> yoki <b>21:30</b> (Bugungi kun uchun)\n` +
+        `• Yoki: <b>2026-08-23 15:00</b> (Aniq sana va vaqt)`,
+        { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('❌ Bekor qilish', `cancel_sched:${code}`) }
+      );
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery(/^cancel_sched:(.+)$/, async (ctx) => {
+      const code = ctx.match[1];
+      userStates.delete(ctx.from.id);
+      const settings = db.getMovieSettings() || {};
+      const targetChannel = settings.autoPostChannel || '@XitFilm_uz';
+      const movie = db.getMovieByCode(code);
+
+      await ctx.editMessageText(
+        buildPostPreviewMessage(movie || { code, title: code }, targetChannel),
+        { parse_mode: 'HTML', reply_markup: buildPostPreviewKeyboard(code) }
+      );
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery('adm_sched_list', async (ctx) => {
+      if (!isAdmin(ctx.from.id)) return;
+      await sendScheduledPostsList(ctx);
+      await ctx.answerCallbackQuery();
+    });
+
+    botInstance.callbackQuery(/^cancel_sched_item:(.+)$/, async (ctx) => {
+      if (!isAdmin(ctx.from.id)) return;
+      const schedId = ctx.match[1];
+      db.cancelScheduledPost(schedId);
+      await sendScheduledPostsList(ctx);
+      await ctx.answerCallbackQuery({ text: 'Reja bekor qilindi 🗑' });
     });
 
     botInstance.callbackQuery(/^cancel_chan:(.+)$/, async (ctx) => {
@@ -2184,6 +2365,43 @@ async function startBot(botToken) {
           }
         }
 
+        if (state.action === 'awaiting_schedule_time') {
+          userStates.delete(userId);
+          const code = state.code;
+          const movie = db.getMovieByCode(code);
+          if (!movie) return await ctx.reply('⚠️ Film ma\'lumotlari topilmadi.');
+
+          const parsedTime = parseManualScheduleInput(text);
+          if (!parsedTime) {
+            return await ctx.reply(
+              `⚠️ <b>Vaqt formati noto'g'ri!</b>\n\n` +
+              `Iltimos, vaqtni <b>20:00</b> yoki <b>21:30</b> yoki <b>2026-08-23 18:00</b> ko'rinishida kiriting:`,
+              { parse_mode: 'HTML' }
+            );
+          }
+
+          const settings = db.getMovieSettings() || {};
+          const targetChannel = settings.autoPostChannel || '@XitFilm_uz';
+
+          db.addScheduledPost({
+            movieCode: code,
+            scheduledTime: parsedTime,
+            targetChannel,
+            createdBy: userId
+          });
+
+          const timeStr = formatUzDateTime(parsedTime.toISOString());
+
+          return await ctx.reply(
+            `🎉 <b>POST MUVAFFAQIYATLI REJALASHTIRILDI!</b>\n\n` +
+            `🎬 <b>Film:</b> «<b>${escapeHTML(movie.title)}</b>» (Kod: <code>${code}</code>)\n` +
+            `⏰ <b>Kanalga chiqish vaqti:</b> <b>${timeStr}</b>\n` +
+            `📢 <b>Kanal:</b> <code>${targetChannel}</code>\n\n` +
+            `<i>💡 Belgilangan soat yetishi bilan bot avtomatik tarzda postni kanalga joylaydi va sizga shaxsiy hisobot yuboradi!</i>`,
+            { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('📋 Barcha rejalar (/reja)', 'adm_sched_list').row().text('◀️ Dashboard', 'adm_refresh') }
+          );
+        }
+
         if (state.action === 'awaiting_movie_code') {
           const customCode = text.replace(/[^0-9a-zA-Z_-]/g, '').trim();
           if (!customCode) {
@@ -2453,10 +2671,11 @@ async function startBot(botToken) {
 
         isBotRunning = true;
         await botInstance.start({
-          allowed_updates: ['message', 'callback_query', 'inline_query', 'chat_member', 'my_chat_member'],
+          allowed_updates: ['message', 'callback_query', 'inline_query', 'chat_member', 'my_chat_member', 'channel_post'],
           onStart: (info) => {
             console.log(`Movie Bot @${info.username} started.`);
             initResumeReminderScheduler();
+            initScheduledPostScheduler();
           }
         });
       } catch (err) {
@@ -2480,6 +2699,7 @@ async function startBot(botToken) {
 }
 
 let resumeInterval = null;
+let scheduledPostInterval = null;
 
 function formatTime(seconds) {
   const m = Math.floor(seconds / 60);
@@ -2532,6 +2752,89 @@ function initResumeReminderScheduler() {
   }, 10 * 60 * 1000);
 }
 
+function initScheduledPostScheduler() {
+  if (scheduledPostInterval) clearInterval(scheduledPostInterval);
+
+  scheduledPostInterval = setInterval(async () => {
+    if (!botInstance || !isBotRunning) return;
+    try {
+      const pending = db.getPendingScheduledPosts() || [];
+      if (pending.length === 0) return;
+
+      const now = new Date();
+
+      for (const item of pending) {
+        if (new Date(item.scheduledTime) <= now) {
+          const movie = db.getMovieByCode(item.movieCode);
+          if (!movie) {
+            db.markScheduledPostPublished(item.id, { error: 'Film topilmadi' });
+            continue;
+          }
+
+          try {
+            console.log(`[Scheduler] 🚀 Auto-publishing scheduled post for #${movie.code} («${movie.title}»)...`);
+            const targetChannel = item.targetChannel || process.env.AUTO_POST_CHANNEL || '@XitFilm_uz';
+            await publishMoviePostToChannel(movie, movie.shortsFileId || null, targetChannel);
+            db.markScheduledPostPublished(item.id);
+
+            // Send notification to Admin
+            const adminId = item.createdBy || process.env.ADMIN_ID || 6263659922;
+            const timeStr = formatUzDateTime(new Date().toISOString());
+
+            await botInstance.api.sendMessage(
+              adminId,
+              `📢 <b>REJALASHTIRILGAN POST KANALGA JOYLANDI!</b> 🚀\n\n` +
+              `🎬 <b>Film:</b> «<b>${escapeHTML(movie.title)}</b>»\n` +
+              `🔑 <b>Kino Kodi:</b> <code>${movie.code}</code>\n` +
+              `⏰ <b>Joylangan vaqt:</b> <b>${timeStr}</b>\n` +
+              `📢 <b>Kanal:</b> <code>${targetChannel}</code>\n\n` +
+              `<i>✅ Post muvaffaqiyatli kanalga chiqarildi!</i>`,
+              { parse_mode: 'HTML' }
+            );
+            console.log(`[Scheduler] ✅ Scheduled post published for #${movie.code}`);
+          } catch (pubErr) {
+            console.error(`[Scheduler Error] #${movie.code}:`, pubErr.message);
+            db.markScheduledPostPublished(item.id, { error: pubErr.message });
+          }
+
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+    } catch (err) {
+      console.error('[Scheduled Post Scheduler Error]:', err.message);
+    }
+  }, 30 * 1000); // Check every 30 seconds
+}
+
+async function sendScheduledPostsList(ctx) {
+  const pending = db.getPendingScheduledPosts() || [];
+  const kb = new InlineKeyboard();
+
+  let text = `⏰ <b>REJALASHTIRILGAN KANAL POSTLARI:</b>\n\n`;
+  if (pending.length === 0) {
+    text += `<i>Hozircha kutilayotgan rejalashtirilgan postlar mavjud emas.</i>\n\n` +
+      `💡 <i>Yangi kino yuklaganingizda «⏰ Vaqt belgilab rejalashtirish» tugmasi orqali istalgan soatga rejalashtirishingiz mumkin.</i>`;
+  } else {
+    text += `📌 <b>Kutilayotgan postlar soni: ${pending.length} ta</b>\n\n`;
+    pending.forEach((item, idx) => {
+      const movie = db.getMovieByCode(item.movieCode);
+      const title = movie ? movie.title : item.movieCode;
+      const timeStr = formatUzDateTime(item.scheduledTime);
+      text += `${idx + 1}. 🎬 <b>«${escapeHTML(title)}»</b> (Kod: <code>${item.movieCode}</code>)\n` +
+        `   ⏰ Vaqti: <b>${timeStr}</b> | 📢 <code>${item.targetChannel}</code>\n\n`;
+      kb.text(`❌ Bekor: #${item.movieCode} (${timeStr})`, `cancel_sched_item:${item.id}`).row();
+    });
+  }
+
+  kb.text('◀️ Dashboard', 'adm_refresh');
+
+  if (ctx.callbackQuery) {
+    return await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
+  } else {
+    return await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+  }
+}
+
 async function sendLanguageSelector(ctx) {
   const kb = new InlineKeyboard()
     .text("O'zbekcha 🇺🇿", 'setlang:uz')
@@ -2544,6 +2847,7 @@ async function sendLanguageSelector(ctx) {
 async function sendAdminDashboard(ctx) {
   const advStats = db.getAdvancedStats();
   const pendingReqs = (db.getRequests() || []).filter(r => r.status === 'pending').length;
+  const pendingScheds = (db.getPendingScheduledPosts() || []).length;
   const storage = db.getStorageChannel();
   const storageTitle = storage.channelId ? `«${storage.channelTitle}»` : 'Ulanmagan';
 
@@ -2554,14 +2858,16 @@ async function sendAdminDashboard(ctx) {
     `┣ 👥 Jami foydalanuvchilar: <b>${advStats.totalUsers} ta</b>\n` +
     `┣ 🎬 Jami kinolar bazasi: <b>${advStats.totalMovies} ta</b>\n` +
     `┣ 🗄 Baza Kanali: <b>${escapeHTML(storageTitle)}</b>\n` +
+    `┣ ⏰ Rejalashtirilgan postlar: <b>${pendingScheds} ta</b>\n` +
     `┣ 📥 Kutilayotgan buyurtmalar: <b>${pendingReqs} ta</b>\n` +
     `┗ ⚡️ Bugungi yangi userlar: <b>+${advStats.growth?.newUsersToday || 0} ta</b>\n\n` +
     `🎯 <b>Bo'limni tanlash uchun tugmalarni bosing:</b>`;
 
   const keyboard = new InlineKeyboard()
     .text('📈 Analitika & Grafik', 'adm_stats').text(`📩 Buyurtmalar (${pendingReqs})`, 'adm_requests').row()
-    .text('🗄 Baza Kanali (Storage)', 'adm_storage').text('🎬 Kinolar Top-8', 'adm_movies').row()
-    .text('🔄 Refresh', 'adm_refresh').url('🌐 Web Admin Panel', 'https://xitfilm.uz/panel/');
+    .text('🗄 Baza Kanali (Storage)', 'adm_storage').text(`⏰ Rejalar (${pendingScheds})`, 'adm_sched_list').row()
+    .text('🎬 Kinolar Top-8', 'adm_movies').text('🔄 Refresh', 'adm_refresh').row()
+    .url('🌐 Web Admin Panel', 'https://xitfilm.uz/panel/');
 
   return await ctx.reply(dashboardText, { parse_mode: 'HTML', reply_markup: keyboard });
 }

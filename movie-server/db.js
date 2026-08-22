@@ -16,6 +16,7 @@ const tiersFile = path.join(dataDir, 'reward_tiers.json');
 const reviewsFile = path.join(dataDir, 'movie_reviews.json');
 const watchlistFile = path.join(dataDir, 'watchlist.json');
 const partnerChannelsFile = path.join(dataDir, 'partner_channels.json');
+const scheduledPostsFile = path.join(dataDir, 'scheduled_posts.json');
 
 const DEFAULT_GENRES = ['Jangari', 'Komediya', 'Melodrama', 'Multfilm', 'Tarixiy', 'Tarjima kino', 'Sarguzasht'];
 
@@ -52,11 +53,97 @@ if (!fs.existsSync(watchlistFile)) {
 if (!fs.existsSync(partnerChannelsFile)) {
   fs.writeFileSync(partnerChannelsFile, JSON.stringify([], null, 2));
 }
+if (!fs.existsSync(scheduledPostsFile)) {
+  fs.writeFileSync(scheduledPostsFile, JSON.stringify([], null, 2));
+}
 if (!fs.existsSync(settingsFile)) {
   fs.writeFileSync(settingsFile, JSON.stringify({
     autoPostEnabled: true,
     autoPostChannel: process.env.AUTO_POST_CHANNEL || ''
   }, null, 2));
+}
+
+function getScheduledPosts() {
+  try {
+    const raw = fs.readFileSync(scheduledPostsFile, 'utf8');
+    return JSON.parse(raw);
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveScheduledPosts(posts) {
+  try {
+    fs.writeFileSync(scheduledPostsFile, JSON.stringify(posts, null, 2));
+    return true;
+  } catch (e) {
+    console.error('Error saving scheduled posts:', e.message);
+    return false;
+  }
+}
+
+function addScheduledPost({ movieCode, scheduledTime, targetChannel, createdBy }) {
+  try {
+    const posts = getScheduledPosts();
+    const entry = {
+      id: `sched_${String(movieCode).trim()}_${Date.now()}`,
+      movieCode: String(movieCode).trim(),
+      scheduledTime: new Date(scheduledTime).toISOString(),
+      targetChannel: targetChannel || process.env.AUTO_POST_CHANNEL || '@XitFilm_uz',
+      status: 'pending',
+      createdBy: createdBy || null,
+      createdAt: new Date().toISOString()
+    };
+    posts.push(entry);
+    saveScheduledPosts(posts);
+    return entry;
+  } catch (e) {
+    console.error('Error adding scheduled post:', e.message);
+    return null;
+  }
+}
+
+function cancelScheduledPost(id) {
+  try {
+    const posts = getScheduledPosts();
+    const item = posts.find(p => p.id === id);
+    if (item) {
+      item.status = 'cancelled';
+      item.cancelledAt = new Date().toISOString();
+      saveScheduledPosts(posts);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+function getPendingScheduledPosts() {
+  try {
+    const posts = getScheduledPosts();
+    return posts.filter(p => p.status === 'pending');
+  } catch (e) {
+    return [];
+  }
+}
+
+function markScheduledPostPublished(id, { messageId, error } = {}) {
+  try {
+    const posts = getScheduledPosts();
+    const item = posts.find(p => p.id === id);
+    if (item) {
+      item.status = error ? 'failed' : 'published';
+      item.publishedAt = new Date().toISOString();
+      if (messageId) item.messageId = messageId;
+      if (error) item.error = error;
+      saveScheduledPosts(posts);
+      return item;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
 }
 
 function getMovieSettings() {
@@ -1775,6 +1862,11 @@ module.exports = {
   getStorageChannel,
   setStorageChannel,
   updateMovieStorage,
+  getScheduledPosts,
+  addScheduledPost,
+  cancelScheduledPost,
+  getPendingScheduledPosts,
+  markScheduledPostPublished,
   saveAuthCode,
   verifyAuthCode,
   isUserPremium,
