@@ -88,6 +88,55 @@ function updateMovieSettings(updates) {
   }
 }
 
+function getStorageChannel() {
+  try {
+    const settings = getMovieSettings();
+    return {
+      channelId: settings.storageChannelId || process.env.STORAGE_CHANNEL_ID || null,
+      channelTitle: settings.storageChannelTitle || 'Xit Film | Shaxsiy',
+      autoBackup: settings.storageAutoBackup !== false
+    };
+  } catch (e) {
+    return { channelId: null, channelTitle: 'Xit Film | Shaxsiy', autoBackup: true };
+  }
+}
+
+function setStorageChannel(channelId, channelTitle = 'Xit Film | Shaxsiy') {
+  try {
+    const current = getMovieSettings();
+    const updated = {
+      ...current,
+      storageChannelId: channelId,
+      storageChannelTitle: channelTitle || current.storageChannelTitle || 'Xit Film | Shaxsiy'
+    };
+    saveMovieSettings(updated);
+    return updated;
+  } catch (e) {
+    return null;
+  }
+}
+
+function updateMovieStorage(code, { storageMessageId, storageShortsMessageId, storageChannelId, storageFileId, storageShortsFileId }) {
+  try {
+    const movies = getMovies();
+    const cleanCode = String(code).trim();
+    const index = movies.findIndex(m => String(m.code).trim() === cleanCode);
+    if (index === -1) return null;
+
+    if (storageMessageId !== undefined) movies[index].storageMessageId = storageMessageId;
+    if (storageShortsMessageId !== undefined) movies[index].storageShortsMessageId = storageShortsMessageId;
+    if (storageChannelId !== undefined) movies[index].storageChannelId = storageChannelId;
+    if (storageFileId !== undefined) movies[index].storageFileId = storageFileId;
+    if (storageShortsFileId !== undefined) movies[index].storageShortsFileId = storageShortsFileId;
+
+    saveMovies(movies);
+    return movies[index];
+  } catch (e) {
+    console.error('Error updating movie storage:', e.message);
+    return null;
+  }
+}
+
 // Movies CRUD
 function getMovies() {
   try {
@@ -173,6 +222,11 @@ function addMovie(movie) {
       description: cleanedDesc,
       fileId: movie.fileId,
       shortsFileId: movie.shortsFileId !== undefined ? movie.shortsFileId : (existing.shortsFileId || null),
+      storageMessageId: movie.storageMessageId !== undefined ? movie.storageMessageId : (existing.storageMessageId || null),
+      storageShortsMessageId: movie.storageShortsMessageId !== undefined ? movie.storageShortsMessageId : (existing.storageShortsMessageId || null),
+      storageChannelId: movie.storageChannelId !== undefined ? movie.storageChannelId : (existing.storageChannelId || null),
+      storageFileId: movie.storageFileId !== undefined ? movie.storageFileId : (existing.storageFileId || null),
+      storageShortsFileId: movie.storageShortsFileId !== undefined ? movie.storageShortsFileId : (existing.storageShortsFileId || null),
       genre: movie.genre || existing.genre || 'Tarjima kino',
       poster: movie.poster !== undefined ? String(movie.poster || '').trim() : (existing.poster || ''),
       likes: existing.likes || [],
@@ -1718,6 +1772,9 @@ module.exports = {
   getMovieSettings,
   saveMovieSettings,
   updateMovieSettings,
+  getStorageChannel,
+  setStorageChannel,
+  updateMovieStorage,
   saveAuthCode,
   verifyAuthCode,
   isUserPremium,

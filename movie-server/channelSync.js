@@ -152,10 +152,56 @@ function registerChannelPostListener(bot) {
       const post = ctx.channelPost;
       if (!post) return;
 
+      const chat = post.chat;
+      const chatTitle = chat?.title || '';
+      const chatIdStr = String(chat?.id || '');
+      const storageInfo = db.getStorageChannel();
+
+      // 1. Check if this post is from the Private Storage Channel ("Xit Film | Shaxsiy")
+      const isStorageChannel =
+        (storageInfo.channelId && storageInfo.channelId === chatIdStr) ||
+        chatTitle.toLowerCase().includes('shaxsiy') ||
+        chatTitle.toLowerCase().includes('xit film | shaxsiy');
+
+      if (isStorageChannel) {
+        // Auto-bind storage channel ID if not set or changed
+        if (storageInfo.channelId !== chatIdStr) {
+          db.setStorageChannel(chatIdStr, chatTitle || 'Xit Film | Shaxsiy');
+          console.log(`[channelSync] 🔒 Private Storage Channel connected: "${chatTitle}" (ID: ${chatIdStr})`);
+        }
+
+        const rawText = post.caption || post.text || '';
+        const fileId = post.video?.file_id || post.document?.file_id || null;
+        
+        // Match movie code e.g. #kod_1001, Kod: 1001, #1001
+        const codeMatch = rawText.match(/(?:#kod_|kodi|kod|code|#)\s*[:=-]?\s*(\d{3,6})/i);
+        if (codeMatch && codeMatch[1]) {
+          const code = codeMatch[1];
+          const isShorts = /#shorts|shorts|treyler|lavha/i.test(rawText);
+
+          if (isShorts) {
+            db.updateMovieStorage(code, {
+              storageShortsMessageId: post.message_id,
+              storageShortsFileId: fileId,
+              storageChannelId: chatIdStr
+            });
+            console.log(`[channelSync] ⚡️ Storage Shorts indexed for #${code} (msg: ${post.message_id})`);
+          } else {
+            db.updateMovieStorage(code, {
+              storageMessageId: post.message_id,
+              storageFileId: fileId,
+              storageChannelId: chatIdStr
+            });
+            console.log(`[channelSync] 🎬 Storage Movie indexed for #${code} (msg: ${post.message_id})`);
+          }
+        }
+        return;
+      }
+
+      // 2. Otherwise check partner channels
       const chatUsername = post.chat?.username?.toLowerCase();
       if (!chatUsername) return;
 
-      // Check if this channel is in our partner list
       const partners = db.getPartnerChannels();
       const partner = partners.find(p => p.username === chatUsername && p.autoSync);
       if (!partner) return;
@@ -182,7 +228,6 @@ function registerChannelPostListener(bot) {
 
       if (saved) {
         console.log(`[channelSync] ✅ New movie synced from @${chatUsername}: "${movieData.title}" (Code: ${movieData.code})`);
-        // Update last synced message ID
         db.updatePartnerChannelSyncId(chatUsername, post.message_id);
       }
     } catch (e) {
@@ -190,7 +235,7 @@ function registerChannelPostListener(bot) {
     }
   });
 
-  console.log('[channelSync] ✅ Partner channel auto-sync listener registered.');
+  console.log('[channelSync] ✅ Storage & Partner channel post listener registered.');
 }
 
 module.exports = {

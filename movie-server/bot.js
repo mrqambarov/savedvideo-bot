@@ -176,6 +176,79 @@ async function publishMoviePostToChannel(movie, shortsFileId = null, targetChann
   return true;
 }
 
+async function syncMovieToStorageChannel(movie) {
+  try {
+    const storage = db.getStorageChannel();
+    if (!storage.channelId || !botInstance || !movie || !movie.fileId) return null;
+
+    const code = String(movie.code).trim();
+    const cleanTitle = escapeHTML(movie.title);
+    const cleanGenre = escapeHTML((movie.genre || 'Tarjima kino').replace(/\s+/g, '_'));
+    const cleanDesc = escapeHTML(movie.description || '');
+
+    const caption =
+      `🎬 <b>#kod_${code} | ${cleanTitle}</b>\n\n` +
+      `📁 <b>Janri:</b> #${cleanGenre}\n` +
+      `🔑 <b>Kino Kodi:</b> <code>${code}</code>\n\n` +
+      `📝 <i>${cleanDesc}</i>\n\n` +
+      `💾 <i>XIT FILM Shaxsiy Media Ombori</i>`;
+
+    const sent = await botInstance.api.sendVideo(storage.channelId, movie.fileId, {
+      caption,
+      parse_mode: 'HTML',
+      supports_streaming: true
+    });
+
+    if (sent && sent.message_id) {
+      const storageFileId = sent.video?.file_id || movie.fileId;
+      db.updateMovieStorage(code, {
+        storageMessageId: sent.message_id,
+        storageChannelId: storage.channelId,
+        storageFileId
+      });
+      console.log(`[Storage] Movie #${code} (${movie.title}) backed up to storage channel (msg_id: ${sent.message_id})`);
+      return { messageId: sent.message_id, fileId: storageFileId };
+    }
+  } catch (err) {
+    console.error(`[Storage Sync Error] Movie #${movie?.code}:`, err.message);
+    return null;
+  }
+}
+
+async function syncShortsToStorageChannel(movie, shortsFileId) {
+  try {
+    const storage = db.getStorageChannel();
+    if (!storage.channelId || !shortsFileId || !botInstance || !movie) return null;
+
+    const code = String(movie.code).trim();
+    const cleanTitle = escapeHTML(movie.title);
+
+    const caption =
+      `⚡️ <b>#shorts #kod_${code} | ${cleanTitle} (Shorts)</b>\n\n` +
+      `🔑 <b>Kino Kodi:</b> <code>${code}</code>\n\n` +
+      `💾 <i>XIT FILM Shaxsiy Media Ombori (Shorts)</i>`;
+
+    const sent = await botInstance.api.sendVideo(storage.channelId, shortsFileId, {
+      caption,
+      parse_mode: 'HTML',
+      supports_streaming: true
+    });
+
+    if (sent && sent.message_id) {
+      const storageShortsFileId = sent.video?.file_id || shortsFileId;
+      db.updateMovieStorage(code, {
+        storageShortsMessageId: sent.message_id,
+        storageShortsFileId
+      });
+      console.log(`[Storage] Shorts for #${code} backed up to storage channel (msg_id: ${sent.message_id})`);
+      return { messageId: sent.message_id, fileId: storageShortsFileId };
+    }
+  } catch (err) {
+    console.error(`[Storage Shorts Sync Error] Movie #${movie?.code}:`, err.message);
+    return null;
+  }
+}
+
 function getMainKeyboard(lang = 'uz') {
   return new Keyboard()
     .text(i18n.t(lang, 'search_btn')).text('⚡️ Shorts Lavhalar')
@@ -462,19 +535,57 @@ async function sendMovie(ctx, movie) {
 
   const plainCaption = `🎬 ${movie.title}\n\nJanr: ${movie.genre || 'Tarjima kino'}\nKod: ${code}\n\n${movie.description || ''}`;
 
-  try {
-    if (movie.fileId) {
-      await ctx.replyWithVideo(movie.fileId, { caption, parse_mode: 'HTML', reply_markup: keyboard });
-    } else if (movie.poster) {
-      await ctx.replyWithPhoto(movie.poster, { caption, parse_mode: 'HTML', reply_markup: keyboard });
-    } else {
-      await ctx.reply(caption, { parse_mode: 'HTML', reply_markup: keyboard });
-    }
-  } catch (e) {
+  let sentSuccessfully = false;
+
+  // 1. Primary delivery: try direct fileId or storageFileId
+  const primaryFileId = movie.fileId || movie.storageFileId;
+  if (primaryFileId) {
     try {
-      await ctx.reply(plainCaption, { reply_markup: keyboard });
-    } catch (err2) {
-      console.error('sendMovie fallback error:', err2.message);
+      await ctx.replyWithVideo(primaryFileId, {
+        caption,
+        parse_mode: 'HTML',
+        reply_markup: keyboard,
+        supports_streaming: true
+      });
+      sentSuccessfully = true;
+    } catch (e) {
+      console.warn(`[sendMovie] Primary fileId delivery failed for #${code}: ${e.message}. Attempting storage fallback...`);
+    }
+  }
+
+  // 2. Storage Channel Fallback: copy directly from Private Storage Channel
+  if (!sentSuccessfully && movie.storageChannelId && movie.storageMessageId) {
+    try {
+      await ctx.api.copyMessage(ctx.chat.id, movie.storageChannelId, movie.storageMessageId, {
+        caption,
+        parse_mode: 'HTML',
+        reply_markup: keyboard
+      });
+      sentSuccessfully = true;
+      console.log(`[sendMovie] #${code} successfully delivered via Storage Channel copyMessage!`);
+    } catch (errStorage) {
+      console.warn(`[sendMovie] Storage channel copyMessage failed for #${code}: ${errStorage.message}`);
+    }
+  }
+
+  // 3. Last Fallback: Poster or text only
+  if (!sentSuccessfully) {
+    if (movie.poster && movie.poster.startsWith('http')) {
+      try {
+        await ctx.replyWithPhoto(movie.poster, { caption, parse_mode: 'HTML', reply_markup: keyboard });
+        sentSuccessfully = true;
+      } catch (errP) {}
+    }
+    if (!sentSuccessfully) {
+      try {
+        await ctx.reply(caption, { parse_mode: 'HTML', reply_markup: keyboard });
+      } catch (errT) {
+        try {
+          await ctx.reply(plainCaption, { reply_markup: keyboard });
+        } catch (err2) {
+          console.error('sendMovie fallback error:', err2.message);
+        }
+      }
     }
   }
 }
@@ -527,6 +638,35 @@ async function startBot(botToken) {
       if (ctx.from) {
         db.addUser(ctx.from);
         db.trackActiveUser(ctx.from.id);
+      }
+      return next();
+    });
+
+    // Admin Forward Message Detection (Auto-bind Private Storage Channel)
+    botInstance.use(async (ctx, next) => {
+      const msg = ctx.message;
+      if (msg && ctx.chat?.type === 'private' && isAdmin(ctx.from?.id)) {
+        const fChat = msg.forward_from_chat || msg.forward_origin?.chat;
+        if (fChat && fChat.type === 'channel') {
+          const chId = String(fChat.id);
+          const chTitle = fChat.title || 'Xit Film | Shaxsiy';
+          db.setStorageChannel(chId, chTitle);
+          console.log(`[Storage] Channel connected via forward: ${chTitle} (ID: ${chId})`);
+
+          const kb = new InlineKeyboard()
+            .text('📤 Barcha kinolarni saqlash', 'do_backup_all')
+            .row()
+            .text('🗄 Ombor Boshqaruvi', 'adm_storage');
+
+          return await ctx.reply(
+            `🔒 <b>SHAXSIY BAZA KANALI BIRIKTIRILDI!</b>\n\n` +
+            `📢 <b>Kanal Nomi:</b> «<b>${escapeHTML(chTitle)}</b>»\n` +
+            `🆔 <b>Kanal ID:</b> <code>${chId}</code>\n\n` +
+            `✅ <i>Endi har bir yuklangan kino va shorts videosi avtomatik tarzda ushbu kanalda ham saqlanadi!</i>\n\n` +
+            `📦 <i>Eski barcha kinolarni ham kanalga yuklab saqlash uchun pastdagi tugmani bosing:</i>`,
+            { parse_mode: 'HTML', reply_markup: kb }
+          );
+        }
       }
       return next();
     });
@@ -652,6 +792,55 @@ async function startBot(botToken) {
         `⚠️ <b>Muhim:</b> <code>@${botInstance?.botInfo?.username || 'xitfilm_bot'}</code> botini ushbu kanalga <b>Administrator</b> qilib qo'shing va <i>"Post Messages (Xabarlar yuborish)"</i> huquqini bering!`,
         { parse_mode: 'HTML' }
       );
+    });
+
+    // --- STORAGE CHANNEL COMMANDS ---
+    botInstance.command(['storage', 'baza'], async (ctx) => {
+      if (!isAdmin(ctx.from.id)) return;
+      return await sendStorageDashboard(ctx);
+    });
+
+    botInstance.command(['set_storage', 'setstorage'], async (ctx) => {
+      if (!isAdmin(ctx.from.id)) return;
+      const text = ctx.message.text.replace(/^\/set_storage(@\w+)?\s*/i, '').replace(/^\/setstorage(@\w+)?\s*/i, '').trim();
+
+      if (!text) {
+        const storage = db.getStorageChannel();
+        return await ctx.reply(
+          `🗄 <b>SHAXSIY BAZA KANALINI SOZLASH</b>\n\n` +
+          `📌 <b>Hozirgi Baza Kanali:</b> ${storage.channelId ? `«<b>${escapeHTML(storage.channelTitle)}</b>» (<code>${storage.channelId}</code>)` : '❌ <i>Hali ulanmagan</i>'}\n\n` +
+          `<b>Ulash usullari:</b>\n` +
+          `1️⃣ <b>«Xit Film | Shaxsiy»</b> kanalidan istalgan xabarni ushbu botga forward (uzatish) qiling\n` +
+          `2️⃣ Yoki kanal ID sini kiriting: <code>/set_storage -100xxxxxxxxxx</code>\n` +
+          `3️⃣ Yoki kanalda istalgan xabar yozing (bot avtomatik taniydi)\n\n` +
+          `<i>⚠️ Eslatma: Bot ushbu kanalda Administrator bo'lishi shart!</i>`,
+          { parse_mode: 'HTML' }
+        );
+      }
+
+      try {
+        const chat = await botInstance.api.getChat(text);
+        db.setStorageChannel(String(chat.id), chat.title || 'Xit Film | Shaxsiy');
+        return await ctx.reply(
+          `✅ <b>Shaxsiy Baza Kanali Sozlandi!</b>\n\n` +
+          `📢 <b>Kanal:</b> «${escapeHTML(chat.title || '')}»\n` +
+          `🆔 <b>ID:</b> <code>${chat.id}</code>\n\n` +
+          `<i>Barcha mavjud kinolarni ushbu kanalga zaxiralash uchun:</i> /backup_all`,
+          { parse_mode: 'HTML' }
+        );
+      } catch (err) {
+        db.setStorageChannel(String(text), 'Xit Film | Shaxsiy');
+        return await ctx.reply(
+          `✅ <b>Shaxsiy Baza Kanali ID saqlandi:</b> <code>${text}</code>\n\n` +
+          `<i>Mavjud kinolarni kanalda zaxiralash uchun:</i> /backup_all`,
+          { parse_mode: 'HTML' }
+        );
+      }
+    });
+
+    botInstance.command(['backup_all', 'baza_saqlash'], async (ctx) => {
+      if (!isAdmin(ctx.from.id)) return;
+      return await runStorageBackupAll(ctx);
     });
 
     botInstance.command(['serial', 'seriallar'], async (ctx) => {
@@ -1153,6 +1342,46 @@ async function startBot(botToken) {
       await ctx.answerCallbackQuery();
     });
 
+    botInstance.callbackQuery('adm_storage', async (ctx) => {
+      if (!isAdmin(ctx.from.id)) return;
+      await ctx.answerCallbackQuery();
+      return await sendStorageDashboard(ctx);
+    });
+
+    botInstance.callbackQuery('do_backup_all', async (ctx) => {
+      if (!isAdmin(ctx.from.id)) return;
+      await ctx.answerCallbackQuery({ text: 'Zaxiralash boshlanmoqda...' });
+      return await runStorageBackupAll(ctx, false);
+    });
+
+    botInstance.callbackQuery('do_backup_all_force', async (ctx) => {
+      if (!isAdmin(ctx.from.id)) return;
+      await ctx.answerCallbackQuery({ text: 'Barcha kinolar qayta zaxiralanmoqda...' });
+      return await runStorageBackupAll(ctx, true);
+    });
+
+    botInstance.callbackQuery('chk_storage_status', async (ctx) => {
+      if (!isAdmin(ctx.from.id)) return;
+      const storage = db.getStorageChannel();
+      if (!storage.channelId) {
+        return await ctx.answerCallbackQuery({ text: 'Baza kanali hali ulanmagan', show_alert: true });
+      }
+      try {
+        const chat = await botInstance.api.getChat(storage.channelId);
+        const member = await botInstance.api.getChatMember(storage.channelId, botInstance.botInfo.id);
+        const isAdminInChannel = ['administrator', 'creator'].includes(member.status);
+
+        if (isAdminInChannel) {
+          await ctx.answerCallbackQuery({ text: `✅ Kanal faol: «${chat.title}» (Admin huquqlari bor)`, show_alert: true });
+        } else {
+          await ctx.answerCallbackQuery({ text: `⚠️ Bot kanalda admin emas! Iltimos admin qilib qo'ying.`, show_alert: true });
+        }
+        return await sendStorageDashboard(ctx);
+      } catch (err) {
+        await ctx.answerCallbackQuery({ text: `❌ Kanal xatoligi: ${err.message}`, show_alert: true });
+      }
+    });
+
     // --- ADMIN MOVIE CODE CHOICE (AUTO VS MANUAL) ---
     botInstance.callbackQuery(/^code_auto:(.+)$/, async (ctx) => {
       const code = ctx.match[1].trim();
@@ -1183,7 +1412,7 @@ async function startBot(botToken) {
         return await ctx.answerCallbackQuery();
       }
 
-      db.addMovie({
+      const savedMovie = db.addMovie({
         code,
         title: upload.title,
         fileId: upload.fileId,
@@ -1191,6 +1420,7 @@ async function startBot(botToken) {
         description: upload.description || 'XIT FILM portalida eng yuqori sifatda tomosha qiling.',
         dateAdded: new Date().toISOString()
       });
+      syncMovieToStorageChannel(savedMovie).catch(e => console.error('[Storage]', e.message));
 
       const kb = new InlineKeyboard()
         .text('📹 Ha, Shorts yuklayman', `up_shorts:${code}`)
@@ -1244,7 +1474,7 @@ async function startBot(botToken) {
 
       userStates.delete(ctx.from.id);
 
-      db.addMovie({
+      const savedMovie = db.addMovie({
         code,
         title: upload.title,
         fileId: upload.fileId,
@@ -1252,6 +1482,7 @@ async function startBot(botToken) {
         description: upload.description || 'XIT FILM portalida eng yuqori sifatda tomosha qiling.',
         dateAdded: new Date().toISOString()
       });
+      syncMovieToStorageChannel(savedMovie).catch(e => console.error('[Storage]', e.message));
 
       const kb = new InlineKeyboard()
         .text('📹 Ha, Shorts yuklayman', `up_shorts:${code}`)
@@ -1307,7 +1538,7 @@ async function startBot(botToken) {
 
       // Delete old movie and add new movie
       db.deleteMovie(code);
-      db.addMovie({
+      const savedMovie = db.addMovie({
         code,
         title: upload.title,
         fileId: upload.fileId,
@@ -1315,6 +1546,7 @@ async function startBot(botToken) {
         description: upload.description || 'XIT FILM portalida eng yuqori sifatda tomosha qiling.',
         dateAdded: new Date().toISOString()
       });
+      syncMovieToStorageChannel(savedMovie).catch(e => console.error('[Storage]', e.message));
 
       const kb = new InlineKeyboard()
         .text('📹 Ha, Shorts yuklayman', `up_shorts:${code}`)
@@ -1775,6 +2007,7 @@ async function startBot(botToken) {
             title: `${movie.title} (Shorts)`,
             views: 0
           });
+          syncShortsToStorageChannel(movie, fileId).catch(e => console.error('[Storage Shorts]', e.message));
         }
 
         const settings = db.getMovieSettings() || {};
@@ -1978,6 +2211,7 @@ async function startBot(botToken) {
             fileId: upload.fileId,
             dateAdded: new Date().toISOString()
           });
+          syncMovieToStorageChannel(movie).catch(e => console.error('[Storage]', e.message));
 
           const kb = new InlineKeyboard()
             .text('📹 Ha, Shorts yuklayman', `up_shorts:${customCode}`)
@@ -2291,6 +2525,8 @@ async function sendLanguageSelector(ctx) {
 async function sendAdminDashboard(ctx) {
   const advStats = db.getAdvancedStats();
   const pendingReqs = (db.getRequests() || []).filter(r => r.status === 'pending').length;
+  const storage = db.getStorageChannel();
+  const storageTitle = storage.channelId ? `«${storage.channelTitle}»` : 'Ulanmagan';
 
   const dashboardText =
     `👑 <b>XIT FILM — ENTERPRISE ADMIN DASHBOARD</b>\n\n` +
@@ -2298,16 +2534,142 @@ async function sendAdminDashboard(ctx) {
     `📊 <b>ASOSIY MONITORING:</b>\n` +
     `┣ 👥 Jami foydalanuvchilar: <b>${advStats.totalUsers} ta</b>\n` +
     `┣ 🎬 Jami kinolar bazasi: <b>${advStats.totalMovies} ta</b>\n` +
+    `┣ 🗄 Baza Kanali: <b>${escapeHTML(storageTitle)}</b>\n` +
     `┣ 📥 Kutilayotgan buyurtmalar: <b>${pendingReqs} ta</b>\n` +
     `┗ ⚡️ Bugungi yangi userlar: <b>+${advStats.growth?.newUsersToday || 0} ta</b>\n\n` +
     `🎯 <b>Bo'limni tanlash uchun tugmalarni bosing:</b>`;
 
   const keyboard = new InlineKeyboard()
     .text('📈 Analitika & Grafik', 'adm_stats').text(`📩 Buyurtmalar (${pendingReqs})`, 'adm_requests').row()
-    .text('🎬 Kinolar Top-8', 'adm_movies').text('🔄 Refresh', 'adm_refresh').row()
-    .url('🌐 Web Admin Panel', 'https://xitfilm.uz/panel/');
+    .text('🗄 Baza Kanali (Storage)', 'adm_storage').text('🎬 Kinolar Top-8', 'adm_movies').row()
+    .text('🔄 Refresh', 'adm_refresh').url('🌐 Web Admin Panel', 'https://xitfilm.uz/panel/');
 
   return await ctx.reply(dashboardText, { parse_mode: 'HTML', reply_markup: keyboard });
+}
+
+async function sendStorageDashboard(ctx) {
+  const storage = db.getStorageChannel();
+  const movies = db.getMovies() || [];
+  const backedUpCount = movies.filter(m => !!m.storageMessageId).length;
+  const totalCount = movies.length;
+  const pendingCount = totalCount - backedUpCount;
+
+  const kb = new InlineKeyboard();
+  if (pendingCount > 0) {
+    kb.text(`📤 Qolgan ${pendingCount} ta kinoni saqlash`, 'do_backup_all').row();
+  } else {
+    kb.text(`🔄 Barcha ${totalCount} ta kinoni qayta saqlash`, 'do_backup_all_force').row();
+  }
+  kb.text('🔍 Kanaldan holatni tekshirish', 'chk_storage_status')
+    .row()
+    .text('◀️ Dashboardga qaytish', 'adm_refresh');
+
+  const text =
+    `🗄 <b>XIT FILM — SHAXSIY MEDIA OMBORI (BAZA):</b>\n\n` +
+    `📢 <b>Baza Kanali:</b> ${storage.channelId ? `«<b>${escapeHTML(storage.channelTitle)}</b>» (<code>${storage.channelId}</code>)` : '❌ <i>Hali ulanmagan (kanaldan bitta xabar forward qiling)</i>'}\n\n` +
+    `📊 <b>Zaxira Holati:</b>\n` +
+    `• Jami kinolar: <b>${totalCount} ta</b>\n` +
+    `• Kanaldagi zaxiralar: <b>${backedUpCount} ta</b> (${Math.round((backedUpCount / (totalCount || 1)) * 100)}%)\n` +
+    `• Zaxiralanmagan: <b>${pendingCount} ta</b>\n\n` +
+    `🛡 <b>Xavfsizlik:</b> <i>2 bosqichli himoya (Dual Storage) faol. Bot chatidagi videolar o'chsa ham, barcha kinolar shaxsiy kanaldan to'g'ridan-to'g'ri uzatiladi!</i>`;
+
+  if (ctx.callbackQuery) {
+    return await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: kb });
+  } else {
+    return await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+  }
+}
+
+async function runStorageBackupAll(ctx, forceAll = false) {
+  const storage = db.getStorageChannel();
+  if (!storage.channelId) {
+    const text =
+      `⚠️ <b>Shaxsiy Baza kanali hali ulanmagan!</b>\n\n` +
+      `«Xit Film | Shaxsiy» kanalidan botga bitta xabarni forward (uzatish) qiling yoki kanal ID sini kiriting: <code>/set_storage -100xxxxxxxxxx</code>`;
+    if (ctx.callbackQuery) {
+      return await ctx.editMessageText(text, { parse_mode: 'HTML' });
+    } else {
+      return await ctx.reply(text, { parse_mode: 'HTML' });
+    }
+  }
+
+  const movies = db.getMovies() || [];
+  const toBackup = forceAll ? movies.filter(m => m.fileId) : movies.filter(m => m.fileId && !m.storageMessageId);
+
+  if (toBackup.length === 0) {
+    const allCount = movies.filter(m => m.fileId).length;
+    const msg = `✅ <b>Barcha mavjud kinolar (${allCount} ta) allaqachon Baza kanalida xavfsiz saqlangan!</b>`;
+    if (ctx.callbackQuery) {
+      return await ctx.editMessageText(msg, { parse_mode: 'HTML' });
+    } else {
+      return await ctx.reply(msg, { parse_mode: 'HTML' });
+    }
+  }
+
+  const initialText =
+    `⏳ <b>Baza kanaliga zaxiralash boshlandi...</b>\n\n` +
+    `📦 Saqlanadigan kinolar: <b>${toBackup.length} ta</b>\n` +
+    `🔄 Jarayon: 0/${toBackup.length}`;
+
+  let statusMsg = null;
+  if (ctx.callbackQuery) {
+    statusMsg = await ctx.editMessageText(initialText, { parse_mode: 'HTML' });
+  } else {
+    statusMsg = await ctx.reply(initialText, { parse_mode: 'HTML' });
+  }
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (let i = 0; i < toBackup.length; i++) {
+    const m = toBackup[i];
+    try {
+      const res = await syncMovieToStorageChannel(m);
+      if (res) {
+        successCount++;
+        if (m.shortsFileId) {
+          await syncShortsToStorageChannel(m, m.shortsFileId);
+        }
+      } else {
+        failCount++;
+      }
+    } catch (e) {
+      failCount++;
+    }
+
+    if ((i + 1) % 2 === 0 || i === toBackup.length - 1) {
+      try {
+        const msgId = statusMsg?.message_id || ctx.msgId;
+        await botInstance.api.editMessageText(
+          ctx.chat.id,
+          msgId,
+          `⏳ <b>Baza kanaliga saqlanmoqda...</b>\n\n` +
+          `📦 Jami: <b>${toBackup.length} ta</b>\n` +
+          `✅ Saqlandi: <b>${successCount} ta</b>\n` +
+          `❌ Xatolik: <b>${failCount} ta</b>\n` +
+          `📊 Jarayon: <b>${i + 1}/${toBackup.length} (${Math.round(((i + 1) / toBackup.length) * 100)}%)</b>`,
+          { parse_mode: 'HTML' }
+        );
+      } catch (_) {}
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 800));
+  }
+
+  const doneKb = new InlineKeyboard().text('◀️ Ombor Boshqaruvi', 'adm_storage');
+  try {
+    const msgId = statusMsg?.message_id || ctx.msgId;
+    await botInstance.api.editMessageText(
+      ctx.chat.id,
+      msgId,
+      `🎉 <b>SHAXSIY BAZA KANALIGA ZAXIRALASH YAKUNLANDI!</b>\n\n` +
+      `📢 <b>Kanal:</b> «${escapeHTML(storage.channelTitle)}»\n` +
+      `✅ Muvaffaqiyatli saqlangan filmlar: <b>${successCount} ta</b>\n` +
+      `${failCount > 0 ? `⚠️ Xatolik bo'lgan: <b>${failCount} ta</b>\n` : ''}` +
+      `\n<i>Barcha filmlar va shorts lavhalari shaxsiy kanalingizda 100% xavfsiz holatda saqlandi!</i>`,
+      { parse_mode: 'HTML', reply_markup: doneKb }
+    );
+  } catch (_) {}
 }
 
 async function stopBot() { if (botInstance) await botInstance.stop(); isBotRunning = false; return true; }
