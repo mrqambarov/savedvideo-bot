@@ -9,6 +9,10 @@ let isBotRunning = false;
 let reconnectTimer = null;
 const userPendingActions = new Map();
 
+function getBotInstance() {
+  return botInstance;
+}
+
 // Birlamchi Telegram ID raqami
 const PRIMARY_ADMIN = 6263659922;
 
