@@ -1,6 +1,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { sendAlert } = require('./alerter');
 const { runCmd } = require('./restarter');
 
@@ -10,15 +11,17 @@ const BASE_DIR = path.join(__dirname, '..', '..');
 const TEMP_DIRS = [
   path.join(BASE_DIR, 'server', 'temp'),
   path.join(BASE_DIR, 'server', 'temp', 'uploads'),
+  path.join(BASE_DIR, 'movie-server', 'temp'),
   path.join(BASE_DIR, 'adult-server', 'temp'),
-  '/tmp'
+  process.platform === 'win32' ? path.join(os.tmpdir(), 'savedvideo-temp') : '/tmp'
 ];
 
-const MAX_FILE_AGE_MS = 2 * 60 * 60 * 1000; // 2 soatdan eski fayllar o'chiriladi
+const MAX_FILE_AGE_MS = 60 * 60 * 1000; // 1 soatdan eski umumiy fayllar
+const PART_FILE_AGE_MS = 15 * 60 * 1000; // 15 daqiqadan oshgan chala yuklamalar (.part, .ytdl, .frag)
 const WARN_THRESHOLD_MB = 500; // 500MB dan oshsa ogohlantirish
 
 /**
- * Berilgan papkadagi eski fayllarni tozalaydi
+ * Berilgan papkadagi eski va chala yuklangan fayllarni tozalaydi
  * @param {string} dir - Papka yo'li
  * @returns {{ deleted: number, freedMB: number }}
  */
@@ -40,10 +43,16 @@ function cleanDirectory(dir) {
         const filePath = path.join(dir, file);
         const stat = fs.statSync(filePath);
 
-        if (stat.isFile() && (now - stat.mtimeMs > MAX_FILE_AGE_MS || file.endsWith('.mp4') || file.endsWith('.tmp') || file.endsWith('.pcm'))) {
-          freedBytes += stat.size;
-          fs.unlinkSync(filePath);
-          deleted++;
+        if (stat.isFile()) {
+          const age = now - stat.mtimeMs;
+          const isPartialOrTemp = file.endsWith('.part') || file.endsWith('.ytdl') || file.endsWith('.tmp') || file.endsWith('.frag') || file.endsWith('.temp');
+          const isMediaTemp = file.endsWith('.mp4') || file.endsWith('.webm') || file.endsWith('.m4a') || file.endsWith('.mp3') || file.endsWith('.pcm');
+
+          if ((isPartialOrTemp && age > PART_FILE_AGE_MS) || (isMediaTemp && age > 30 * 60 * 1000) || age > MAX_FILE_AGE_MS) {
+            freedBytes += stat.size;
+            fs.unlinkSync(filePath);
+            deleted++;
+          }
         }
       } catch (e) {
         // Fayl o'chirishda xato — o'tkazib yuborish
@@ -88,26 +97,36 @@ async function performDeepClean() {
 
   // Linux tizim keshini tozalash
   try {
-    await runCmd('sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true');
+    if (process.platform !== 'win32') {
+      await runCmd('sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true');
+    }
   } catch (_) {}
 
   return { totalDeleted, totalFreedMB };
 }
 
 /**
- * Barcha bazalarni arxivlab ZIP fayl yaratadi (Instant Backup)
+ * Barcha 3 ta bot bazalarini (Downloader, Kino, 18+ Adult) arxivlab ZIP fayl yaratadi
  * @returns {Promise<string|null>} - Zip fayl yo'li
  */
 async function createFullBackupZip() {
   const dateStr = new Date().toISOString().split('T')[0];
-  const zipPath = path.join('/tmp', `full_backup_${dateStr}_${Date.now()}.zip`);
+  const outDir = process.platform === 'win32' ? os.tmpdir() : '/tmp';
+  const zipPath = path.join(outDir, `guardian_backup_${dateStr}_${Date.now()}.zip`);
+
+  const serverData = path.join(BASE_DIR, 'server', 'data');
+  const movieData = path.join(BASE_DIR, 'movie-server', 'data');
+  const adultData = path.join(BASE_DIR, 'adult-server', 'data');
+  const channelsJson = path.join(BASE_DIR, 'channels.json');
 
   try {
-    const serverData = path.join(BASE_DIR, 'server', 'data');
-    const movieData = path.join(BASE_DIR, 'movie-server', 'data');
-    const channelsJson = path.join(BASE_DIR, 'channels.json');
-
-    await runCmd(`zip -r ${zipPath} ${serverData} ${movieData} ${channelsJson} 2>/dev/null || zip -r ${zipPath} /root/savedvideo/server/data /root/savedvideo/movie-server/data /root/savedvideo/channels.json`);
+    if (process.platform === 'win32') {
+      // Windows PowerShell Compress-Archive or tar
+      await runCmd(`powershell -Command "Compress-Archive -Path '${serverData}','${movieData}','${adultData}','${channelsJson}' -DestinationPath '${zipPath}' -Force"`, 60000);
+    } else {
+      // Linux zip command
+      await runCmd(`zip -r "${zipPath}" "${serverData}" "${movieData}" "${adultData}" "${channelsJson}" 2>/dev/null || tar -czf "${zipPath}" "${serverData}" "${movieData}" "${adultData}" "${channelsJson}" 2>/dev/null`, 60000);
+    }
 
     if (fs.existsSync(zipPath)) {
       return zipPath;
@@ -146,3 +165,4 @@ async function cleanAllTempDirs() {
 }
 
 module.exports = { cleanAllTempDirs, trimPm2Logs, performDeepClean, createFullBackupZip };
+

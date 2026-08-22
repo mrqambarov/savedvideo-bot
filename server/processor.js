@@ -230,17 +230,20 @@ function applyAudioEffect(inputPath, outputName, effect) {
 }
 
 /**
- * Slices a 4-second audio snippet and converts it to raw 16-bit PCM mono 44.1kHz for Shazam API
+ * Slices an audio snippet and converts it to raw 16-bit PCM mono 44.1kHz for Shazam API
  * @param {string} inputPath 
  * @param {string} outputName 
+ * @param {number} startSec 
+ * @param {number} durationSec 
  * @returns {Promise<string>} Path to raw PCM file
  */
-function generateRawPcmForShazam(inputPath, outputName) {
+function generateRawPcmForShazam(inputPath, outputName, startSec = 3, durationSec = 5) {
   const outputPath = path.join(tempDir, `${outputName}.raw`);
+  const safeDuration = Math.min(Math.max(durationSec, 3), 5.5); // Ensure snippet stays <= 500KB for RapidAPI
   const args = [
     '-y',
-    '-ss', '3', // Start at 3 seconds to avoid intro silence or talking
-    '-t', '5',  // Slices 5 seconds (under 500KB limit for 44.1kHz mono s16le)
+    '-ss', String(startSec),
+    '-t', String(safeDuration),
     '-i', inputPath,
     '-f', 's16le',
     '-acodec', 'pcm_s16le',
@@ -251,11 +254,11 @@ function generateRawPcmForShazam(inputPath, outputName) {
   return runFFmpeg(args)
     .then(() => outputPath)
     .catch(() => {
-      // Fallback to starting from the absolute beginning if the file is shorter than 3 seconds
+      // Fallback to starting from the absolute beginning if file is shorter than startSec
       const fallbackArgs = [
         '-y',
         '-ss', '0',
-        '-t', '5',
+        '-t', String(safeDuration),
         '-i', inputPath,
         '-f', 's16le',
         '-acodec', 'pcm_s16le',

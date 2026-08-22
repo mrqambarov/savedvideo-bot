@@ -1,8 +1,13 @@
 'use strict';
+const path = require('path');
+module.paths.push(
+  path.join(__dirname, '..', '..', 'server', 'node_modules'),
+  path.join(__dirname, '..', '..', 'movie-server', 'node_modules'),
+  path.join(__dirname, '..', '..', 'node_modules')
+);
 const axios = require('axios');
 const fs = require('fs');
 const FormData = require('form-data');
-const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;

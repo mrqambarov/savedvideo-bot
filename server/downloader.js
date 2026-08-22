@@ -417,7 +417,15 @@ async function downloadAudio(url, outputName) {
  */
 function searchMusic(query, limit = 10) {
   return new Promise((resolve, reject) => {
-    const searchTarget = `ytsearch${limit}:${query}`;
+    // Clean query: strip unwanted noisy text / characters
+    const cleanQuery = String(query || '')
+      .replace(/[\r\n\t]+/g, ' ')
+      .replace(/[|&;$%@"<>()+,]/g, ' ')
+      .trim();
+
+    if (!cleanQuery) return resolve([]);
+
+    const searchTarget = `ytsearch${limit}:${cleanQuery}`;
     const cookiesArgs = getCookiesArgs();
     const ytDlpBin = getYtDlpBin();
 
@@ -434,7 +442,7 @@ function searchMusic(query, limit = 10) {
 
     execFile(ytDlpBin, args, { maxBuffer: 15 * 1024 * 1024, env }, (err, stdout, stderr) => {
       if (err && !stdout) {
-        return reject(new Error(stderr || err.message));
+        return resolve([]); // Gracefully resolve empty results instead of crashing
       }
 
       const results = [];
@@ -443,12 +451,14 @@ function searchMusic(query, limit = 10) {
         if (!line) continue;
         try {
           const item = JSON.parse(line);
-          results.push({
-            title: item.title,
-            id: item.id,
-            duration: item.duration || 0,
-            url: `https://www.youtube.com/watch?v=${item.id}`
-          });
+          if (item && item.id) {
+            results.push({
+              title: item.title || 'Unknown Title',
+              id: item.id,
+              duration: item.duration || 0,
+              url: `https://www.youtube.com/watch?v=${item.id}`
+            });
+          }
         } catch (e) {}
       }
       resolve(results);

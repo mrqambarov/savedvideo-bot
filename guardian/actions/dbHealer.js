@@ -1,10 +1,11 @@
 'use strict';
 const fs = require('fs');
+const path = require('path');
 const { validateJsonFile } = require('../checks/dbIntegrityCheck');
 const { sendAlert, sendCriticalAlert } = require('./alerter');
 
 /**
- * Buzilgan baza faylini zaxiradan (.bak) tiklaydi yoki toza holatda yaratadi
+ * Buzilgan baza faylini ko'p bosqichli zaxiradan (.bak, .bak.1, .bak.2, .bak.3) tiklaydi yoki toza holatda yaratadi
  * @param {string} name - Baza nomi
  * @param {string} filePath - Asl fayl yo'li
  * @param {string} defaultContent - Zaxira ham bo'lmasa yaratiladigan boshlang'ich JSON
@@ -13,25 +14,34 @@ const { sendAlert, sendCriticalAlert } = require('./alerter');
 async function healDatabase(name, filePath, defaultContent = '[]') {
   console.log(`[DB Healer] "${name}" bazasini avtomatik tiklash boshlandi...`);
 
-  const bakPath = `${filePath}.bak`;
-  let restoredFromBak = false;
+  const candidateBackups = [
+    `${filePath}.bak`,
+    `${filePath}.bak.1`,
+    `${filePath}.bak.2`,
+    `${filePath}.bak.3`
+  ];
 
-  // 1. Avval .bak nusxasi borligini va to'g'riligini tekshiramiz
-  if (fs.existsSync(bakPath)) {
-    const bakCheck = validateJsonFile(bakPath);
-    if (bakCheck.valid) {
-      try {
-        fs.copyFileSync(bakPath, filePath);
-        restoredFromBak = true;
-        console.log(`[DB Healer] "${name}" .bak zaxira nusxasidan muvaffaqiyatli tiklandi!`);
-      } catch (e) {
-        console.error(`[DB Healer] Nusxalashda xato:`, e.message);
+  let restoredFrom = null;
+
+  // 1. Zaxira nusxalarini navbatma-navbat tekshirib tiklash
+  for (const bakPath of candidateBackups) {
+    if (fs.existsSync(bakPath)) {
+      const bakCheck = validateJsonFile(bakPath);
+      if (bakCheck.valid) {
+        try {
+          fs.copyFileSync(bakPath, filePath);
+          restoredFrom = path.basename(bakPath);
+          console.log(`[DB Healer] "${name}" ${restoredFrom} zaxira nusxasidan muvaffaqiyatli tiklandi!`);
+          break;
+        } catch (e) {
+          console.error(`[DB Healer] Nusxalashda xato (${bakPath}):`, e.message);
+        }
       }
     }
   }
 
-  // 2. Agar .bak bo'lmasa yoki u ham buzilgan bo'lsa, defaultContent bilan yaratamiz
-  if (!restoredFromBak) {
+  // 2. Agar barcha zaxiralar buzilgan yoki yo'q bo'lsa, defaultContent bilan yaratamiz
+  if (!restoredFrom) {
     try {
       fs.writeFileSync(filePath, defaultContent, 'utf8');
       console.log(`[DB Healer] "${name}" boshlang'ich toza holatda qayta yaratildi.`);
@@ -43,7 +53,7 @@ async function healDatabase(name, filePath, defaultContent = '[]') {
   }
 
   // 3. Adminga xabar berish
-  const healMethod = restoredFromBak ? 'Oxirgi avto-zaxira (.bak) orqali' : 'Toza boshlang\'ich holatda';
+  const healMethod = restoredFrom ? `Avto-zaxira (${restoredFrom}) orqali` : 'Toza boshlang\'ich holatda';
   await sendAlert(
     `🩹 <b>Baza buzilganligi aniqlandi va o'zini o'zi tikladi!</b>\n\n` +
     `• Baza: <code>${name}</code>\n` +
@@ -57,3 +67,4 @@ async function healDatabase(name, filePath, defaultContent = '[]') {
 }
 
 module.exports = { healDatabase };
+

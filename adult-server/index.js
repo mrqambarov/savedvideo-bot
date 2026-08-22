@@ -19,8 +19,16 @@ app.use('/adult/api', apiRouter);
 // Fallback for direct local calls or old client calls
 app.use('/api', apiRouter);
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'adult-server', timestamp: new Date().toISOString() });
+app.get(['/health', '/adult/api/health'], (req, res) => {
+  const bStatus = typeof bot.getBotStatus === 'function' ? bot.getBotStatus() : { running: true };
+  res.json({
+    status: 'ok',
+    service: 'adult-server',
+    uptime: process.uptime(),
+    botRunning: bStatus.running,
+    lastPulse: bStatus.lastPulse || Date.now(),
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Boot 18+ Video Telegram Bot (only if distinct token is set)

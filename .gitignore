@@ -15,5 +15,6 @@ movie-server/node_modules/
 *.zip
 *.tar.gz
 .idea/
-
-
+guardian/data/
+logs/*.log
+*.log

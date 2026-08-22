@@ -1,4 +1,10 @@
 'use strict';
+const path = require('path');
+module.paths.push(
+  path.join(__dirname, '..', '..', 'server', 'node_modules'),
+  path.join(__dirname, '..', '..', 'movie-server', 'node_modules'),
+  path.join(__dirname, '..', '..', 'node_modules')
+);
 const axios = require('axios');
 
 /**
@@ -19,9 +25,22 @@ async function httpCheck({ name, url, timeoutMs = 8000, expectedStatus = 200 }) 
       headers: { 'User-Agent': 'Guardian-Watchdog/1.0' }
     });
     const latencyMs = Date.now() - start;
+    const body = res.data || {};
 
     if (res.status === expectedStatus || res.status < 500) {
-      return { ok: true, status: res.status, latencyMs };
+      // Agar bot running false bo'lsa
+      if (body.botRunning === false) {
+        return {
+          ok: false,
+          status: res.status,
+          latencyMs,
+          botRunning: false,
+          lastPulse: body.lastPulse,
+          data: body,
+          error: 'Telegram Bot polling to\'xtab qolgan (Deadlock)'
+        };
+      }
+      return { ok: true, status: res.status, latencyMs, botRunning: body.botRunning, lastPulse: body.lastPulse, data: body };
     }
     return {
       ok: false,

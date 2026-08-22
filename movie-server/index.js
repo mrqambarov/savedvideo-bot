@@ -15,8 +15,16 @@ app.use(cors());
 app.use(express.json());
 
 // Guardian Watchdog health endpoint (auth talab qilmaydi)
-app.get('/movies/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'movie-bot', uptime: process.uptime(), ts: Date.now() });
+app.get(['/movies/api/health', '/api/health'], (req, res) => {
+  const bStatus = typeof bot.getBotStatus === 'function' ? bot.getBotStatus() : { running: true };
+  res.json({
+    status: 'ok',
+    service: 'movie-bot',
+    uptime: process.uptime(),
+    botRunning: bStatus.running,
+    lastPulse: bStatus.lastPulse || Date.now(),
+    ts: Date.now()
+  });
 });
 
 // API Routes

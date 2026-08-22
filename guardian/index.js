@@ -6,7 +6,13 @@
  * ║  kuzatadi, o'zini o'zi tuzatadi va Adminga hisobot beradi   ║
  * ╚══════════════════════════════════════════════════════════════╝
  */
+const fs = require('fs');
 const path = require('path');
+module.paths.push(
+  path.join(__dirname, '..', 'server', 'node_modules'),
+  path.join(__dirname, '..', 'movie-server', 'node_modules'),
+  path.join(__dirname, '..', 'node_modules')
+);
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 // ─── Tekshiruvchilar ──────────────────────────────────────────────────────────
@@ -16,13 +22,14 @@ const { checkNetwork }           = require('./checks/networkCheck');
 const { checkSystemResources }   = require('./checks/diskCheck');
 const { checkAllSSL }            = require('./checks/sslCheck');
 const { checkAllDatabases }      = require('./checks/dbIntegrityCheck');
-const { checkDownloaderBinaries, updateYtDlp } = require('./checks/downloaderCheck');
+const { checkDownloaderBinaries, updateYtDlp, syntheticDownloadCheck } = require('./checks/downloaderCheck');
 
 // ─── Harakatlar ───────────────────────────────────────────────────────────────
 const { restartProcess, reloadNginx, restartAllProcesses, renewSSL } = require('./actions/restarter');
-const { cleanAllTempDirs, trimPm2Logs, performDeepClean } = require('./actions/cleaner');
+const { cleanAllTempDirs, trimPm2Logs, performDeepClean, createFullBackupZip } = require('./actions/cleaner');
 const { healDatabase }           = require('./actions/dbHealer');
-const { sendAlert, sendRecoveryAlert, sendCriticalAlert, sendMorningDigest } = require('./actions/alerter');
+const { sendAlert, sendRecoveryAlert, sendCriticalAlert, sendMorningDigest, sendDocumentToAdmin } = require('./actions/alerter');
+
 
 // ─── Sozlamalar ───────────────────────────────────────────────────────────────
 const CONFIG = {
@@ -186,7 +193,7 @@ async function databaseCycle() {
 
 /**
  * 4. YUKLASH DVIGATELI TSIKLI (har 2 soat)
- * yt-dlp va ffmpegni yangilaydi
+ * yt-dlp va ffmpegni yangilaydi hamda sintetik ekstraksiya testini o'tkazadi
  */
 async function downloaderCycle() {
   console.log('\n[Guardian] ─── Yuklash dvigateli tekshiruvi boshlandi ───');
@@ -195,8 +202,12 @@ async function downloaderCycle() {
   if (!binResults.ytdlp.ok) {
     console.warn('[Guardian] yt-dlp ishlamayapti, yangilashga urinish...');
     await updateYtDlp();
+  } else {
+    // Sintetik ekstraktor va formatlar testini o'tkazish
+    await syntheticDownloadCheck();
   }
 }
+
 
 /**
  * 5. RESURS TSIKLI (har 1 soat)
@@ -311,7 +322,35 @@ function checkMorningReportSchedule() {
 }
 
 /**
- * 8. HAFTALIK PROFILAKTIKA VA XOTIRA TOZALASH (Har yakshanba soat 04:00 da)
+ * 8. KUNLIK CLOUD TELEGRAM ZAXIRA (Har kuni soat 04:00 Tashkent vaqti)
+ * Barcha 3 ta bot bazalarini arxivlab Adminga yuboradi
+ */
+let lastDailyBackupDate = null;
+function checkDailyBackupSchedule() {
+  const now = new Date();
+  const tashkentHour = (now.getUTCHours() + 5) % 24;
+  const dateStr = now.toISOString().split('T')[0];
+
+  if (tashkentHour === 4 && lastDailyBackupDate !== dateStr) {
+    lastDailyBackupDate = dateStr;
+    runSafely('dailyTelegramBackup', async () => {
+      console.log('[Guardian] ─── Kunlik Avto-Backup boshlandi (04:00) ───');
+      const zipPath = await createFullBackupZip();
+      if (zipPath && fs.existsSync(zipPath)) {
+        const caption =
+          `💾 <b>KUNLIK AVTO-ZAXIRA (GUARDIAN CLOUD BACKUP)</b>\n\n` +
+          `📅 Sana: <b>${dateStr}</b>\n` +
+          `📦 <b>3 ta Bot (Downloader, Kino, 18+ Adult) va Kanallar</b> bazasi to'liq arxivlandi.\n` +
+          `🔒 <i>Ushbu fayl xavfsiz Telegram zaxirasi sifatida saqlandi.</i>`;
+        await sendDocumentToAdmin(zipPath, caption);
+        console.log('[Guardian] Kunlik zaxira nusxasi Adminga muvaffaqiyatli yuborildi.');
+      }
+    });
+  }
+}
+
+/**
+ * 9. HAFTALIK PROFILAKTIKA VA XOTIRA TOZALASH (Har yakshanba soat 04:00 da)
  */
 let lastWeeklyMaintenanceDate = null;
 function checkWeeklyMaintenanceSchedule() {
@@ -368,11 +407,12 @@ async function start() {
     await sendAlert(
       `🛡️ <b>GUARDIAN PRO FAOL ISHGA TUSHDI!</b>\n\n` +
       `✅ Barcha intellektual xizmatlar tayyor:\n` +
-      `• ⚡ Tezkor monitoring: <b>har 30s</b>\n` +
+      `• ⚡ Tezkor monitoring va Liveness Watchdog: <b>har 30s</b>\n` +
       `• 🌐 Tarmoq nazorati: <b>har 2 daqiqa</b>\n` +
-      `• 🗄 Baza Auto-Healer: <b>har 10 daqiqa</b>\n` +
-      `• 📥 yt-dlp & Dvigatel: <b>har 2 soat</b>\n` +
-      `• 🧹 Resurs va Temp tozalash: <b>har 1 soat</b>\n` +
+      `• 🗄 3-Bot Baza Auto-Healer & Rolling Backups: <b>har 10 daqiqa</b>\n` +
+      `• 📥 yt-dlp & Sintetik Dvigatel Testi: <b>har 2 soat</b>\n` +
+      `• 🧹 Resurs va Chala fayllarni tozalash: <b>har 1 soat</b>\n` +
+      `• 💾 Kunlik Telegram Cloud Avto-Zaxira: <b>har kuni 04:00 da</b>\n` +
       `• ☀️ Ertalabki hisobot: <b>har kuni 09:00 da</b>\n` +
       `• 🧹 Haftalik profilaktika: <b>har yakshanba 04:00 da</b>\n\n` +
       `<i>💡 Admin Telegram botda /guardian deb yozib interaktiv boshqaruv pultini ochishi mumkin!</i>`,
@@ -394,6 +434,7 @@ async function start() {
   setInterval(() => runSafely('resourceCycle', resourceCycle),       CONFIG.intervals.resource);
   setInterval(() => runSafely('sslCycle', sslCycle),                 CONFIG.intervals.ssl);
   setInterval(() => {
+    checkDailyBackupSchedule();
     checkMorningReportSchedule();
     checkWeeklyMaintenanceSchedule();
   }, 60 * 1000);
@@ -410,3 +451,4 @@ async function start() {
 }
 
 start();
+

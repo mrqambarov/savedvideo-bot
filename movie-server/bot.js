@@ -2349,7 +2349,32 @@ async function notifyNewMovie(movie) {
   }
 }
 
-module.exports = { startBot, stopBot, getBotInstance, notifyNewMovie };
+let lastPulseTimestamp = Date.now();
+
+function getBotStatus() {
+  return {
+    running: isBotRunning,
+    lastPulse: lastPulseTimestamp,
+    botUsername: botInstance?.botInfo?.username || process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot'
+  };
+}
+
+function getBotLiveness() {
+  return {
+    running: isBotRunning,
+    lastPulse: lastPulseTimestamp,
+    alive: isBotRunning
+  };
+}
+
+module.exports = {
+  startBot,
+  stopBot,
+  getBotInstance,
+  getBotStatus,
+  getBotLiveness,
+  notifyNewMovie
+};
 
 // Feature #8 — External notifyWatchers access
 module.exports.notifyWatchers = async function(movieCode, episodeNum) {
@@ -2361,3 +2386,4 @@ module.exports.notifyWatchers = async function(movieCode, episodeNum) {
     console.error('notifyWatchers error:', e.message);
   }
 };
+

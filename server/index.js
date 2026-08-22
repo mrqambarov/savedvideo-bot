@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 require('dotenv').config();
 
 const apiRouter = require('./api');
@@ -18,7 +19,15 @@ app.use(express.json());
 
 // Guardian Watchdog health endpoint (auth talab qilmaydi)
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'vibeconvert-bot', uptime: process.uptime(), ts: Date.now() });
+  const bStatus = typeof bot.getBotStatus === 'function' ? bot.getBotStatus() : { running: true };
+  res.json({
+    status: 'ok',
+    service: 'vibeconvert-bot',
+    uptime: process.uptime(),
+    botRunning: bStatus.running,
+    lastPulse: bStatus.lastPulse || Date.now(),
+    ts: Date.now()
+  });
 });
 
 // API Routes

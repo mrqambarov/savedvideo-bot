@@ -255,7 +255,7 @@ router.get('/config', (req, res) => {
       sponsorUsername: channels[0]?.username || '@XitFilm_uz',
       sponsorLink: channels[0]?.link || 'https://t.me/XitFilm_uz',
       sponsorChannels: channels.length > 0 ? channels : [{ username: '@XitFilm_uz', link: 'https://t.me/XitFilm_uz', title: '1-Homiy Kanal' }],
-      shazamKey: process.env.SHAZAM_KEY || '',
+      shazamKey: process.env.SHAZAM_RAPIDAPI_KEY || process.env.SHAZAM_KEY || '',
       sponsorEnabled: true
     });
   } catch (e) {
@@ -270,7 +270,10 @@ router.post('/config', (req, res) => {
       sponsorManager.saveChannels(sponsorChannels);
     }
     if (botToken) process.env.TELEGRAM_BOT_TOKEN = botToken;
-    if (shazamKey) process.env.SHAZAM_KEY = shazamKey;
+    if (shazamKey) {
+      process.env.SHAZAM_RAPIDAPI_KEY = shazamKey;
+      process.env.SHAZAM_KEY = shazamKey;
+    }
     res.json({ success: true, message: 'Downloader Bot sozlamalari saqlandi!' });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -354,10 +357,20 @@ router.post('/guardian/action', async (req, res) => {
       return res.json({ success: true, output: out.output });
     }
 
+    if (action === 'test_ytdlp') {
+      const { syntheticDownloadCheck } = require('../guardian/checks/downloaderCheck');
+      const resDl = await syntheticDownloadCheck();
+      return res.json({
+        success: resDl.ok,
+        message: resDl.ok ? "✓ yt-dlp video ekstraktori 100% sog'lom ishlamoqda!" : `⚠️ Ekstraksiya xatosi: ${resDl.error || 'Noma\'lum'}`
+      });
+    }
+
     if (action === 'scan_syntax') {
       const results = await diagnoseCodeSyntax();
       return res.json({ success: true, results });
     }
+
 
     if (action === 'backup') {
       const zipPath = await createFullBackupZip();
@@ -370,4 +383,286 @@ router.post('/guardian/action', async (req, res) => {
   }
 });
 
+// ─── Downloader Bot Broadcast Engine ─────────────────────────────────────────
+let currentBroadcast = {
+  total: 0,
+  sent: 0,
+  failed: 0,
+  status: 'idle',
+  logs: []
+};
+let isStopRequested = false;
+
+const scheduledFile = path.join(__dirname, 'data', 'scheduled_broadcasts.json');
+function getScheduledBroadcasts() {
+  try {
+    if (fs.existsSync(scheduledFile)) {
+      return JSON.parse(fs.readFileSync(scheduledFile, 'utf8'));
+    }
+  } catch (_) {}
+  return [];
+}
+
+function saveScheduledBroadcasts(list) {
+  try {
+    fs.writeFileSync(scheduledFile, JSON.stringify(list, null, 2), 'utf8');
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+router.get('/broadcast', (req, res) => {
+  res.json(currentBroadcast);
+});
+
+router.post('/broadcast/stop', (req, res) => {
+  if (currentBroadcast.status === 'running') {
+    isStopRequested = true;
+    currentBroadcast.logs.push(`⚠️ Admin tomonidan to'xtatish buyrug'i berildi (${new Date().toLocaleTimeString()})`);
+    return res.json({ success: true, message: 'Reklama to\'xtatilmoqda...' });
+  }
+  res.json({ success: true, message: 'Faol reklama yo\'q' });
+});
+
+router.post('/broadcast', async (req, res) => {
+  try {
+    const { message, mediaType, mediaUrl, buttons, targetSegment } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Xabar matni kiritilishi shart.' });
+    }
+
+    if (currentBroadcast.status === 'running') {
+      return res.status(400).json({ error: 'Hozirda boshqa reklama tarqatilmoqda.' });
+    }
+
+    let users = db.getUsers ? db.getUsers() : [];
+    if (!users || users.length === 0) {
+      return res.status(400).json({ error: 'Botda a\'zolar topilmadi.' });
+    }
+
+    if (targetSegment === 'active') {
+      const threeDaysAgo = Date.now() - (3 * 24 * 60 * 60 * 1000);
+      users = users.filter(u => u.lastActive && new Date(u.lastActive).getTime() >= threeDaysAgo);
+    } else if (targetSegment === 'inactive') {
+      const threeDaysAgo = Date.now() - (3 * 24 * 60 * 60 * 1000);
+      users = users.filter(u => !u.lastActive || new Date(u.lastActive).getTime() < threeDaysAgo);
+    }
+
+    if (users.length === 0) {
+      return res.status(400).json({ error: 'Tanlangan segment bo\'yicha foydalanuvchilar topilmadi.' });
+    }
+
+    isStopRequested = false;
+    currentBroadcast = {
+      total: users.length,
+      sent: 0,
+      failed: 0,
+      status: 'running',
+      logs: [`Downloader Bot reklama tarqatish boshlandi (${users.length} ta foydalanuvchi): ${new Date().toLocaleTimeString()}`]
+    };
+
+    if (typeof db.logActivity === 'function') {
+      db.logActivity({
+        bot: 'Downloader Bot',
+        icon: '📢',
+        text: `Downloader botda reklama yuborilmoqda (${users.length} ta foydalanuvchiga)`,
+        color: '#6366f1'
+      });
+    }
+
+    res.json({ success: true, message: 'Broadcasting started.', progress: currentBroadcast });
+
+    const botInstance = bot.getBotInstance ? bot.getBotInstance() : null;
+    if (!botInstance) {
+      currentBroadcast.status = 'failed';
+      currentBroadcast.logs.push('Xatolik: Downloader Telegram bot faol emas.');
+      return;
+    }
+
+    let replyMarkup = null;
+    if (Array.isArray(buttons) && buttons.length > 0) {
+      const kb = new InlineKeyboard();
+      let added = 0;
+      buttons.forEach((b) => {
+        if (b.label && b.url) {
+          kb.url(b.label, b.url);
+          added++;
+          if (added % 2 === 0) kb.row();
+        }
+      });
+      if (added > 0) replyMarkup = kb;
+    }
+
+    // Fon rejimida yuborish
+    (async () => {
+      for (let i = 0; i < users.length; i++) {
+        if (isStopRequested) {
+          currentBroadcast.status = 'stopped';
+          currentBroadcast.logs.push(`🛑 Reklama to'xtatildi. Yuborildi: ${currentBroadcast.sent}, Xato: ${currentBroadcast.failed}`);
+          return;
+        }
+
+        const user = users[i];
+        const chatId = user.id || user.chatId;
+        if (!chatId) continue;
+
+        try {
+          if (mediaType === 'photo' && mediaUrl) {
+            await botInstance.api.sendPhoto(chatId, mediaUrl, {
+              caption: message,
+              parse_mode: 'HTML',
+              reply_markup: replyMarkup || undefined
+            });
+          } else if (mediaType === 'video' && mediaUrl) {
+            await botInstance.api.sendVideo(chatId, mediaUrl, {
+              caption: message,
+              parse_mode: 'HTML',
+              reply_markup: replyMarkup || undefined
+            });
+          } else {
+            await botInstance.api.sendMessage(chatId, message, {
+              parse_mode: 'HTML',
+              reply_markup: replyMarkup || undefined,
+              disable_web_page_preview: false
+            });
+          }
+          currentBroadcast.sent++;
+        } catch (sendErr) {
+          currentBroadcast.failed++;
+          const errMsg = sendErr.message || '';
+          if (errMsg.includes('blocked') || errMsg.includes('deactivated')) {
+            // User blocked bot
+          } else if (errMsg.includes('429') || errMsg.includes('Too Many Requests')) {
+            await new Promise(r => setTimeout(r, 5000));
+          }
+        }
+
+        // 35ms oraliq (~28 xabar/sekund)
+        await new Promise(r => setTimeout(r, 35));
+      }
+
+      currentBroadcast.status = 'completed';
+      currentBroadcast.logs.push(`✅ Reklama yakunlandi. Jami: ${currentBroadcast.total}, Yetkazildi: ${currentBroadcast.sent}, Xato: ${currentBroadcast.failed} (${new Date().toLocaleTimeString()})`);
+    })();
+
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Rejalashtirilgan reklamalar (Scheduled Broadcasts)
+router.get('/broadcast/scheduled', (req, res) => {
+  res.json(getScheduledBroadcasts());
+});
+
+router.post('/broadcast/scheduled', (req, res) => {
+  try {
+    const { message, mediaType, mediaUrl, buttons, scheduledTime, targetSegment } = req.body;
+    if (!message || !scheduledTime) {
+      return res.status(400).json({ error: 'Xabar matni va yuborilish vaqti kiritilishi shart.' });
+    }
+
+    const scheduledDate = new Date(scheduledTime);
+    if (isNaN(scheduledDate.getTime()) || scheduledDate.getTime() <= Date.now()) {
+      return res.status(400).json({ error: 'Belgilangan vaqt kelajakda bo\'lishi kerak.' });
+    }
+
+    const list = getScheduledBroadcasts();
+    const newBroadcast = {
+      id: 'sch_' + Date.now(),
+      message,
+      mediaType: mediaType || 'text',
+      mediaUrl: mediaUrl || '',
+      buttons: Array.isArray(buttons) ? buttons : [],
+      targetSegment: targetSegment || 'all',
+      scheduledTime: scheduledDate.toISOString(),
+      createdAt: new Date().toISOString(),
+      status: 'pending'
+    };
+    list.unshift(newBroadcast);
+    saveScheduledBroadcasts(list);
+
+    res.json({ success: true, broadcast: newBroadcast, message: 'Reklama belgilangan vaqtga rejalashtirildi!' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.delete('/broadcast/scheduled/:id', (req, res) => {
+  try {
+    const list = getScheduledBroadcasts();
+    const updated = list.filter(b => b.id !== req.params.id);
+    saveScheduledBroadcasts(updated);
+    res.json({ success: true, message: 'Rejalashtirilgan reklama bekor qilindi.' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Rejalashtirilgan xabarlarni tekshiruvchi fon taymeri (har 30s)
+setInterval(async () => {
+  try {
+    const list = getScheduledBroadcasts();
+    const now = Date.now();
+    const dueItems = list.filter(b => b.status === 'pending' && new Date(b.scheduledTime).getTime() <= now);
+
+    for (const item of dueItems) {
+      item.status = 'processing';
+      saveScheduledBroadcasts(list);
+
+      // Trigger broadcast
+      const botInstance = bot.getBotInstance ? bot.getBotInstance() : null;
+      if (!botInstance) {
+        item.status = 'failed';
+        saveScheduledBroadcasts(list);
+        continue;
+      }
+
+      let users = db.getUsers ? db.getUsers() : [];
+      let sentCount = 0;
+      let failCount = 0;
+
+      let replyMarkup = null;
+      if (Array.isArray(item.buttons) && item.buttons.length > 0) {
+        const kb = new InlineKeyboard();
+        let added = 0;
+        item.buttons.forEach((b) => {
+          if (b.label && b.url) {
+            kb.url(b.label, b.url);
+            added++;
+            if (added % 2 === 0) kb.row();
+          }
+        });
+        if (added > 0) replyMarkup = kb;
+      }
+
+      for (const u of users) {
+        const chatId = u.id || u.chatId;
+        if (!chatId) continue;
+        try {
+          if (item.mediaType === 'photo' && item.mediaUrl) {
+            await botInstance.api.sendPhoto(chatId, item.mediaUrl, { caption: item.message, parse_mode: 'HTML', reply_markup: replyMarkup || undefined });
+          } else if (item.mediaType === 'video' && item.mediaUrl) {
+            await botInstance.api.sendVideo(chatId, item.mediaUrl, { caption: item.message, parse_mode: 'HTML', reply_markup: replyMarkup || undefined });
+          } else {
+            await botInstance.api.sendMessage(chatId, item.message, { parse_mode: 'HTML', reply_markup: replyMarkup || undefined });
+          }
+          sentCount++;
+        } catch (_) {
+          failCount++;
+        }
+        await new Promise(r => setTimeout(r, 40));
+      }
+
+      item.status = 'completed';
+      item.sent = sentCount;
+      item.failed = failCount;
+      item.completedAt = new Date().toISOString();
+      saveScheduledBroadcasts(list);
+    }
+  } catch (_) {}
+}, 30 * 1000);
+
 module.exports = router;
+

@@ -102,6 +102,43 @@ async function diagnoseCodeSyntax() {
   return results;
 }
 
+const { fetchProcessLogs } = require('../actions/restarter');
+
+/**
+ * PM2 va Log fayllaridan oxirgi xatoliklarni o'qiydi
+ * @param {string} serviceName 
+ * @returns {Promise<string>}
+ */
+async function readProcessCrashLogs(serviceName) {
+  let combined = '';
+  try {
+    // 1. PM2 orqali loglarni olish
+    const pm2Logs = await fetchProcessLogs(serviceName, 40);
+    combined += `\n${pm2Logs}`;
+  } catch (_) {}
+
+  // 2. Logs papkasidagi fayllardan o'qish
+  const logFileMap = {
+    'vibeconvert-bot': 'vibeconvert-error.log',
+    'movie-bot': 'movie-bot-error.log',
+    'adult-bot': 'adult-bot-error.log'
+  };
+
+  const logFileName = logFileMap[serviceName];
+  if (logFileName) {
+    const logPath = path.join(BASE_DIR, 'logs', logFileName);
+    if (fs.existsSync(logPath)) {
+      try {
+        const content = fs.readFileSync(logPath, 'utf8');
+        const lines = content.split('\n').slice(-40).join('\n');
+        combined += `\n${lines}`;
+      } catch (_) {}
+    }
+  }
+
+  return combined;
+}
+
 /**
  * 2. Aqlli Xatolik Klassifikatori va Avtomatik Davolovchi (AI Doctor Dispatcher)
  * Xatolik matniga qarab to'g'ri tuzatish choralarni avtomatik tanlaydi
@@ -110,53 +147,84 @@ async function diagnoseCodeSyntax() {
  * @returns {Promise<{ diagnosed: boolean, action: string, success: boolean }>}
  */
 async function diagnoseAndHeal(serviceName, errorMessage = '') {
-  const err = (errorMessage || '').toLowerCase();
-  console.log(`[AI Doctor] Diagnostika: [${serviceName}] -> "${errorMessage.substring(0, 100)}"`);
+  let fullErrorContext = errorMessage || '';
+
+  // Agar xatolik matni qisqa bo'lsa, log fayllaridan chuqur o'qish
+  if (fullErrorContext.length < 50 || fullErrorContext.includes('down') || fullErrorContext.includes('failure')) {
+    const crashLogs = await readProcessCrashLogs(serviceName);
+    fullErrorContext += `\n${crashLogs}`;
+  }
+
+  const err = fullErrorContext.toLowerCase();
+  console.log(`[AI Doctor] Diagnostika: [${serviceName}] -> Tahlil qilinmoqda (${fullErrorContext.length} belgili log)...`);
+
+  let rootCause = 'Noma\'lum xatolik / jarayon to\'xtashi';
+  let actionTaken = 'Standart qayta ishga tushirish';
+  let success = false;
+  let diagnosed = false;
 
   // Ssenariy 1: Port band / EADDRINUSE
-  if (err.includes('eaddrinuse') || err.includes('address already in use') || err.includes('port')) {
+  if (err.includes('eaddrinuse') || err.includes('address already in use') || err.includes('bind')) {
+    diagnosed = true;
     const portMap = { 'vibeconvert-bot': 5000, 'movie-bot': 5001, 'adult-bot': 5002 };
     const port = portMap[serviceName] || 5000;
-    console.log(`[AI Doctor] Ssenariy: Port ${port} band. Port tozalash va restart...`);
+    rootCause = `Port :${port} boshqa zombi jarayon tomonidan band qilingan (EADDRINUSE)`;
+    console.log(`[AI Doctor] Ssenariy: ${rootCause}. Port tozalash va restart...`);
     await freePortIfOccupied(port);
-    const ok = await restartProcess(serviceName, true);
-    recordHealingAction(`Port :${port} EADDRINUSE on ${serviceName}`, 'Zombie process holding port', `freePort(${port}) & restart`, ok);
-    return { diagnosed: true, action: `Port :${port} bo'shatildi va ${serviceName} qayta ishga tushirildi`, success: ok };
+    success = await restartProcess(serviceName, true);
+    actionTaken = `Port :${port} bo'shatildi va ${serviceName} qayta ishga tushirildi`;
   }
 
   // Ssenariy 2: Telegram Webhook / 409 Conflict
-  if (err.includes('409') || err.includes('conflict') || err.includes('getupdates') || err.includes('webhook')) {
-    console.log(`[AI Doctor] Ssenariy: 409 Conflict. Webhook tozalash va restart...`);
-    const ok = await restartProcess(serviceName, true);
-    recordHealingAction(`409 Conflict on ${serviceName}`, 'Duplicate polling or active webhook', 'deleteWebhook & restart', ok);
-    return { diagnosed: true, action: `409 ziddiyati tozalandi va ${serviceName} qayta ulandi`, success: ok };
+  else if (err.includes('409') || err.includes('conflict') || err.includes('getupdates') || err.includes('webhook')) {
+    diagnosed = true;
+    rootCause = 'Telegram 409 Conflict (Boshqa joyda ochiq qolgan polling yoki eski webhook)';
+    console.log(`[AI Doctor] Ssenariy: ${rootCause}. Webhook tozalash va restart...`);
+    success = await restartProcess(serviceName, true);
+    actionTaken = `Webhook to'liq tozalandi va ${serviceName} polling rejimiga qayta ulandi`;
   }
 
-  // Ssenariy 3: Missing Node Package / MODULE_NOT_FOUND
-  if (err.includes('cannot find module') || err.includes('module_not_found')) {
-    console.log(`[AI Doctor] Ssenariy: Paket yetishmayapti. npm install ishga tushirilmoqda...`);
+  // Ssenariy 3: Telegram Rate Limit / 429 Too Many Requests
+  else if (err.includes('429') || err.includes('too many requests') || err.includes('retry after')) {
+    diagnosed = true;
+    rootCause = 'Telegram API Rate Limit (429 Too Many Requests - spam himoyasi)';
+    console.log(`[AI Doctor] Ssenariy: ${rootCause}. Cooldown qo'llanilmoqda...`);
+    await new Promise(r => setTimeout(r, 10000));
+    success = await restartProcess(serviceName, true);
+    actionTaken = `10 soniya cooldown berildi va ${serviceName} qayta yoqildi`;
+  }
+
+  // Ssenariy 4: Missing Node Package / MODULE_NOT_FOUND
+  else if (err.includes('cannot find module') || err.includes('module_not_found')) {
+    diagnosed = true;
+    rootCause = 'Yetishmayotgan Node.js paketi (MODULE_NOT_FOUND)';
+    console.log(`[AI Doctor] Ssenariy: ${rootCause}. npm install ishga tushirilmoqda...`);
     try {
-      await runCmd('cd /root/savedvideo && npm run install:all || npm install', 60000);
-      const ok = await restartProcess(serviceName, true);
-      recordHealingAction(`Missing module in ${serviceName}`, 'Missing npm dependency', 'npm install & restart', ok);
-      return { diagnosed: true, action: `Yetishmayotgan paketlar o'rnatildi va ${serviceName} qayta ishga tushirildi`, success: ok };
+      if (process.platform !== 'win32') {
+        await runCmd('cd /root/savedvideo && npm run install:all || npm install', 60000);
+      }
+      success = await restartProcess(serviceName, true);
+      actionTaken = `npm paketlar o'rnatildi va ${serviceName} qayta yoqildi`;
     } catch (npmErr) {
-      return { diagnosed: true, action: `npm install xatosi: ${npmErr.message}`, success: false };
+      actionTaken = `npm install muvaffaqiyatsiz: ${npmErr.message}`;
     }
   }
 
-  // Ssenariy 4: Disk to'lib ketgan / ENOSPC
-  if (err.includes('enospc') || err.includes('no space left') || err.includes('disk full')) {
-    console.log(`[AI Doctor] Ssenariy: Disk to'ldi. Favqulodda tozalash...`);
+  // Ssenariy 5: Disk to'lib ketgan / ENOSPC
+  else if (err.includes('enospc') || err.includes('no space left') || err.includes('disk full')) {
+    diagnosed = true;
+    rootCause = 'Server diski to\'lib qolgan (ENOSPC)';
+    console.log(`[AI Doctor] Ssenariy: ${rootCause}. Favqulodda tozalash...`);
     const { totalDeleted, totalFreedMB } = await performDeepClean();
-    const ok = await restartProcess(serviceName, true);
-    recordHealingAction(`Disk ENOSPC in ${serviceName}`, 'Disk storage exhausted', `deepClean (${totalFreedMB}MB freed)`, ok);
-    return { diagnosed: true, action: `Disk tozalandi (${totalFreedMB}MB) va ${serviceName} qayta ishga tushirildi`, success: ok };
+    success = await restartProcess(serviceName, true);
+    actionTaken = `Disk tozalandi (${totalFreedMB}MB bo'shatildi) va ${serviceName} qayta yoqildi`;
   }
 
-  // Ssenariy 5: JSON Baza buzilgan / JSON.parse error
-  if (err.includes('unexpected token') || err.includes('json.parse') || err.includes('syntaxerror: unexpected')) {
-    console.log(`[AI Doctor] Ssenariy: JSON baza buzilgan. Baza auto-healer ishga tushmoqda...`);
+  // Ssenariy 6: JSON Baza buzilgan / JSON.parse error
+  else if (err.includes('unexpected token') || err.includes('json.parse') || err.includes('syntaxerror: unexpected')) {
+    diagnosed = true;
+    rootCause = 'Baza JSON fayli buzilgan (JSON.parse SyntaxError)';
+    console.log(`[AI Doctor] Ssenariy: ${rootCause}. Baza auto-healer ishga tushmoqda...`);
     const { checkAllDatabases } = require('../checks/dbIntegrityCheck');
     const dbs = await checkAllDatabases();
     let healedCount = 0;
@@ -166,38 +234,69 @@ async function diagnoseAndHeal(serviceName, errorMessage = '') {
         healedCount++;
       }
     }
-    const ok = await restartProcess(serviceName, true);
-    recordHealingAction(`JSON Corruption in ${serviceName}`, 'Corrupted database file', `healDatabase (${healedCount} fixed)`, ok);
-    return { diagnosed: true, action: `${healedCount} ta baza tiklandi va ${serviceName} restart qilindi`, success: ok };
+    success = await restartProcess(serviceName, true);
+    actionTaken = `${healedCount} ta buzilgan baza zaxiradan tiklandi va ${serviceName} qayta yoqildi`;
   }
 
-  // Ssenariy 6: yt-dlp / Extractors Outdated
-  if (err.includes('yt-dlp') || err.includes('extractor') || err.includes('cannot parse data') || err.includes('sign in to confirm')) {
-    console.log(`[AI Doctor] Ssenariy: yt-dlp yangilanishi talab etiladi...`);
+  // Ssenariy 7: RAM Heap out of memory / Memory leak
+  else if (err.includes('heap out of memory') || err.includes('allocation failed') || err.includes('javascript heap')) {
+    diagnosed = true;
+    rootCause = 'Xotira toshib ketishi (JavaScript Heap Out of Memory)';
+    console.log(`[AI Doctor] Ssenariy: ${rootCause}. Kesh tozalash va restart...`);
+    await performDeepClean();
+    success = await restartProcess(serviceName, true);
+    actionTaken = `Xotira bo'shatildi va ${serviceName} yangi xotira bilan qayta yoqildi`;
+  }
+
+  // Ssenariy 8: yt-dlp / Extractors Outdated
+  else if (err.includes('yt-dlp') || err.includes('extractor') || err.includes('cannot parse data') || err.includes('sign in to confirm')) {
+    diagnosed = true;
+    rootCause = 'yt-dlp video ekstraktori eskirgan yoki platforma tomonidan bloklangan';
+    console.log(`[AI Doctor] Ssenariy: ${rootCause}. Yangilanish amalga oshirilmoqda...`);
     const upRes = await updateYtDlp();
-    recordHealingAction(`yt-dlp download failure in ${serviceName}`, 'Outdated extractor', 'updateYtDlp()', upRes.success);
-    return { diagnosed: true, action: `yt-dlp yangilandi: ${upRes.success ? 'Muvaffaqiyatli' : upRes.output}`, success: upRes.success };
+    actionTaken = `yt-dlp yangilandi (${upRes.success ? 'OK' : 'Xato'})`;
+    success = upRes.success;
   }
 
-  // Ssenariy 7: Nginx / Web gateway xatosi
-  if (err.includes('502 bad gateway') || err.includes('504 gateway timeout') || err.includes('nginx')) {
-    console.log(`[AI Doctor] Ssenariy: 502/504 Nginx xatosi. Nginx va botlarni sinxron qayta yuklash...`);
+  // Ssenariy 9: Nginx / Web gateway xatosi
+  else if (err.includes('502 bad gateway') || err.includes('504 gateway timeout') || err.includes('nginx')) {
+    diagnosed = true;
+    rootCause = 'Nginx 502/504 Gateway javob bermasligi';
+    console.log(`[AI Doctor] Ssenariy: ${rootCause}. Nginx va botlarni sinxron tiklash...`);
     await reloadNginx();
-    const ok = await restartProcess(serviceName, true);
-    recordHealingAction(`502/504 Bad Gateway on ${serviceName}`, 'Nginx proxy mismatch', 'reloadNginx() & restartProcess()', ok);
-    return { diagnosed: true, action: `Nginx va ${serviceName} sinxron tiklandi`, success: ok };
+    success = await restartProcess(serviceName, true);
+    actionTaken = `Nginx va ${serviceName} sinxron tiklandi`;
   }
 
-  // Standart fallback: Xavfsiz qayta yuklash
-  console.log(`[AI Doctor] Standart fallback: ${serviceName} restart qilinmoqda...`);
-  const ok = await restartProcess(serviceName);
-  recordHealingAction(`General failure in ${serviceName}`, errorMessage.substring(0, 100), 'restartProcess()', ok);
-  return { diagnosed: false, action: `${serviceName} qayta yuklandi`, success: ok };
+  // Standart fallback
+  else {
+    console.log(`[AI Doctor] Standart fallback: ${serviceName} qayta ishga tushirilmoqda...`);
+    success = await restartProcess(serviceName);
+    actionTaken = `${serviceName} qayta yuklandi`;
+  }
+
+  // Tarixga yozish
+  recordHealingAction(`Crash / Incident on ${serviceName}`, rootCause, actionTaken, success);
+
+  // Adminga chiroyli xabar yuborish
+  await sendAlert(
+    `🧠 <b>AI DOCTOR — AUTO-HEALING NATIJASI:</b>\n\n` +
+    `• Servis: <code>${serviceName}</code>\n` +
+    `• Aniqlangan sabab: <b>${rootCause}</b>\n` +
+    `• Ko'rilgan chora: <b>${actionTaken}</b>\n` +
+    `• Holat: <b>${success ? '✅ Muvaffaqiyatli tiklandi' : '⚠️ Qo\'shimcha tekshiruv zarur'}</b>`,
+    `ai_heal_${serviceName}_${Date.now()}`,
+    success ? 'ok' : 'warn'
+  );
+
+  return { diagnosed, action: actionTaken, success };
 }
 
 module.exports = {
   diagnoseAndHeal,
   diagnoseCodeSyntax,
+  readProcessCrashLogs,
   recordHealingAction,
   getHealingHistory
 };
+

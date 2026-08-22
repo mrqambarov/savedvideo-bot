@@ -439,12 +439,13 @@ router.post('/broadcast', authMiddleware, async (req, res) => {
       replyMarkup = new InlineKeyboard().url(buttonText.trim(), buttonUrl.trim());
     }
 
+    let isAdultStop = false;
     let index = 0;
     const interval = setInterval(async () => {
-      if (index >= users.length) {
+      if (index >= users.length || isAdultStop) {
         clearInterval(interval);
-        currentBroadcast.status = 'completed';
-        currentBroadcast.logs.push(`Reklama tugatildi: ${new Date().toLocaleTimeString()}. Muvaffaqiyatli: ${currentBroadcast.sent}, Xato: ${currentBroadcast.failed}`);
+        currentBroadcast.status = isAdultStop ? 'stopped' : 'completed';
+        currentBroadcast.logs.push(`Reklama ${isAdultStop ? 'to\'xtatildi' : 'tugatildi'}: ${new Date().toLocaleTimeString()}. Muvaffaqiyatli: ${currentBroadcast.sent}, Xato: ${currentBroadcast.failed}`);
         return;
       }
 
@@ -479,5 +480,15 @@ router.post('/broadcast', authMiddleware, async (req, res) => {
   }
 });
 
+router.post('/broadcast/stop', authMiddleware, (req, res) => {
+  if (currentBroadcast.status === 'running') {
+    currentBroadcast.status = 'stopped';
+    currentBroadcast.logs.push(`⚠️ Admin tomonidan to'xtatildi (${new Date().toLocaleTimeString()})`);
+    return res.json({ success: true, message: '18+ Bot reklamasi to\'xtatilmoqda...' });
+  }
+  res.json({ success: true, message: 'Faol reklama yo\'q' });
+});
+
 module.exports = router;
+
 

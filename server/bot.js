@@ -1,5 +1,7 @@
 const { Bot, InputFile, InlineKeyboard, Keyboard } = require('grammy');
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+require('dotenv').config();
 const fs = require('fs');
 const axios = require('axios');
 const { execFile } = require('child_process');
@@ -46,29 +48,58 @@ function escapeHTML(str) {
 /**
  * Tries to identify music from a file path using local metadata and Shazam API
  * @param {string} filePath 
- * @returns {Promise<object | null>} { title, artist } or null
+ * @returns {Promise<object | null>} { title, artist, image, shareUrl } or null
  */
 async function identifyMusicFromPath(filePath) {
   try {
-    // A. Check local metadata first
+    // A. Check local metadata first (if valid and not generic)
     const local = await getFileMetadata(filePath);
-    if (local && local.title && local.title !== 'Unknown Title') {
-      return { title: local.title, artist: local.artist || 'Unknown Artist' };
+    if (
+      local && 
+      local.title && 
+      local.title !== 'Unknown Title' && 
+      local.artist && 
+      local.artist !== 'Unknown Artist' &&
+      !/instagram|tiktok|snapchat|youtube|audio|sound|video|unknown/i.test(local.title)
+    ) {
+      return { 
+        title: local.title, 
+        artist: local.artist, 
+        album: local.album || 'Unknown Album' 
+      };
     }
 
-    // B. Shazam API fallback
-    const apiKey = process.env.SHAZAM_RAPIDAPI_KEY;
+    // B. Shazam API fallback with multi-offset time slicing
+    const apiKey = process.env.SHAZAM_RAPIDAPI_KEY || process.env.SHAZAM_KEY;
     if (apiKey) {
       const fileId = Math.random().toString(36).substring(2, 8);
-      const rawPcmPath = await processor.generateRawPcmForShazam(filePath, `id_tmp_${fileId}`);
-      const match = await queryShazamAPI(rawPcmPath, apiKey);
-      
-      try {
-        if (fs.existsSync(rawPcmPath)) fs.unlinkSync(rawPcmPath);
-      } catch (e) {}
+      let rawPcmPath = await processor.generateRawPcmForShazam(filePath, `id_tmp_${fileId}`, 3, 5);
+      let match = await queryShazamAPI(rawPcmPath, apiKey).catch(() => null);
+      try { if (fs.existsSync(rawPcmPath)) fs.unlinkSync(rawPcmPath); } catch (_) {}
+
+      // If initial 3s offset didn't match, retry at 10s (often the chorus or main beat)
+      if (!match) {
+        const fileId2 = Math.random().toString(36).substring(2, 8);
+        rawPcmPath = await processor.generateRawPcmForShazam(filePath, `id_tmp_${fileId2}`, 10, 5);
+        match = await queryShazamAPI(rawPcmPath, apiKey).catch(() => null);
+        try { if (fs.existsSync(rawPcmPath)) fs.unlinkSync(rawPcmPath); } catch (_) {}
+      }
+
+      // If 10s offset didn't match, retry at 20s
+      if (!match) {
+        const fileId3 = Math.random().toString(36).substring(2, 8);
+        rawPcmPath = await processor.generateRawPcmForShazam(filePath, `id_tmp_${fileId3}`, 20, 5);
+        match = await queryShazamAPI(rawPcmPath, apiKey).catch(() => null);
+        try { if (fs.existsSync(rawPcmPath)) fs.unlinkSync(rawPcmPath); } catch (_) {}
+      }
 
       if (match && match.title) {
-        return { title: match.title, artist: match.artist || 'Unknown Artist' };
+        return { 
+          title: match.title, 
+          artist: match.artist || 'Unknown Artist',
+          image: match.image || null,
+          shareUrl: match.shareUrl || 'https://www.shazam.com'
+        };
       }
     }
   } catch (err) {
@@ -147,6 +178,7 @@ async function downloadTelegramFile(ctx, fileId, destPath) {
  */
 async function queryShazamAPI(rawPcmPath, apiKey) {
   try {
+    if (!fs.existsSync(rawPcmPath)) return null;
     const rawData = fs.readFileSync(rawPcmPath);
     const base64Data = rawData.toString('base64');
 
@@ -163,17 +195,18 @@ async function queryShazamAPI(rawPcmPath, apiKey) {
     });
 
     if (response.data && response.data.track) {
+      const track = response.data.track;
       return {
-        title: response.data.track.title,
-        artist: response.data.track.subtitle,
-        image: response.data.track.images && response.data.track.images.background,
-        shareUrl: response.data.track.url
+        title: track.title,
+        artist: track.subtitle || 'Unknown Artist',
+        image: track.images?.coverarthq || track.images?.coverart || track.images?.background || null,
+        shareUrl: track.url || 'https://www.shazam.com'
       };
     }
     return null;
   } catch (error) {
-    console.error('Shazam API Query Error:', error.message);
-    throw new Error('Shazam recognition failed: ' + (error.response?.data?.message || error.message));
+    console.error('Shazam API Query Error:', error.response?.data?.message || error.message);
+    return null;
   }
 }
 // Referral / contest info — shared by the /referal command and the keyboard button.
@@ -974,7 +1007,7 @@ function startBot(token) {
           const url = urlCache.get(shortId);
 
           await ctx.answerCallbackQuery({ text: '🎵 MP3 musiqa ajratilmoqda...' });
-          const statusMsg = await ctx.reply('🎧 **Videodan MP3 musiqa ajratilmoqda...**', { parse_mode: 'Markdown' });
+          const statusMsg = await ctx.reply('🎧 <b>Videodan MP3 musiqa ajratilmoqda va tahlil qilinmoqda...</b>', { parse_mode: 'HTML' });
 
           let tempDlPath = null;
           try {
@@ -985,19 +1018,49 @@ function startBot(token) {
             }
 
             const audioPath = await processor.extractAudio(mediaPath, `audio_${shortId}`);
-            const botUsername = ctx.me ? ctx.me.username : 'vibeconvert_bot';
-            const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
-            const captionText = `🎵 @${botUsername} orqali ajratib olindi 🚀\n\n🍿 Yangi HD kinolar va premyeralar: @${movieBotUsername}`;
+            
+            // Step: Identify song via metadata and Shazam
+            const song = await identifyMusicFromPath(audioPath);
 
-            await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
+            const botUsername = ctx.me ? ctx.me.username : 'savemedia_music_bot';
+            const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
+
+            let audioTitle = `Audio_${shortId}`;
+            let audioPerformer = `@${botUsername}`;
+            let captionText = `🎵 @${botUsername} orqali ajratib olindi 🚀\n\n🍿 Yangi HD kinolar va premyeralar: @${movieBotUsername}`;
+
+            const qId = Math.random().toString(36).substring(2, 8);
+            const keyboard = new InlineKeyboard();
+
+            if (song && song.title) {
+              audioTitle = song.title;
+              audioPerformer = song.artist || `@${botUsername}`;
+              captionText = `🔍 <b>Musiqa aniqlandi!</b>\n\n📌 Nomi: <b>${escapeHTML(song.title)}</b>\n👤 Ijrochi: <i>${escapeHTML(song.artist)}</i>\n\n🚀 @${botUsername} orqali ajratib olindi\n🍿 Yangi kinolar: @${movieBotUsername}`;
+
+              urlCache.set(`lyr_${qId}`, { title: song.title, artist: song.artist });
+              keyboard
+                .text('🎵 To\'liq Original MP3 ni yuklash', `dl_shz_mp3:${qId}`)
+                .row()
+                .text('📜 Qo\'shiq Matni (Lyrics)', `lyrics_q:${qId}`)
+                .row()
+                .text('🪐 Boshqa variantlar (1..10)', `src_shz_list:${qId}`);
+            } else {
+              urlCache.set(`retry_aud_${qId}`, { url, shortId });
+              keyboard
+                .text('🔍 Originalini qidirish (Shazam)', `aud_shz_retry:${qId}`);
+            }
+
+            await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id).catch(() => {});
             await ctx.replyWithAudio(new InputFile(audioPath), {
               caption: captionText,
-              title: `Audio_${shortId}`,
-              performer: `@${botUsername}`
+              parse_mode: 'HTML',
+              title: audioTitle,
+              performer: audioPerformer,
+              reply_markup: keyboard
             });
 
             db.trackDownload('audio');
-            db.trackUserDownload(ctx.from.id, `MP3 Audio`, 'audio', url || 'media');
+            db.trackUserDownload(ctx.from.id, audioTitle, 'audio', url || 'media');
 
             try {
               if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
@@ -1008,6 +1071,89 @@ function startBot(token) {
             try {
               await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `❌ Musiqani ajratishda xatolik: ${escapeHTML(err.message)}`);
             } catch (e) {}
+          }
+          return;
+        }
+
+        // Shazam Retry Handler
+        if (data.startsWith('aud_shz_retry:')) {
+          const qId = data.split(':')[1];
+          const item = urlCache.get(`retry_aud_${qId}`);
+          if (!item || !item.url) {
+            return await ctx.answerCallbackQuery({ text: 'Havola muddati o\'tgan. Qayta yuboring.', show_alert: true });
+          }
+          await ctx.answerCallbackQuery({ text: '🔍 Shazam orqali qayta qidirilmoqda...' });
+          const waitMsg = await ctx.reply('🛰 <b>Shazam bazasidan to\'liq tahlil qilinmoqda...</b>', { parse_mode: 'HTML' });
+          let tempAudio = null;
+          try {
+            tempAudio = await downloader.downloadAudio(item.url, `retry_${qId}`);
+            const song = await identifyMusicFromPath(tempAudio);
+            if (song && song.title) {
+              urlCache.set(`lyr_${qId}`, { title: song.title, artist: song.artist });
+              const kb = new InlineKeyboard()
+                .text('🎵 To\'liq Original MP3 ni yuklash', `dl_shz_mp3:${qId}`)
+                .row()
+                .text('📜 Qo\'shiq Matni (Lyrics)', `lyrics_q:${qId}`)
+                .row()
+                .text('🪐 Boshqa variantlar (1..10)', `src_shz_list:${qId}`);
+
+              const text = `🔍 <b>Musiqa aniqlandi!</b>\n\n📌 Nomi: <b>${escapeHTML(song.title)}</b>\n👤 Ijrochi: <i>${escapeHTML(song.artist)}</i>`;
+              if (song.image) {
+                await ctx.replyWithPhoto(song.image, { caption: text, parse_mode: 'HTML', reply_markup: kb });
+                await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id).catch(() => {});
+              } else {
+                await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, text, { parse_mode: 'HTML', reply_markup: kb });
+              }
+            } else {
+              await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Kechirasiz, bu videodagi musiqani Shazam orqali aniqlab bo'lmadi.`);
+            }
+            if (fs.existsSync(tempAudio)) fs.unlinkSync(tempAudio);
+          } catch (e) {
+            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Xatolik: ${e.message}`);
+            if (tempAudio && fs.existsSync(tempAudio)) fs.unlinkSync(tempAudio);
+          }
+          return;
+        }
+
+        // Search options from identified track
+        if (data.startsWith('src_shz_list:')) {
+          const qId = data.split(':')[1];
+          const trackInfo = urlCache.get(`lyr_${qId}`);
+          if (!trackInfo) {
+            return await ctx.answerCallbackQuery({ text: 'Muddati o\'tgan. Qayta urinib ko\'ring.', show_alert: true });
+          }
+          await ctx.answerCallbackQuery({ text: '🪐 Variantlar qidirilmoqda...' });
+          const waitMsg = await ctx.reply(`🔍 <b>«${escapeHTML(trackInfo.artist)} — ${escapeHTML(trackInfo.title)}»</b> variantlari qidirilmoqda...`, { parse_mode: 'HTML' });
+          try {
+            const results = await downloader.searchMusic(`${trackInfo.artist} ${trackInfo.title}`, 10);
+            if (!results || results.length === 0) {
+              return await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Boshqa variantlar topilmadi.`);
+            }
+            const searchId = Math.random().toString(36).substring(2, 8);
+            searchCache.set(searchId, results);
+
+            let textMsg = `🔍 <b>${escapeHTML(trackInfo.artist)} — ${escapeHTML(trackInfo.title)}</b>\n\nQuyidagi versiyalardan birini tanlang:\n\n`;
+            results.forEach((r, idx) => {
+              textMsg += `${idx + 1}. <b>${escapeHTML(r.title)}</b> ${formatDuration(r.duration)}\n`;
+            });
+
+            const keyboard = new InlineKeyboard();
+            for (let i = 0; i < Math.min(5, results.length); i++) {
+              keyboard.text(`${i + 1}`, `src_dl:${searchId}:${i}`);
+            }
+            keyboard.row();
+            if (results.length > 5) {
+              for (let i = 5; i < results.length; i++) {
+                keyboard.text(`${i + 1}`, `src_dl:${searchId}:${i}`);
+              }
+              keyboard.row();
+            }
+            keyboard.text('❌ Yopish', `src_close:${searchId}`);
+
+            await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id).catch(() => {});
+            await ctx.reply(textMsg, { parse_mode: 'HTML', reply_markup: keyboard });
+          } catch (err) {
+            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Variantlarni qidirishda xatolik: ${err.message}`);
           }
           return;
         }
@@ -1046,25 +1192,35 @@ function startBot(token) {
           if (!trackInfo) {
             return await ctx.answerCallbackQuery({ text: 'Muddati o\'tgan. Qayta urinib ko\'ring.', show_alert: true });
           }
-          await ctx.answerCallbackQuery({ text: '🎵 MP3 qidirilmoqda va yuklanmoqda...' });
-          const statusMsg = await ctx.reply(`🎵 <b>«${escapeHTML(trackInfo.title)}»</b> MP3 varianti qidirilmoqda...`, { parse_mode: 'HTML' });
+          await ctx.answerCallbackQuery({ text: '🎵 Original MP3 qidirilmoqda va yuklanmoqda...' });
+          const statusMsg = await ctx.reply(`🎵 <b>«${escapeHTML(trackInfo.artist)} — ${escapeHTML(trackInfo.title)}»</b> original MP3 qidirilmoqda...`, { parse_mode: 'HTML' });
           try {
-            const results = await downloader.searchMusic(`${trackInfo.artist} ${trackInfo.title}`, 1);
+            let results = await downloader.searchMusic(`${trackInfo.artist} ${trackInfo.title}`, 3);
             if (!results || results.length === 0) {
-              return await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `❌ Qo'shiq topilmadi.`);
+              results = await downloader.searchMusic(`${trackInfo.title} audio`, 3);
+            }
+            if (!results || results.length === 0) {
+              return await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `❌ Kechirasiz, «${escapeHTML(trackInfo.title)}» qo'shig'i topilmadi.`);
             }
             const target = results[0];
-            await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `📥 <b>«${escapeHTML(target.title)}»</b> yuklanmoqda...`, { parse_mode: 'HTML' });
+            await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `📥 <b>«${escapeHTML(target.title)}»</b> to'liq original MP3 yuklanmoqda...`, { parse_mode: 'HTML' });
             const audioPath = await downloader.downloadAudio(target.url, `shz_${qId}`);
-            const botUsername = ctx.me.username;
+            const botUsername = ctx.me ? ctx.me.username : 'savemedia_music_bot';
+            const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
+            
             await ctx.replyWithAudio(new InputFile(audioPath), {
               title: trackInfo.title,
               performer: trackInfo.artist,
-              caption: `🎵 @${botUsername} orqali yuklab olindi 🚀`
+              caption: `🎵 <b>${escapeHTML(trackInfo.artist)} — ${escapeHTML(trackInfo.title)}</b> (Original MP3)\n\n🚀 @${botUsername} orqali yuklab olindi!\n🍿 Yangi HD kinolar: @${movieBotUsername}`,
+              parse_mode: 'HTML'
             });
+            db.trackDownload('audio');
+            db.trackUserDownload(ctx.from.id, `${trackInfo.artist} - ${trackInfo.title}`, 'audio', target.url);
+
             await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id).catch(() => {});
             try { if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath); } catch (_) {}
           } catch (e) {
+            console.error('dl_shz_mp3 error:', e);
             await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `❌ Musiqani yuklashda xato: ${e.message}`);
           }
           return;
@@ -1821,216 +1977,66 @@ function formatDownloadError(err) {
           }
         }
 
-        // 2. Download Audio (Link)
-        if (action === 'dl_aud') {
-          const shortId = param1;
-          const url = urlCache.get(shortId);
-          if (!url) return ctx.reply('❌ Kechirasiz, havola muddati tugagan. Iltimos havolani qayta yuboring.');
-
-          const waitMsg = await ctx.reply('🔍 Musiqa tahlil qilinmoqda, iltimos kuting...');
-          const outputName = `dl_${shortId}`;
-
-          try {
-            let audioPath;
-            let videoPath = localVideoCache.get(shortId);
-            
-            // If cached video has expired, download it temporarily to run search and extraction
-            let tempVideoDownloaded = false;
-            let isAlreadyAudio = false;
-            if (!videoPath || !fs.existsSync(videoPath)) {
-              await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '📥 Musiqa tahlil qilinmoqda (ovoz yuklanmoqda)...');
-              // Download only the audio track of the url (extremely fast, tiny size)
-              videoPath = await downloader.downloadAudio(url, `dl_tmp_${shortId}`);
-              tempVideoDownloaded = true;
-              isAlreadyAudio = true;
-            }
-
-            // Perform song identification
-            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '⚡️ Musiqa aniqlanmoqda...');
-            const song = await identifyMusicFromPath(videoPath);
-
-            if (song) {
-              const fullTitle = song.title;
-              const fullArtist = song.artist;
-              await ctx.api.editMessageText(
-                ctx.chat.id, 
-                waitMsg.message_id, 
-                `🔍 Musiqa aniqlandi: <b>${escapeHTML(fullArtist)} - ${escapeHTML(fullTitle)}</b>\n\n🪐 Variantlar qidirilmoqda...`,
-                { parse_mode: 'HTML' }
-              );
-
-              try {
-                // Search for the identified track's variants on YouTube
-                const results = await downloader.searchMusic(`${fullArtist} ${fullTitle}`, 10);
-                if (results && results.length > 0) {
-                  const searchId = Math.random().toString(36).substring(2, 8);
-                  searchCache.set(searchId, results);
-
-                  let textMsg = `🔍 <b>${escapeHTML(fullArtist)} - ${escapeHTML(fullTitle)}</b>\n\nQuyidagi versiyalardan birini tanlang:\n\n`;
-                  results.forEach((r, idx) => {
-                    textMsg += `${idx + 1}. <b>${escapeHTML(r.title)}</b> ${formatDuration(r.duration)}\n`;
-                  });
-
-                  const keyboard = new InlineKeyboard();
-                  
-                  // First row (1-5)
-                  for (let i = 0; i < Math.min(5, results.length); i++) {
-                    keyboard.text(`${i + 1}`, `src_dl:${searchId}:${i}`);
-                  }
-                  keyboard.row();
-                  
-                  // Second row (6-10)
-                  if (results.length > 5) {
-                    for (let i = 5; i < results.length; i++) {
-                      keyboard.text(`${i + 1}`, `src_dl:${searchId}:${i}`);
-                    }
-                    keyboard.row();
-                  }
-                  
-                  // Third row (Close)
-                  keyboard.text('❌ Yopish', `src_close:${searchId}`);
-
-                  await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
-                  await ctx.reply(textMsg, {
-                    parse_mode: 'HTML',
-                    reply_markup: keyboard
-                  });
-
-                  // Cleanup temporary audio file
-                  if (tempVideoDownloaded && fs.existsSync(videoPath)) {
-                    fs.unlinkSync(videoPath);
-                  }
-                  return; // Exit here. User will make selection from the keyboard.
-                }
-              } catch (searchErr) {
-                console.warn('YouTube search failed, falling back to local audio extraction:', searchErr.message);
-              }
-            }
-
-            // Fallback to local audio extraction
-            if (isAlreadyAudio) {
-              audioPath = videoPath; // Already downloaded as MP3!
-            } else {
-              await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '⚡️ To\'liq musiqa topilmadi. Videodagi ovozning o\'zi ajratilmoqda...');
-              audioPath = await processor.extractAudio(videoPath, outputName);
-            }
-
-            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '📤 Musiqa yuklanmoqda...');
-            const botUsername = ctx.me.username;
-            const shareText = encodeURIComponent(`Eng tezkor video va musiqa yuklovchi bot! 🚀`);
-            const shareUrl = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${shareText}`;
-            const finalTitle = song ? song.title : 'Extracted Audio';
-            const finalPerformer = song ? `${song.artist} | VibeConvert` : `VibeConvert (@${botUsername})`;
-
-            await ctx.replyWithAudio(new InputFile(audioPath), {
-              title: finalTitle,
-              performer: finalPerformer,
-              caption: `❤️ @${botUsername} orqali yuklab olindi 🚀`,
-              reply_markup: new InlineKeyboard()
-                .url('↪️ Do\'stlarga ulashish', shareUrl)
-                .row()
-                .url('👉 Guruhga Qo\'shish ⤴️', `https://t.me/${botUsername}?startgroup=true`)
-            });
-            db.trackDownload('audio');
-            db.trackUserDownload(ctx.from.id, finalTitle, 'audio', url);
-
-            await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
-
-            // Cleanup
-            if (isAlreadyAudio) {
-              if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
-            } else {
-              if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
-              if (tempVideoDownloaded && fs.existsSync(videoPath)) {
-                fs.unlinkSync(videoPath);
-              }
-            }
-          } catch (err) {
-            console.error('Audio extraction error:', err.message);
-            const userErrStr = err.message.includes('ovoz') || err.message.includes('audio') || err.message.includes('musiqa')
-              ? err.message
-              : 'Ushbu videoda musiqa (ovoz) treki mavjud emas.';
-            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `⚠️ ${userErrStr}`);
-          }
-        }
-
-        // 2.5 Search Download (from list)
-        if (action === 'src_dl') {
-          const shortId = param1;
-          const idx = parseInt(param2);
-          const results = searchCache.get(shortId);
-          if (!results || !results[idx]) {
-            return ctx.reply('❌ Sessiya muddati o\'tgan yoki musiqa topilmadi. Iltimos qayta qidiring.');
-          }
-
-          const song = results[idx];
-          const waitMsg = await ctx.reply(`📥 "${song.title}" yuklab olinmoqda...`);
-          const outputName = `src_${shortId}_${idx}`;
-
-          try {
-            const audioPath = await downloader.downloadAudio(song.url, outputName);
-            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '📤 Telegramga yuklanmoqda...');
-            
-            const botUsername = ctx.me.username;
-            const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
-            const shareText = encodeURIComponent(`Eng tezkor video va musiqa yuklovchi bot! 🚀`);
-            const shareUrl = `https://t.me/share/url?url=https://t.me/${botUsername}&text=${shareText}`;
-
-            await ctx.replyWithAudio(new InputFile(audioPath), {
-              title: song.title,
-              performer: `VibeConvert (@${botUsername})`,
-              caption: `❤️ @${botUsername} orqali yuklab olindi 🚀\n\n🍿 Yangi kinolar bepul: @${movieBotUsername}`,
-              reply_markup: new InlineKeyboard()
-                .url('↪️ Do\'stlarga ulashish', shareUrl)
-                .row()
-                .url('👉 Guruhga Qo\'shish ⤴️', `https://t.me/${botUsername}?startgroup=true`)
-            });
-            db.trackDownload('audio');
-            db.trackUserDownload(ctx.from.id, song.title, 'audio', song.url);
-
-            await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
-            fs.unlinkSync(audioPath); // Cleanup
-          } catch (err) {
-            console.error(err);
-            await ctx.api.editMessageText(
-              ctx.chat.id,
-              waitMsg.message_id,
-              formatDownloadError(err),
-              { parse_mode: 'HTML' }
-            );
-          }
-        }
-
-        // 2.6 Close search query
-        if (action === 'src_close') {
-          const shortId = param1;
-          searchCache.delete(shortId);
-          try {
-            await ctx.deleteMessage();
-          } catch (e) {}
-        }
-
         // 3. Extract Audio from Uploaded Video
         if (action === 'vid_extract') {
           const shortFileId = param1;
           const fileId = fileCache.get(shortFileId);
           if (!fileId) return ctx.reply('❌ Kechirasiz, yuklash muddati o\'tgan. Iltimos videoni qayta yuboring.');
 
-          const waitMsg = await ctx.reply('🎵 Video yuklab olinib, ovozi ajratilmoqda...');
+          const waitMsg = await ctx.reply('🎵 Video yuklab olinib, ovozi ajratilmoqda va tahlil qilinmoqda...');
           const tempInput = path.join(downloader.tempDir, `in_${shortFileId}.mp4`);
 
           try {
             await downloadTelegramFile(ctx, fileId, tempInput);
-            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '⚡️ MP3 formatiga o\'tkazilmoqda...');
+            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '⚡️ MP3 formatiga o\'tkazilmoqda va qo\'shiq aniqlanmoqda...');
             const outPath = await processor.extractAudio(tempInput, `ext_${shortFileId}`);
             
-            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '📤 Musiqa yuborilmoqda...');
-            await ctx.replyWithAudio(new InputFile(outPath));
+            // Run song identification
+            const song = await identifyMusicFromPath(outPath);
+
+            const botUsername = ctx.me ? ctx.me.username : 'savemedia_music_bot';
+            const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
+
+            let audioTitle = `Audio_${shortFileId}`;
+            let audioPerformer = `@${botUsername}`;
+            let captionText = `🎵 @${botUsername} orqali ajratib olindi 🚀\n\n🍿 Yangi HD kinolar va premyeralar: @${movieBotUsername}`;
+
+            const qId = Math.random().toString(36).substring(2, 8);
+            const keyboard = new InlineKeyboard();
+
+            if (song && song.title) {
+              audioTitle = song.title;
+              audioPerformer = song.artist || `@${botUsername}`;
+              captionText = `🔍 <b>Musiqa aniqlandi!</b>\n\n📌 Nomi: <b>${escapeHTML(song.title)}</b>\n👤 Ijrochi: <i>${escapeHTML(song.artist)}</i>\n\n🚀 @${botUsername} orqali ajratib olindi\n🍿 Yangi kinolar: @${movieBotUsername}`;
+
+              urlCache.set(`lyr_${qId}`, { title: song.title, artist: song.artist });
+              keyboard
+                .text('🎵 To\'liq Original MP3 ni yuklash', `dl_shz_mp3:${qId}`)
+                .row()
+                .text('📜 Qo\'shiq Matni (Lyrics)', `lyrics_q:${qId}`)
+                .row()
+                .text('🪐 Boshqa variantlar (1..10)', `src_shz_list:${qId}`);
+            } else {
+              fileCache.set(qId, fileId);
+              keyboard
+                .text('🔍 Originalini qidirish (Shazam)', `aud_identify:${qId}`);
+            }
+
+            await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id).catch(() => {});
+            await ctx.replyWithAudio(new InputFile(outPath), {
+              caption: captionText,
+              parse_mode: 'HTML',
+              title: audioTitle,
+              performer: audioPerformer,
+              reply_markup: keyboard
+            });
             db.trackDownload('audio');
-            
-            await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
-            fs.unlinkSync(tempInput);
-            fs.unlinkSync(outPath);
+            db.trackUserDownload(ctx.from.id, audioTitle, 'audio', 'video_upload');
+
+            try {
+              if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
+              if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
+            } catch (e) {}
           } catch (err) {
             console.error(err);
             await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Xatolik yuz berdi: ${err.message}`);
@@ -2343,35 +2349,64 @@ function formatDownloadError(err) {
           try {
             await downloadTelegramFile(ctx, fileId, tempInput);
             
-            // Step A: Check local metadata tags first
+            // Step A: Check local metadata tags first (if valid and not generic)
             const localMeta = await getFileMetadata(tempInput);
-            if (localMeta) {
+            if (
+              localMeta && 
+              localMeta.title && 
+              localMeta.title !== 'Unknown Title' && 
+              localMeta.artist && 
+              localMeta.artist !== 'Unknown Artist' &&
+              !/instagram|tiktok|snapchat|youtube|audio|sound|video|unknown/i.test(localMeta.title)
+            ) {
+              const qId = Math.random().toString(36).substring(2, 8);
+              urlCache.set(`lyr_${qId}`, { title: localMeta.title, artist: localMeta.artist });
+              const kb = new InlineKeyboard()
+                .text('🎵 To\'liq MP3 Yuklash', `dl_shz_mp3:${qId}`)
+                .row()
+                .text('📜 Qo\'shiq Matni (Lyrics)', `lyrics_q:${qId}`)
+                .row()
+                .text('🪐 Boshqa variantlar (1..10)', `src_shz_list:${qId}`);
+
               await ctx.api.editMessageText(
                 ctx.chat.id, 
                 waitMsg.message_id, 
-                `🎵 <b>Mahalliy teglar aniqlandi!</b>\n\n📌 Nom: <i>${escapeHTML(localMeta.title)}</i>\n👤 Ijrochi: <i>${escapeHTML(localMeta.artist)}</i>\n💿 Albom: <i>${escapeHTML(localMeta.album)}</i>`, 
-                { parse_mode: 'HTML' }
+                `🎵 <b>Mahalliy teglar aniqlandi!</b>\n\n📌 Nom: <b>${escapeHTML(localMeta.title)}</b>\n👤 Ijrochi: <i>${escapeHTML(localMeta.artist)}</i>\n💿 Albom: <i>${escapeHTML(localMeta.album || '-')}</i>`, 
+                { parse_mode: 'HTML', reply_markup: kb }
               );
               fs.unlinkSync(tempInput);
               return;
             }
 
             // Step B: Shazam Recognition
-            const apiKey = process.env.SHAZAM_RAPIDAPI_KEY;
+            const apiKey = process.env.SHAZAM_RAPIDAPI_KEY || process.env.SHAZAM_KEY;
             if (!apiKey) {
               await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '❌ Musiqa fayli ichida hech qanday metadata topilmadi va Shazam API kaliti sozlangan emas.');
               fs.unlinkSync(tempInput);
               return;
             }
 
-            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '⚡️ Shazam API uchun snippet kesilmoqda (Mono PCM 44.1kHz)...');
-            const rawPcmPath = await processor.generateRawPcmForShazam(tempInput, `pcm_${fileId}`);
-            
-            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '🛰 Shazam bazasidan qidirilmoqda...');
-            const match = await queryShazamAPI(rawPcmPath, apiKey);
+            await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '⚡️ Shazam bazasidan tahlil qilinmoqda...');
+            let rawPcmPath = await processor.generateRawPcmForShazam(tempInput, `pcm_${shortFileId}`, 3, 5);
+            let match = await queryShazamAPI(rawPcmPath, apiKey);
+            try { if (fs.existsSync(rawPcmPath)) fs.unlinkSync(rawPcmPath); } catch (_) {}
 
-            if (match) {
-              await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
+            // Retry with offset 10s if 3s didn't match
+            if (!match) {
+              rawPcmPath = await processor.generateRawPcmForShazam(tempInput, `pcm_${shortFileId}_2`, 10, 5);
+              match = await queryShazamAPI(rawPcmPath, apiKey);
+              try { if (fs.existsSync(rawPcmPath)) fs.unlinkSync(rawPcmPath); } catch (_) {}
+            }
+
+            // Retry with offset 20s if 10s didn't match
+            if (!match) {
+              rawPcmPath = await processor.generateRawPcmForShazam(tempInput, `pcm_${shortFileId}_3`, 20, 5);
+              match = await queryShazamAPI(rawPcmPath, apiKey);
+              try { if (fs.existsSync(rawPcmPath)) fs.unlinkSync(rawPcmPath); } catch (_) {}
+            }
+
+            if (match && match.title) {
+              await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id).catch(() => {});
               const captionText = `🔍 <b>Musiqa aniqlandi!</b>\n\n📌 Nomi: <b>${escapeHTML(match.title)}</b>\n👤 Ijrochi: <i>${escapeHTML(match.artist)}</i>\n\n🔗 <a href="${match.shareUrl}">Shazam havolasi</a>`;
 
               const qId = Math.random().toString(36).substring(2, 8);
@@ -2380,7 +2415,9 @@ function formatDownloadError(err) {
               const kb = new InlineKeyboard()
                 .text('🎵 To\'liq MP3 Yuklash', `dl_shz_mp3:${qId}`)
                 .row()
-                .text('📜 Qo\'shiq Matni (Lyrics)', `lyrics_q:${qId}`);
+                .text('📜 Qo\'shiq Matni (Lyrics)', `lyrics_q:${qId}`)
+                .row()
+                .text('🪐 Boshqa variantlar (1..10)', `src_shz_list:${qId}`);
 
               if (match.image) {
                 await ctx.replyWithPhoto(match.image, {
@@ -2392,13 +2429,12 @@ function formatDownloadError(err) {
                 await ctx.reply(captionText, { parse_mode: 'HTML', reply_markup: kb });
               }
             } else {
-              await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '❌ Kechirasiz, bu musiqani aniqlab bo\'lmadi.');
+              await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '❌ Kechirasiz, bu musiqani Shazam orqali aniqlab bo\'lmadi.');
             }
 
             fs.unlinkSync(tempInput);
-            if (fs.existsSync(rawPcmPath)) fs.unlinkSync(rawPcmPath);
           } catch (err) {
-            console.error(err);
+            console.error('aud_identify error:', err);
             await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, `❌ Musiqani aniqlashda xatolik: ${err.message}`);
             if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
           }
@@ -2516,13 +2552,25 @@ async function stopBot() {
   }
 }
 
+let lastPulseTimestamp = Date.now();
+
 /**
- * Returns the current bot status
+ * Returns the current bot status & liveness
  */
 function getBotStatus() {
   return {
     running: isBotRunning,
-    hasToken: !!(process.env.TELEGRAM_BOT_TOKEN)
+    hasToken: !!(process.env.TELEGRAM_BOT_TOKEN),
+    lastPulse: lastPulseTimestamp,
+    botUsername: botInstance?.botInfo?.username || 'savemedia_music_bot'
+  };
+}
+
+function getBotLiveness() {
+  return {
+    running: isBotRunning,
+    lastPulse: lastPulseTimestamp,
+    alive: isBotRunning
   };
 }
 
@@ -2534,5 +2582,7 @@ module.exports = {
   startBot,
   stopBot,
   getBotStatus,
+  getBotLiveness,
   getBotInstance
 };
+

@@ -725,9 +725,29 @@ async function stopBot() {
   return true;
 }
 
+let lastPulseTimestamp = Date.now();
+
+function getBotStatus() {
+  return {
+    running: isBotRunning,
+    lastPulse: lastPulseTimestamp,
+    botUsername: botInstance?.botInfo?.username || 'Instavdeo_bot'
+  };
+}
+
+function getBotLiveness() {
+  return {
+    running: isBotRunning,
+    lastPulse: lastPulseTimestamp,
+    alive: isBotRunning
+  };
+}
+
 module.exports = {
   startBot,
   stopBot,
-  getBotStatus: () => ({ running: isBotRunning, botUsername: botInstance?.botInfo?.username || 'Instavdeo_bot' }),
-  getBotInstance: () => botInstance
+  getBotStatus,
+  getBotLiveness,
+  getBotInstance
 };
+

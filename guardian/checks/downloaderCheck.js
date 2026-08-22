@@ -1,5 +1,10 @@
 'use strict';
 const path = require('path');
+module.paths.push(
+  path.join(__dirname, '..', '..', 'server', 'node_modules'),
+  path.join(__dirname, '..', '..', 'movie-server', 'node_modules'),
+  path.join(__dirname, '..', '..', 'node_modules')
+);
 const fs = require('fs');
 const axios = require('axios');
 const { runCmd } = require('../actions/restarter');
@@ -73,6 +78,53 @@ async function updateYtDlp() {
 }
 
 /**
+ * yt-dlp keshini tozalaydi (--rm-cache-dir)
+ */
+async function clearYtDlpCache() {
+  try {
+    const binToRun = fs.existsSync(ytDlpBin) ? ytDlpBin : 'yt-dlp';
+    await runCmd(`${binToRun} --rm-cache-dir`, 15000);
+    console.log('[Downloader Engine] yt-dlp keshi tozalandi.');
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Haqiqiy ekstraksiya testi (Synthetic Extraction Check)
+ * yt-dlp ning ekstraktorlari bloklangan yoki eskirganligini aniqlaydi
+ */
+async function syntheticDownloadCheck() {
+  console.log('[Downloader Check] Sintetik yuklash va ekstraktor testi boshlandi...');
+  const binToRun = fs.existsSync(ytDlpBin) ? ytDlpBin : 'yt-dlp';
+  const testUrl = 'https://www.youtube.com/watch?v=jNQXAC9IVRw'; // 1-video on YouTube (19s test)
+
+  try {
+    // Faqat metadata va formatlarni tekshirish (video yuklamasdan)
+    const out = await runCmd(`${binToRun} --dump-json --no-playlist --socket-timeout 8 "${testUrl}"`, 20000);
+    if (out && (out.includes('"title"') || out.includes('"id"'))) {
+      console.log('[Downloader Check] ✓ yt-dlp ekstraktori 100% sog\'lom ishlamoqda.');
+      return { ok: true };
+    }
+    return { ok: false, error: 'Metadata qaytmadi' };
+  } catch (err) {
+    const errLower = (err.message || '').toLowerCase();
+    console.warn(`[Downloader Check] ⚠️ yt-dlp ekstraktorida muammo: ${err.message}`);
+
+    // Agar blok, 403 yoki eski extractor bo'lsa, avtomatik davolash
+    if (errLower.includes('bot') || errLower.includes('403') || errLower.includes('extractor') || errLower.includes('sign in')) {
+      console.log('[Downloader Healer] yt-dlp keshini tozalash va yangilash choralari ko\'rilmoqda...');
+      await clearYtDlpCache();
+      const updateRes = await updateYtDlp();
+      return { ok: false, error: err.message, healed: updateRes.success };
+    }
+
+    return { ok: false, error: err.message, healed: false };
+  }
+}
+
+/**
  * Zaxira Cobalt API larni tekshiradi
  */
 async function checkCobaltEndpoints() {
@@ -92,4 +144,12 @@ async function checkCobaltEndpoints() {
   return { total: endpoints.length, active: healthyCount };
 }
 
-module.exports = { checkDownloaderBinaries, updateYtDlp, checkCobaltEndpoints };
+module.exports = {
+  checkDownloaderBinaries,
+  updateYtDlp,
+  clearYtDlpCache,
+  syntheticDownloadCheck,
+  checkCobaltEndpoints
+};
+
+

@@ -192,11 +192,19 @@ export default function GuardianPage() {
             </button>
             <button
               className="guardian-action-btn"
-              onClick={() => handleAction('update_ytdlp')}
+              onClick={() => handleAction('backup')}
               disabled={!!actionLoading}
             >
-              <Download size={15} color="#8b5cf6" className={actionLoading === 'update_ytdlp_' ? 'spin' : ''} />
-              <span>yt-dlp Yangilash</span>
+              <Download size={15} color="#10b981" className={actionLoading === 'backup_' ? 'spin' : ''} />
+              <span>💾 3-Bot ZIP Zaxira</span>
+            </button>
+            <button
+              className="guardian-action-btn"
+              onClick={() => handleAction('test_ytdlp')}
+              disabled={!!actionLoading}
+            >
+              <Activity size={15} color="#38bdf8" className={actionLoading === 'test_ytdlp_' ? 'spin' : ''} />
+              <span>⚡ yt-dlp Ekstraktor Testi</span>
             </button>
             <button
               className="guardian-action-btn"

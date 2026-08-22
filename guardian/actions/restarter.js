@@ -7,35 +7,55 @@ const RESTART_COOLDOWNS = new Map(); // processName => lastRestartTimestamp
 const RESTART_COOLDOWN_MS = 2 * 60 * 1000; // bir jarayonni 2 daqiqada bir marta restart
 
 /**
- * Shell buyrug'ini ishga tushirish va natijasini qaytarish
+ * Shell buyrug'ini ishga tushirish va natijasini qaytarish (Cross-platform)
  */
 function runCmd(cmd, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
-    const child = exec(
-      `export PATH=$PATH:/usr/local/bin:/usr/bin:/usr/sbin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin && ${cmd}`,
+    const isWin = process.platform === 'win32';
+    const finalCmd = isWin
+      ? cmd
+      : `export PATH=$PATH:/usr/local/bin:/usr/bin:/usr/sbin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -1)/bin && ${cmd}`;
+
+    exec(
+      finalCmd,
       { timeout: timeoutMs },
       (err, stdout, stderr) => {
         if (err) return reject(new Error(stderr || err.message));
-        resolve(stdout.trim());
+        resolve((stdout || '').trim());
       }
     );
   });
 }
 
 /**
- * Qotib qolgan yoki zombi jarayon portni band qilib turgan bo'lsa, uni tozalaydi
+ * Qotib qolgan yoki zombi jarayon portni band qilib turgan bo'lsa, uni tozalaydi (Cross-platform)
  * @param {number} port
  */
 async function freePortIfOccupied(port) {
   try {
-    // Linux fuser / lsof yordamida portni bo'shatish
-    await runCmd(`fuser -k ${port}/tcp 2>/dev/null || true`);
+    if (process.platform === 'win32') {
+      try {
+        const out = await runCmd(`netstat -ano | findstr :${port}`, 5000);
+        const lines = out.split('\n');
+        for (const line of lines) {
+          const parts = line.trim().split(/\s+/);
+          const pid = parts[parts.length - 1];
+          if (pid && !isNaN(pid) && Number(pid) > 0 && Number(pid) !== process.pid) {
+            await runCmd(`taskkill /F /PID ${pid}`, 5000);
+          }
+        }
+      } catch (_) {}
+    } else {
+      // Linux fuser / lsof yordamida portni bo'shatish
+      await runCmd(`fuser -k ${port}/tcp 2>/dev/null || true`);
+    }
     console.log(`[Zombie Slayer] Port :${port} tozalandi.`);
     return true;
   } catch (e) {
     return false;
   }
 }
+
 
 /**
  * PM2 jarayonini restart qiladi (port tozalash va cooldown tekshiruvi bilan)

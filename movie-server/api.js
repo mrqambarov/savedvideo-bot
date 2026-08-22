@@ -698,15 +698,212 @@ router.get('/creators', (req, res) => {
   res.json({ success: true, creators: db.getCreators() });
 });
 
-router.get('/search-analytics', (req, res) => {
+// ─── Kino Bot Broadcast Engine ──────────────────────────────────────────────
+let movieCurrentBroadcast = {
+  total: 0,
+  sent: 0,
+  failed: 0,
+  status: 'idle',
+  logs: []
+};
+let isMovieStopRequested = false;
+
+const movieScheduledFile = path.join(__dirname, 'data', 'scheduled_broadcasts.json');
+function getMovieScheduledBroadcasts() {
   try {
-    const data = db.getSearchAnalytics ? db.getSearchAnalytics() : { totalUnique: 0, top: [], noResults: [] };
-    res.json(data);
+    if (fs.existsSync(movieScheduledFile)) {
+      return JSON.parse(fs.readFileSync(movieScheduledFile, 'utf8'));
+    }
+  } catch (_) {}
+  return [];
+}
+
+function saveMovieScheduledBroadcasts(list) {
+  try {
+    fs.writeFileSync(movieScheduledFile, JSON.stringify(list, null, 2), 'utf8');
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+router.get('/broadcast', (req, res) => {
+  res.json(movieCurrentBroadcast);
+});
+
+router.post('/broadcast/stop', (req, res) => {
+  if (movieCurrentBroadcast.status === 'running') {
+    isMovieStopRequested = true;
+    movieCurrentBroadcast.logs.push(`⚠️ Admin tomonidan to'xtatish buyrug'i berildi (${new Date().toLocaleTimeString()})`);
+    return res.json({ success: true, message: 'Kino bot reklamasi to\'xtatilmoqda...' });
+  }
+  res.json({ success: true, message: 'Faol reklama yo\'q' });
+});
+
+router.post('/broadcast', async (req, res) => {
+  try {
+    const { message, mediaType, mediaUrl, buttons, targetSegment } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Xabar matni kiritilishi shart.' });
+    }
+
+    if (movieCurrentBroadcast.status === 'running') {
+      return res.status(400).json({ error: 'Hozirda boshqa reklama tarqatilmoqda.' });
+    }
+
+    let users = db.getUsers ? db.getUsers() : [];
+    if (!users || users.length === 0) {
+      return res.status(400).json({ error: 'Botda a\'zolar topilmadi.' });
+    }
+
+    if (targetSegment === 'active') {
+      const threeDaysAgo = Date.now() - (3 * 24 * 60 * 60 * 1000);
+      users = users.filter(u => u.lastActive && new Date(u.lastActive).getTime() >= threeDaysAgo);
+    } else if (targetSegment === 'inactive') {
+      const threeDaysAgo = Date.now() - (3 * 24 * 60 * 60 * 1000);
+      users = users.filter(u => !u.lastActive || new Date(u.lastActive).getTime() < threeDaysAgo);
+    }
+
+    if (users.length === 0) {
+      return res.status(400).json({ error: 'Tanlangan segment bo\'yicha foydalanuvchilar topilmadi.' });
+    }
+
+    isMovieStopRequested = false;
+    movieCurrentBroadcast = {
+      total: users.length,
+      sent: 0,
+      failed: 0,
+      status: 'running',
+      logs: [`Kino Bot reklama tarqatish boshlandi (${users.length} ta foydalanuvchi): ${new Date().toLocaleTimeString()}`]
+    };
+
+    res.json({ success: true, message: 'Broadcasting started.', progress: movieCurrentBroadcast });
+
+    const botInstance = bot.getBotInstance ? bot.getBotInstance() : null;
+    if (!botInstance) {
+      movieCurrentBroadcast.status = 'failed';
+      movieCurrentBroadcast.logs.push('Xatolik: Kino Telegram bot faol emas.');
+      return;
+    }
+
+    const { InlineKeyboard } = require('grammy');
+    let replyMarkup = null;
+    if (Array.isArray(buttons) && buttons.length > 0) {
+      const kb = new InlineKeyboard();
+      let added = 0;
+      buttons.forEach((b) => {
+        if (b.label && b.url) {
+          kb.url(b.label, b.url);
+          added++;
+          if (added % 2 === 0) kb.row();
+        }
+      });
+      if (added > 0) replyMarkup = kb;
+    }
+
+    // Fon rejimida yuborish
+    (async () => {
+      for (let i = 0; i < users.length; i++) {
+        if (isMovieStopRequested) {
+          movieCurrentBroadcast.status = 'stopped';
+          movieCurrentBroadcast.logs.push(`🛑 Reklama to'xtatildi. Yuborildi: ${movieCurrentBroadcast.sent}, Xato: ${movieCurrentBroadcast.failed}`);
+          return;
+        }
+
+        const user = users[i];
+        const chatId = user.id || user.chatId;
+        if (!chatId) continue;
+
+        try {
+          if (mediaType === 'photo' && mediaUrl) {
+            await botInstance.api.sendPhoto(chatId, mediaUrl, {
+              caption: message,
+              parse_mode: 'HTML',
+              reply_markup: replyMarkup || undefined
+            });
+          } else if (mediaType === 'video' && mediaUrl) {
+            await botInstance.api.sendVideo(chatId, mediaUrl, {
+              caption: message,
+              parse_mode: 'HTML',
+              reply_markup: replyMarkup || undefined
+            });
+          } else {
+            await botInstance.api.sendMessage(chatId, message, {
+              parse_mode: 'HTML',
+              reply_markup: replyMarkup || undefined,
+              disable_web_page_preview: false
+            });
+          }
+          movieCurrentBroadcast.sent++;
+        } catch (sendErr) {
+          movieCurrentBroadcast.failed++;
+          const errMsg = sendErr.message || '';
+          if (errMsg.includes('429') || errMsg.includes('Too Many Requests')) {
+            await new Promise(r => setTimeout(r, 5000));
+          }
+        }
+
+        // 35ms oraliq (~28 xabar/sekund)
+        await new Promise(r => setTimeout(r, 35));
+      }
+
+      movieCurrentBroadcast.status = 'completed';
+      movieCurrentBroadcast.logs.push(`✅ Kino bot reklama yakunlandi. Jami: ${movieCurrentBroadcast.total}, Yetkazildi: ${movieCurrentBroadcast.sent}, Xato: ${movieCurrentBroadcast.failed} (${new Date().toLocaleTimeString()})`);
+    })();
+
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
+// Rejalashtirilgan reklamalar (Scheduled Broadcasts)
+router.get('/broadcast/scheduled', (req, res) => {
+  res.json(getMovieScheduledBroadcasts());
+});
+
+router.post('/broadcast/scheduled', (req, res) => {
+  try {
+    const { message, mediaType, mediaUrl, buttons, scheduledTime, targetSegment } = req.body;
+    if (!message || !scheduledTime) {
+      return res.status(400).json({ error: 'Xabar matni va yuborilish vaqti kiritilishi shart.' });
+    }
+
+    const scheduledDate = new Date(scheduledTime);
+    if (isNaN(scheduledDate.getTime()) || scheduledDate.getTime() <= Date.now()) {
+      return res.status(400).json({ error: 'Belgilangan vaqt kelajakda bo\'lishi kerak.' });
+    }
+
+    const list = getMovieScheduledBroadcasts();
+    const newBroadcast = {
+      id: 'sch_movie_' + Date.now(),
+      message,
+      mediaType: mediaType || 'text',
+      mediaUrl: mediaUrl || '',
+      buttons: Array.isArray(buttons) ? buttons : [],
+      targetSegment: targetSegment || 'all',
+      scheduledTime: scheduledDate.toISOString(),
+      createdAt: new Date().toISOString(),
+      status: 'pending'
+    };
+    list.unshift(newBroadcast);
+    saveMovieScheduledBroadcasts(list);
+
+    res.json({ success: true, broadcast: newBroadcast, message: 'Reklama belgilangan vaqtga rejalashtirildi!' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.delete('/broadcast/scheduled/:id', (req, res) => {
+  try {
+    const list = getMovieScheduledBroadcasts();
+    const updated = list.filter(b => b.id !== req.params.id);
+    saveMovieScheduledBroadcasts(updated);
+    res.json({ success: true, message: 'Rejalashtirilgan reklama bekor qilindi.' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 module.exports = router;
 
