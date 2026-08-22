@@ -176,6 +176,25 @@ async function publishMoviePostToChannel(movie, shortsFileId = null, targetChann
   return true;
 }
 
+async function sendVideoWithRetry(chatId, fileId, options, maxRetries = 4) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await botInstance.api.sendVideo(chatId, fileId, options);
+    } catch (err) {
+      const errMsg = err.message || '';
+      const retryMatch = errMsg.match(/retry after (\d+)/i) || (err.parameters?.retry_after ? [null, err.parameters.retry_after] : null);
+      if (retryMatch && attempt < maxRetries) {
+        const waitSec = parseInt(retryMatch[1], 10) || 5;
+        console.warn(`[Telegram Rate Limit 429] Waiting ${waitSec + 2}s before retry... (Attempt ${attempt}/${maxRetries})`);
+        await new Promise(r => setTimeout(r, (waitSec + 2) * 1000));
+        continue;
+      }
+      if (attempt === maxRetries) throw err;
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+}
+
 async function syncMovieToStorageChannel(movie) {
   try {
     const storage = db.getStorageChannel();
@@ -193,7 +212,7 @@ async function syncMovieToStorageChannel(movie) {
       `📝 <i>${cleanDesc}</i>\n\n` +
       `💾 <i>XIT FILM Shaxsiy Media Ombori</i>`;
 
-    const sent = await botInstance.api.sendVideo(storage.channelId, movie.fileId, {
+    const sent = await sendVideoWithRetry(storage.channelId, movie.fileId, {
       caption,
       parse_mode: 'HTML',
       supports_streaming: true
@@ -228,7 +247,7 @@ async function syncShortsToStorageChannel(movie, shortsFileId) {
       `🔑 <b>Kino Kodi:</b> <code>${code}</code>\n\n` +
       `💾 <i>XIT FILM Shaxsiy Media Ombori (Shorts)</i>`;
 
-    const sent = await botInstance.api.sendVideo(storage.channelId, shortsFileId, {
+    const sent = await sendVideoWithRetry(storage.channelId, shortsFileId, {
       caption,
       parse_mode: 'HTML',
       supports_streaming: true
@@ -2628,6 +2647,7 @@ async function runStorageBackupAll(ctx, forceAll = false) {
       if (res) {
         successCount++;
         if (m.shortsFileId) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
           await syncShortsToStorageChannel(m, m.shortsFileId);
         }
       } else {
@@ -2646,14 +2666,14 @@ async function runStorageBackupAll(ctx, forceAll = false) {
           `⏳ <b>Baza kanaliga saqlanmoqda...</b>\n\n` +
           `📦 Jami: <b>${toBackup.length} ta</b>\n` +
           `✅ Saqlandi: <b>${successCount} ta</b>\n` +
-          `❌ Xatolik: <b>${failCount} ta</b>\n` +
+          `${failCount > 0 ? `⚠️ Kutilmoqda: <b>${failCount} ta</b>\n` : ''}` +
           `📊 Jarayon: <b>${i + 1}/${toBackup.length} (${Math.round(((i + 1) / toBackup.length) * 100)}%)</b>`,
           { parse_mode: 'HTML' }
         );
       } catch (_) {}
     }
 
-    await new Promise(resolve => setTimeout(resolve, 800));
+    await new Promise(resolve => setTimeout(resolve, 2000));
   }
 
   const doneKb = new InlineKeyboard().text('◀️ Ombor Boshqaruvi', 'adm_storage');
