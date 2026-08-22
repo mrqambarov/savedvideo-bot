@@ -1025,7 +1025,7 @@ function startBot(token) {
             const botUsername = ctx.me ? ctx.me.username : 'savemedia_music_bot';
             const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
 
-            let audioTitle = `Audio_${shortId}`;
+            let audioTitle = 'Musiqa (Audio)';
             let audioPerformer = `@${botUsername}`;
             let captionText = `🎵 @${botUsername} orqali ajratib olindi 🚀\n\n🍿 Yangi HD kinolar va premyeralar: @${movieBotUsername}`;
 
@@ -1033,11 +1033,11 @@ function startBot(token) {
             const keyboard = new InlineKeyboard();
 
             if (song && song.title) {
-              audioTitle = song.title;
-              audioPerformer = song.artist || `@${botUsername}`;
-              captionText = `🔍 <b>Musiqa aniqlandi!</b>\n\n📌 Nomi: <b>${escapeHTML(song.title)}</b>\n👤 Ijrochi: <i>${escapeHTML(song.artist)}</i>\n\n🚀 @${botUsername} orqali ajratib olindi\n🍿 Yangi kinolar: @${movieBotUsername}`;
+              audioTitle = (song.artist && !song.title.includes(song.artist)) ? `${song.artist} - ${song.title}` : song.title;
+              audioPerformer = `@${botUsername}`;
+              captionText = `🔍 <b>Musiqa aniqlandi!</b>\n\n📌 Nomi: <b>${escapeHTML(song.title)}</b>\n👤 Ijrochi: <i>${escapeHTML(song.artist || 'Noma\'lum')}</i>\n\n🚀 @${botUsername} orqali ajratib olindi\n🍿 Yangi kinolar: @${movieBotUsername}`;
 
-              urlCache.set(`lyr_${qId}`, { title: song.title, artist: song.artist });
+              urlCache.set(`lyr_${qId}`, { title: song.title, artist: song.artist || '' });
               keyboard
                 .text('🎵 To\'liq Original MP3 ni yuklash', `dl_shz_mp3:${qId}`)
                 .row()
@@ -1045,6 +1045,14 @@ function startBot(token) {
                 .row()
                 .text('🪐 Boshqa variantlar (1..10)', `src_shz_list:${qId}`);
             } else {
+              if (url) {
+                try {
+                  const info = await downloader.getInfo(url).catch(() => null);
+                  if (info && info.title && !/instagram|tiktok|snapchat|video|sound/i.test(info.title)) {
+                    audioTitle = info.title.replace(/[#@][\w_]+/g, '').replace(/[\r\n\t]+/g, ' ').trim();
+                  }
+                } catch (_) {}
+              }
               urlCache.set(`retry_aud_${qId}`, { url, shortId });
               keyboard
                 .text('🔍 Originalini qidirish (Shazam)', `aud_shz_retry:${qId}`);
@@ -1193,7 +1201,7 @@ function startBot(token) {
             return await ctx.answerCallbackQuery({ text: 'Muddati o\'tgan. Qayta urinib ko\'ring.', show_alert: true });
           }
           await ctx.answerCallbackQuery({ text: '🎵 Original MP3 qidirilmoqda va yuklanmoqda...' });
-          const statusMsg = await ctx.reply(`🎵 <b>«${escapeHTML(trackInfo.artist)} — ${escapeHTML(trackInfo.title)}»</b> original MP3 qidirilmoqda...`, { parse_mode: 'HTML' });
+          const statusMsg = await ctx.reply(`🎵 <b>«${escapeHTML(trackInfo.artist ? trackInfo.artist + ' — ' : '')}${escapeHTML(trackInfo.title)}»</b> original MP3 qidirilmoqda...`, { parse_mode: 'HTML' });
           try {
             let results = await downloader.searchMusic(`${trackInfo.artist} ${trackInfo.title}`, 3);
             if (!results || results.length === 0) {
@@ -1207,15 +1215,18 @@ function startBot(token) {
             const audioPath = await downloader.downloadAudio(target.url, `shz_${qId}`);
             const botUsername = ctx.me ? ctx.me.username : 'savemedia_music_bot';
             const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
+            const fullTrackTitle = (trackInfo.artist && !trackInfo.title.includes(trackInfo.artist)) 
+              ? `${trackInfo.artist} - ${trackInfo.title}` 
+              : trackInfo.title;
             
             await ctx.replyWithAudio(new InputFile(audioPath), {
-              title: trackInfo.title,
-              performer: trackInfo.artist,
-              caption: `🎵 <b>${escapeHTML(trackInfo.artist)} — ${escapeHTML(trackInfo.title)}</b> (Original MP3)\n\n🚀 @${botUsername} orqali yuklab olindi!\n🍿 Yangi HD kinolar: @${movieBotUsername}`,
+              title: fullTrackTitle,
+              performer: `@${botUsername}`,
+              caption: `🎵 <b>${escapeHTML(trackInfo.artist ? trackInfo.artist + ' — ' : '')}${escapeHTML(trackInfo.title)}</b> (Original MP3)\n\n🚀 @${botUsername} orqali yuklab olindi!\n🍿 Yangi HD kinolar: @${movieBotUsername}`,
               parse_mode: 'HTML'
             });
             db.trackDownload('audio');
-            db.trackUserDownload(ctx.from.id, `${trackInfo.artist} - ${trackInfo.title}`, 'audio', target.url);
+            db.trackUserDownload(ctx.from.id, `${trackInfo.artist ? trackInfo.artist + ' - ' : ''}${trackInfo.title}`, 'audio', target.url);
 
             await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id).catch(() => {});
             try { if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath); } catch (_) {}
@@ -1223,6 +1234,59 @@ function startBot(token) {
             console.error('dl_shz_mp3 error:', e);
             await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `❌ Musiqani yuklashda xato: ${e.message}`);
           }
+          return;
+        }
+
+        // Search Result Direct Download Handler
+        if (data.startsWith('src_dl:')) {
+          const parts = data.split(':');
+          const searchId = parts[1];
+          const index = parseInt(parts[2], 10);
+          const results = searchCache.get(searchId);
+          if (!results || !results[index]) {
+            return await ctx.answerCallbackQuery({ text: 'Qidiruv muddati o\'tgan. Qayta qidiring.', show_alert: true });
+          }
+
+          const item = results[index];
+          await ctx.answerCallbackQuery({ text: '🎵 Musiqa yuklanmoqda...' });
+          const statusMsg = await ctx.reply(`📥 <b>«${escapeHTML(item.title)}»</b> yuklanmoqda...`, { parse_mode: 'HTML' });
+
+          try {
+            const audioPath = await downloader.downloadAudio(item.url, `src_${searchId}_${index}`);
+            const botUsername = ctx.me ? ctx.me.username : 'savemedia_music_bot';
+            const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
+
+            const cleanTitle = item.title
+              .replace(/\b(Official\s*(Music\s*)?Video|Official\s*Audio|HD|4K|HQ|Clip|Klip|mp3|Premyera)\b/gi, '')
+              .replace(/[[\]()|]+/g, ' ')
+              .replace(/[\r\n\t]+/g, ' ')
+              .trim();
+
+            await ctx.replyWithAudio(new InputFile(audioPath), {
+              title: cleanTitle || item.title,
+              performer: `@${botUsername}`,
+              caption: `🎵 <b>${escapeHTML(cleanTitle || item.title)}</b>\n\n🚀 @${botUsername} orqali yuklab olindi!\n🍿 Yangi HD kinolar: @${movieBotUsername}`,
+              parse_mode: 'HTML'
+            });
+
+            db.trackDownload('audio');
+            db.trackUserDownload(ctx.from.id, item.title, 'audio', item.url);
+
+            await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id).catch(() => {});
+            try { if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath); } catch (_) {}
+          } catch (err) {
+            console.error('src_dl error:', err);
+            await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, `❌ Yuklashda xatolik: ${err.message}`);
+          }
+          return;
+        }
+
+        if (data.startsWith('src_close:')) {
+          const searchId = data.split(':')[1];
+          searchCache.delete(searchId);
+          try {
+            await ctx.deleteMessage();
+          } catch (_) {}
           return;
         }
 
@@ -1997,7 +2061,7 @@ function formatDownloadError(err) {
             const botUsername = ctx.me ? ctx.me.username : 'savemedia_music_bot';
             const movieBotUsername = process.env.MOVIE_BOT_USERNAME || 'xitfilm_bot';
 
-            let audioTitle = `Audio_${shortFileId}`;
+            let audioTitle = 'Musiqa (Audio)';
             let audioPerformer = `@${botUsername}`;
             let captionText = `🎵 @${botUsername} orqali ajratib olindi 🚀\n\n🍿 Yangi HD kinolar va premyeralar: @${movieBotUsername}`;
 
@@ -2005,11 +2069,11 @@ function formatDownloadError(err) {
             const keyboard = new InlineKeyboard();
 
             if (song && song.title) {
-              audioTitle = song.title;
-              audioPerformer = song.artist || `@${botUsername}`;
-              captionText = `🔍 <b>Musiqa aniqlandi!</b>\n\n📌 Nomi: <b>${escapeHTML(song.title)}</b>\n👤 Ijrochi: <i>${escapeHTML(song.artist)}</i>\n\n🚀 @${botUsername} orqali ajratib olindi\n🍿 Yangi kinolar: @${movieBotUsername}`;
+              audioTitle = (song.artist && !song.title.includes(song.artist)) ? `${song.artist} - ${song.title}` : song.title;
+              audioPerformer = `@${botUsername}`;
+              captionText = `🔍 <b>Musiqa aniqlandi!</b>\n\n📌 Nomi: <b>${escapeHTML(song.title)}</b>\n👤 Ijrochi: <i>${escapeHTML(song.artist || 'Noma\'lum')}</i>\n\n🚀 @${botUsername} orqali ajratib olindi\n🍿 Yangi kinolar: @${movieBotUsername}`;
 
-              urlCache.set(`lyr_${qId}`, { title: song.title, artist: song.artist });
+              urlCache.set(`lyr_${qId}`, { title: song.title, artist: song.artist || '' });
               keyboard
                 .text('🎵 To\'liq Original MP3 ni yuklash', `dl_shz_mp3:${qId}`)
                 .row()
@@ -2187,6 +2251,8 @@ function formatDownloadError(err) {
             const outPath = await processor.compressAudio(tempInput, `compressed_${shortFileId}`);
             await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
             await ctx.replyWithAudio(new InputFile(outPath), {
+              title: 'Musiqa (96kbps)',
+              performer: `@${ctx.me.username}`,
               caption: `📉 **Audio hajmi kichraytirildi! (96kbps)**\n❤️ @${ctx.me.username} orqali siqildi`,
               parse_mode: 'Markdown'
             });
@@ -2268,6 +2334,8 @@ function formatDownloadError(err) {
 
             await ctx.api.deleteMessage(ctx.chat.id, waitMsg.message_id);
             await ctx.replyWithAudio(new InputFile(outPath), {
+              title: `Musiqa (${factor}x)`,
+              performer: `@${ctx.me.username}`,
               caption: `⚡️ **Audio tezligi:** ${factor}x\n❤️ @${ctx.me.username} orqali tahrirlandi`,
               parse_mode: 'Markdown'
             });
@@ -2322,8 +2390,10 @@ function formatDownloadError(err) {
 
             await ctx.api.editMessageText(ctx.chat.id, waitMsg.message_id, '📤 Musiqa yuborilmoqda...');
             await ctx.replyWithAudio(new InputFile(outPath), {
-              title: `SavedVideo_${effect.toUpperCase()}`,
-              performer: 'VibeConvert Bot'
+              title: `Musiqa [${effect.toUpperCase()}]`,
+              performer: `@${ctx.me.username}`,
+              caption: `🎹 **${effect.toUpperCase()} effekti qo'shildi!**\n❤️ @${ctx.me.username} orqali tahrirlandi`,
+              parse_mode: 'Markdown'
             });
             db.trackDownload('audio');
 
